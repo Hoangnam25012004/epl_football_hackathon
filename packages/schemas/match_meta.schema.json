@@ -1,0 +1,279 @@
+{
+  "$defs": {
+    "PlayerInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "foot": {
+          "enum": [
+            "right",
+            "left"
+          ],
+          "title": "Foot",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nationality": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Nationality",
+          "type": "string"
+        },
+        "position": {
+          "enum": [
+            "GK",
+            "DF",
+            "MF",
+            "FW"
+          ],
+          "title": "Position",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "GK",
+            "CB",
+            "FB",
+            "DM",
+            "CM",
+            "AM",
+            "W",
+            "ST"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "shirt": {
+          "maximum": 99,
+          "minimum": 1,
+          "title": "Shirt",
+          "type": "integer"
+        },
+        "short_name": {
+          "minLength": 1,
+          "title": "Short Name",
+          "type": "string"
+        },
+        "team_id": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Team Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "team_id",
+        "shirt",
+        "name",
+        "short_name",
+        "position",
+        "role",
+        "foot",
+        "nationality"
+      ],
+      "title": "PlayerInfo",
+      "type": "object"
+    },
+    "TeamInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "formation": {
+          "enum": [
+            "4-3-3",
+            "4-2-3-1",
+            "4-4-2",
+            "3-5-2"
+          ],
+          "title": "Formation",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_color": {
+          "pattern": "^#[0-9A-F]{6}$",
+          "title": "Primary Color",
+          "type": "string"
+        },
+        "secondary_color": {
+          "pattern": "^#[0-9A-F]{6}$",
+          "title": "Secondary Color",
+          "type": "string"
+        },
+        "short_name": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Short Name",
+          "type": "string"
+        },
+        "venue": {
+          "minLength": 1,
+          "title": "Venue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name",
+        "primary_color",
+        "secondary_color",
+        "formation",
+        "venue"
+      ],
+      "title": "TeamInfo",
+      "type": "object"
+    },
+    "TeamSheet": {
+      "additionalProperties": false,
+      "properties": {
+        "bench": {
+          "items": {
+            "pattern": "^[a-z0-9_]+-\\d{2}$",
+            "type": "string"
+          },
+          "title": "Bench",
+          "type": "array"
+        },
+        "starting_xi": {
+          "items": {
+            "pattern": "^[a-z0-9_]+-\\d{2}$",
+            "type": "string"
+          },
+          "title": "Starting Xi",
+          "type": "array"
+        },
+        "team": {
+          "$ref": "#/$defs/TeamInfo"
+        }
+      },
+      "required": [
+        "team",
+        "starting_xi",
+        "bench"
+      ],
+      "title": "TeamSheet",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "minimum": 0,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "away": {
+      "$ref": "#/$defs/TeamSheet"
+    },
+    "competition": {
+      "default": "Synthetic League",
+      "title": "Competition",
+      "type": "string"
+    },
+    "disclaimer": {
+      "default": "Synthetic data. Fictional teams and players. Not affiliated with the Premier League.",
+      "title": "Disclaimer",
+      "type": "string"
+    },
+    "generator_version": {
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "home": {
+      "$ref": "#/$defs/TeamSheet"
+    },
+    "home_attacks_right_p1": {
+      "title": "Home Attacks Right P1",
+      "type": "boolean"
+    },
+    "kickoff_utc": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "title": "Kickoff Utc",
+      "type": "string"
+    },
+    "match_id": {
+      "pattern": "^[a-z0-9_]+-\\d+$",
+      "title": "Match Id",
+      "type": "string"
+    },
+    "players": {
+      "patternProperties": {
+        "^[a-z0-9_]+-\\d{2}$": {
+          "$ref": "#/$defs/PlayerInfo"
+        }
+      },
+      "title": "Players",
+      "type": "object"
+    },
+    "referee": {
+      "title": "Referee",
+      "type": "string"
+    },
+    "scenario": {
+      "title": "Scenario",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "synthetic": {
+      "const": true,
+      "default": true,
+      "title": "Synthetic",
+      "type": "boolean"
+    },
+    "venue": {
+      "title": "Venue",
+      "type": "string"
+    },
+    "weather": {
+      "enum": [
+        "clear",
+        "cloudy",
+        "rain",
+        "wind"
+      ],
+      "title": "Weather",
+      "type": "string"
+    }
+  },
+  "required": [
+    "generator_version",
+    "match_id",
+    "scenario",
+    "seed",
+    "attempt",
+    "venue",
+    "referee",
+    "kickoff_utc",
+    "weather",
+    "home",
+    "away",
+    "home_attacks_right_p1",
+    "players"
+  ],
+  "title": "MatchMeta",
+  "type": "object"
+}

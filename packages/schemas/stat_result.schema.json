@@ -1,0 +1,234 @@
+{
+  "$defs": {
+    "MinuteWindow": {
+      "additionalProperties": false,
+      "description": "Window on the football-minute axis, optionally restricted to one half.",
+      "properties": {
+        "end_min": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Min"
+        },
+        "kind": {
+          "const": "minute",
+          "default": "minute",
+          "title": "Kind",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "start_min": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Min"
+        }
+      },
+      "title": "MinuteWindow",
+      "type": "object"
+    },
+    "RollingWindow": {
+      "additionalProperties": false,
+      "description": "Window on the played-time axis (`match_ms`), for \"the last N minutes\".",
+      "properties": {
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "rolling",
+          "default": "rolling",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "RollingWindow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of_seq": {
+      "title": "As Of Seq",
+      "type": "integer"
+    },
+    "definition": {
+      "title": "Definition",
+      "type": "string"
+    },
+    "denominator": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Denominator"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "label": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Label"
+    },
+    "metric": {
+      "title": "Metric",
+      "type": "string"
+    },
+    "numerator": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Numerator"
+    },
+    "player": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Player"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "insufficient_data"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "team": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Team"
+    },
+    "unit": {
+      "enum": [
+        "count",
+        "percent",
+        "xg",
+        "meters",
+        "kmh",
+        "minutes",
+        "ratio",
+        "index",
+        "rating"
+      ],
+      "title": "Unit",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Value"
+    },
+    "window": {
+      "discriminator": {
+        "mapping": {
+          "minute": "#/$defs/MinuteWindow",
+          "rolling": "#/$defs/RollingWindow"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MinuteWindow"
+        },
+        {
+          "$ref": "#/$defs/RollingWindow"
+        }
+      ],
+      "title": "Window"
+    }
+  },
+  "required": [
+    "metric",
+    "team",
+    "player",
+    "window",
+    "value",
+    "unit",
+    "evidence_event_ids",
+    "status",
+    "as_of_seq",
+    "definition"
+  ],
+  "title": "StatResult",
+  "type": "object"
+}
