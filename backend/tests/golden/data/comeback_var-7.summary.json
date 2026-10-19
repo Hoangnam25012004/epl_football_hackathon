@@ -1,0 +1,112 @@
+{
+  "match_id": "comeback_var-7",
+  "attempt": 0,
+  "events": 2078,
+  "stats": {
+    "FULL": {
+      "teams": {
+        "ironvale_united": {
+          "score": 3.0,
+          "possession": 46.71,
+          "pass_share": 47.02,
+          "passes": 442.0,
+          "pass_accuracy": 84.16,
+          "shots": 20.0,
+          "shots_on_target": 10.0,
+          "xg": 5.16,
+          "final_third_entries": 21.0,
+          "corners": 10.0,
+          "fouls": 7.0,
+          "cards": 2.0,
+          "offsides": 3.0
+        },
+        "saltmarsh_rovers": {
+          "score": 2.0,
+          "possession": 53.29,
+          "pass_share": 52.98,
+          "passes": 498.0,
+          "pass_accuracy": 87.75,
+          "shots": 14.0,
+          "shots_on_target": 6.0,
+          "xg": 1.95,
+          "final_third_entries": 40.0,
+          "corners": 7.0,
+          "fouls": 11.0,
+          "cards": 1.0,
+          "offsides": 1.0
+        }
+      },
+      "ball_in_play_minutes": 54.35
+    },
+    "H1": {
+      "teams": {
+        "ironvale_united": {
+          "score": 0.0,
+          "possession": 45.54,
+          "pass_share": 45.62,
+          "passes": 219.0,
+          "pass_accuracy": 82.19,
+          "shots": 2.0,
+          "shots_on_target": 0.0,
+          "xg": 0.16,
+          "final_third_entries": 10.0,
+          "corners": 3.0,
+          "fouls": 2.0,
+          "cards": 1.0,
+          "offsides": 0.0
+        },
+        "saltmarsh_rovers": {
+          "score": 1.0,
+          "possession": 54.46,
+          "pass_share": 54.38,
+          "passes": 261.0,
+          "pass_accuracy": 87.74,
+          "shots": 10.0,
+          "shots_on_target": 5.0,
+          "xg": 1.03,
+          "final_third_entries": 26.0,
+          "corners": 5.0,
+          "fouls": 6.0,
+          "cards": 0.0,
+          "offsides": 1.0
+        }
+      },
+      "ball_in_play_minutes": 27.33
+    },
+    "H2": {
+      "teams": {
+        "ironvale_united": {
+          "score": 3.0,
+          "possession": 47.9,
+          "pass_share": 48.48,
+          "passes": 223.0,
+          "pass_accuracy": 86.1,
+          "shots": 18.0,
+          "shots_on_target": 10.0,
+          "xg": 5.0,
+          "final_third_entries": 11.0,
+          "corners": 7.0,
+          "fouls": 5.0,
+          "cards": 1.0,
+          "offsides": 3.0
+        },
+        "saltmarsh_rovers": {
+          "score": 1.0,
+          "possession": 52.1,
+          "pass_share": 51.52,
+          "passes": 237.0,
+          "pass_accuracy": 87.76,
+          "shots": 4.0,
+          "shots_on_target": 1.0,
+          "xg": 0.93,
+          "final_third_entries": 14.0,
+          "corners": 2.0,
+          "fouls": 5.0,
+          "cards": 1.0,
+          "offsides": 0.0
+        }
+      },
+      "ball_in_play_minutes": 27.02
+    }
+  }
+}

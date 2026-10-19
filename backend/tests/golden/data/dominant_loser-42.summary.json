@@ -1,0 +1,112 @@
+{
+  "match_id": "dominant_loser-42",
+  "attempt": 0,
+  "events": 2210,
+  "stats": {
+    "FULL": {
+      "teams": {
+        "harbor_lions": {
+          "score": 1.0,
+          "possession": 54.06,
+          "pass_share": 54.06,
+          "passes": 546.0,
+          "pass_accuracy": 86.81,
+          "shots": 23.0,
+          "shots_on_target": 4.0,
+          "xg": 3.94,
+          "final_third_entries": 26.0,
+          "corners": 13.0,
+          "fouls": 8.0,
+          "cards": 2.0,
+          "offsides": 5.0
+        },
+        "kestrel_athletic": {
+          "score": 2.0,
+          "possession": 45.94,
+          "pass_share": 45.94,
+          "passes": 464.0,
+          "pass_accuracy": 82.97,
+          "shots": 9.0,
+          "shots_on_target": 3.0,
+          "xg": 1.18,
+          "final_third_entries": 21.0,
+          "corners": 4.0,
+          "fouls": 8.0,
+          "cards": 1.0,
+          "offsides": 0.0
+        }
+      },
+      "ball_in_play_minutes": 57.9
+    },
+    "H1": {
+      "teams": {
+        "harbor_lions": {
+          "score": 0.0,
+          "possession": 47.63,
+          "pass_share": 46.82,
+          "passes": 250.0,
+          "pass_accuracy": 84.8,
+          "shots": 3.0,
+          "shots_on_target": 1.0,
+          "xg": 0.41,
+          "final_third_entries": 12.0,
+          "corners": 6.0,
+          "fouls": 4.0,
+          "cards": 0.0,
+          "offsides": 3.0
+        },
+        "kestrel_athletic": {
+          "score": 1.0,
+          "possession": 52.37,
+          "pass_share": 53.18,
+          "passes": 284.0,
+          "pass_accuracy": 86.27,
+          "shots": 7.0,
+          "shots_on_target": 2.0,
+          "xg": 0.68,
+          "final_third_entries": 19.0,
+          "corners": 2.0,
+          "fouls": 2.0,
+          "cards": 0.0,
+          "offsides": 0.0
+        }
+      },
+      "ball_in_play_minutes": 30.88
+    },
+    "H2": {
+      "teams": {
+        "harbor_lions": {
+          "score": 1.0,
+          "possession": 61.4,
+          "pass_share": 62.18,
+          "passes": 296.0,
+          "pass_accuracy": 88.51,
+          "shots": 20.0,
+          "shots_on_target": 3.0,
+          "xg": 3.53,
+          "final_third_entries": 14.0,
+          "corners": 7.0,
+          "fouls": 4.0,
+          "cards": 2.0,
+          "offsides": 2.0
+        },
+        "kestrel_athletic": {
+          "score": 1.0,
+          "possession": 38.6,
+          "pass_share": 37.82,
+          "passes": 180.0,
+          "pass_accuracy": 77.78,
+          "shots": 2.0,
+          "shots_on_target": 1.0,
+          "xg": 0.49,
+          "final_third_entries": 2.0,
+          "corners": 2.0,
+          "fouls": 6.0,
+          "cards": 1.0,
+          "offsides": 0.0
+        }
+      },
+      "ball_in_play_minutes": 27.03
+    }
+  }
+}
