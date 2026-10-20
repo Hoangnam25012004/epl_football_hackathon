@@ -61,6 +61,8 @@
 
 ## Ngày 2 — 22/10: Orchestrator + Claim Verifier + Guardrail trên Foundry
 
+> Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day2-design.md](docs/day2-design.md). Làm **mock trước**, sau đó dùng GitHub Models làm LLM thật tạm thời, và chuyển sang Foundry khi có Azure.
+
 - [ ] **P0** Khung Orchestrator (Microsoft Agent Framework / Semantic Kernel) kết nối model trên Foundry
 - [ ] **P0** Đăng ký Stats Tools thành tool / function cho agent
 - [ ] **P0** Mock LLM + biến `USE_MOCK_LLM` để dev và test không tốn quota
@@ -73,7 +75,9 @@
 - [ ] **P0** Fallback: khi Foundry lỗi hoặc timeout, trả template deterministic
 - [ ] **P1** Bắt đầu bộ eval: 20 claim mẫu có đáp án cho kịch bản 1
 
-**Hoàn thành khi:** gửi claim *"Đội A áp đảo hiệp 2"* nhận được verdict đúng, có số liệu và event IDs, dùng Foundry thật.
+**Hoàn thành khi** (2 tầng, xem day2-design §0):
+- **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
+- **B (LLM thật):** cùng kết quả đó qua GitHub Models (khi có token), rồi qua Foundry (khi có Azure); bộ eval 20 claim không có verdict sai nào.
 
 ---
 

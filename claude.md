@@ -250,3 +250,7 @@
   - _Model Foundry:_ chưa chốt
   - _Region:_ chưa chốt
   - _Category chính:_ Best Multi-Agent System (đã chốt 20/10)
+  - _Ngôn ngữ claim:_ tiếng Việt + tiếng Anh; câu giải thích theo ngôn ngữ của claim (đã chốt 20/10)
+  - _LLM tạm khi chưa có Azure:_ GitHub Models (tương thích OpenAI, chung adapter với Foundry); mock là mặc định cho dev/CI (đã chốt 20/10)
+  - _Orchestrator:_ Microsoft Agent Framework Workflows, ghim phiên bản sau spike; dự phòng là runner `asyncio` (đã chốt 20/10). Chi tiết: [docs/day2-design.md](docs/day2-design.md)
+  - _Azure:_ Free Account bằng email trường bị từ chối ("not eligible", 20/10); đang thử tài khoản Microsoft cá nhân / Azure for Students
