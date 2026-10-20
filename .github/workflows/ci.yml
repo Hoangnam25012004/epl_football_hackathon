@@ -24,6 +24,6 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - name: tests with coverage
-        run: uv run pytest -m "not slow and not perf" --cov=pundit --cov-fail-under=85
+        run: uv run pytest -m "not slow and not perf and not live" --cov=pundit --cov-fail-under=85
       - name: time budgets (no coverage)
         run: uv run pytest -m perf

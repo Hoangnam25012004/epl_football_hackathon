@@ -1,16 +1,22 @@
-"""Command line: `pundit generate | replay | stats | validate | schema | scenarios`.
+"""Command line: `pundit generate | replay | stats | validate | schema | scenarios` (Day 1) and
+`pundit claim | moments | eval | serve` (Day 2).
 
-Exit codes: 0 success, 1 invalid data or unsatisfiable scenario, 2 bad arguments.
+Exit codes: 0 success, 1 invalid data, unsatisfiable scenario or failed evaluation, 2 bad
+arguments or configuration.
 """
 
 import argparse
 import asyncio
 import io
 import json
+import logging
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from pundit.agents.contracts import ClaimRequest, ClaimResult, Moment, WsMessage
+from pundit.agents.moments import detect_all
 from pundit.domain.errors import InvalidEventError, PunditError
 from pundit.domain.events import EVENT_ADAPTER, PassEvent
 from pundit.domain.matchtime import RollingWindow, minute_exact, parse_window
@@ -21,11 +27,21 @@ from pundit.engine.match import GeneratedMatch
 from pundit.engine.replay import RealClock, describe_event, replay, status_line
 from pundit.engine.scenarios import SCENARIOS
 from pundit.engine.validate import validate_match
+from pundit.llm.settings import ConfigError, Settings, load_settings, read_env_file
+from pundit.orchestration.evaluation import load_eval, run_eval, seq_at
+from pundit.orchestration.service import ClaimService, StaticSource
 from pundit.state.match_state import MatchState
 from pundit.stats import REGISTRY, MetricParams, StatResult, compute, display
 from pundit.stats.possession import possession_totals
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_DIR = REPO_ROOT / "backend"
+ENV_FILE = BACKEND_DIR / ".env"  # optional, never committed
+EVALS_DIR = BACKEND_DIR / "evals"
+EVAL_FILES = (
+    EVALS_DIR / "claims_dominant_loser_42.json",
+    EVALS_DIR / "heldout_dominant_loser_42.json",
+)
 RECENT_MINUTES = 10.0  # window of the "LAST 10'" possession in replay status lines
 DATA_DIR = REPO_ROOT / "data" / "matches"
 GOLDEN_DIR = REPO_ROOT / "backend" / "tests" / "golden" / "data"
@@ -161,6 +177,10 @@ def _schemas() -> dict[str, str]:
         "event.schema.json": dump(EVENT_ADAPTER.json_schema(mode="serialization")),
         "match_meta.schema.json": dump(MatchMeta.model_json_schema(mode="serialization")),
         "stat_result.schema.json": dump(StatResult.model_json_schema(mode="serialization")),
+        "claim_request.schema.json": dump(ClaimRequest.model_json_schema(mode="validation")),
+        "claim_result.schema.json": dump(ClaimResult.model_json_schema(mode="serialization")),
+        "moment.schema.json": dump(Moment.model_json_schema(mode="serialization")),
+        "ws_message.schema.json": dump(WsMessage.model_json_schema(mode="serialization")),
     }
 
 
@@ -177,6 +197,117 @@ def _cmd_scenarios(args: argparse.Namespace) -> int:
     for key, scenario in SCENARIOS.items():
         print(f"{key:<16} {scenario.home} vs {scenario.away}: {scenario.title_en}")
     print(f"\n{len(REGISTRY)} metrics: {', '.join(sorted(REGISTRY))}")
+    return 0
+
+
+def _print_claim(result: ClaimResult, *, trace: bool) -> None:
+    vi = result.language == "vi"
+    print(f"{result.match_id} @ {result.as_of_display} (seq {result.as_of_seq}) | synthetic data")
+    print(f"CLAIM     {result.text}")
+    print(f"VERDICT   {result.verdict}   (reason {result.reason_code})")
+    print(f"WHY       {result.explanation or '(no explanation published)'}")
+    for item in result.assertions:
+        a = item.assertion
+        value = "" if a.value is None else f"{a.value:g}"
+        detail = " ".join(f"{a.kind} {a.metric or ''} {a.op or ''} {value}".split())
+        negated = " (negated)" if a.negated else ""
+        print(
+            f"CHECK     {item.outcome:<12} {detail} [{a.window.label()}]{negated}"
+            f" -> {item.rationale_code}"
+        )
+        for fact in item.facts:
+            if not fact.derived:
+                label = fact.label_vi if vi else fact.label_en
+                events = len(fact.evidence_event_ids)
+                print(f"            {label} = {fact.display}   [{events} events]")
+    ids = result.evidence_event_ids
+    sample = ", ".join(ids[:3]) + (" ..." if len(ids) > 3 else "")
+    print(f"EVIDENCE  {len(ids)} event ids: {sample}")
+    guard = "passed" if result.guardrail.passed else "FAILED"
+    print(
+        f"SOURCE    analyst {result.analyst_source} ({result.model}) | "
+        f"explanation {result.explanation_source} | guardrail {guard}"
+    )
+    print(f"DEGRADED  {', '.join(result.degraded) or '-'}")
+    steps = ", ".join(f"{k} {v:.0f}" for k, v in result.timings_ms.items() if k != "total")
+    print(f"TIME      total {result.timings_ms.get('total', 0.0):.0f} ms ({steps})")
+    if trace and result.trace:
+        print("TRACE")
+        for span in result.trace:
+            indent = "  " if span.parent_id else ""
+            model = f" model={span.model}" if span.model else ""
+            error = f" error={span.error}" if span.error else ""
+            print(
+                f"  {span.span_id} {indent}{span.agent:<18} {span.kind:<9} {span.name:<14} "
+                f"{span.status:<9} attempt {span.attempt} {span.duration_ms:7.2f} ms{model}{error}"
+            )
+
+
+def _cmd_claim(args: argparse.Namespace) -> int:
+    match = _load(args)
+    request = ClaimRequest(
+        match_id=match.meta.match_id,
+        text=args.text,
+        language=args.lang,
+        as_of_seq=seq_at(match.events, args.at),
+        include_trace=args.trace,
+    )
+    service = ClaimService(load_settings(ENV_FILE))
+    source = StaticSource(match.meta, match.events)
+    claim_id = f"{match.meta.match_id}-c0001"
+    result = asyncio.run(service.verify(request, source, claim_id=claim_id))
+    if args.json:
+        shown = result if args.trace else result.model_copy(update={"trace": None})
+        print(shown.model_dump_json(indent=2))
+    else:
+        _print_claim(result, trace=args.trace)
+    return 0
+
+
+def _cmd_moments(args: argparse.Namespace) -> int:
+    match = _load(args)
+    meta = match.meta
+    moments = [m for m in detect_all(meta, match.events) if m.importance >= args.min_importance]
+    if args.json:
+        for moment in moments:
+            print(moment.model_dump_json())
+        return 0
+    print(f"{meta.match_id} | {len(moments)} moments | synthetic data")
+    for m in moments:
+        team = meta.team_info(m.team).short_name if m.team else ""
+        player = meta.players[m.player].short_name if m.player else ""
+        facts = ", ".join(f"{f.label_en.split(' · ')[0]} {f.display}" for f in m.facts)
+        stars = "*" * m.importance
+        print(f"[{m.display_minute:>6}] {m.kind:<16} {stars:<3} {team:<3} {player:<16} {facts}")
+    return 0
+
+
+def _cmd_eval(args: argparse.Namespace) -> int:
+    files = [load_eval(Path(path)) for path in (args.file or EVAL_FILES)]
+    if args.provider == "mock":
+        settings = Settings()
+    else:
+        env = {**read_env_file(ENV_FILE), **os.environ}
+        env.update({"USE_MOCK_LLM": "false", "LLM_PROVIDER": args.provider})
+        settings = Settings.from_env(env)
+    report = asyncio.run(run_eval(files, ClaimService(settings)))
+    print(f"evaluation with provider {settings.provider} ({settings.model_name}) | synthetic data")
+    for line in report.lines():
+        print(line)
+    min_accuracy = 1.0 if settings.provider == "mock" else 0.9
+    passed = report.passed(require_full_accuracy=False) and report.accuracy >= min_accuracy
+    print("PASSED" if passed else "FAILED")
+    return 0 if passed else 1
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from pundit.api.app import create_app
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    logging.getLogger("agent_framework").setLevel(logging.WARNING)  # one line per superstep
+    uvicorn.run(create_app(load_settings(ENV_FILE)), host=args.host, port=args.port)
     return 0
 
 
@@ -224,6 +355,31 @@ def _parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("scenarios", help="list scenarios and metrics")
     p.set_defaults(func=_cmd_scenarios)
+
+    p = sub.add_parser("claim", help="verify a claim against a match (Vietnamese or English)")
+    p.add_argument("text", help='the claim, e.g. "Đội nhà áp đảo hiệp 2"')
+    source(p)
+    p.add_argument("--at", default=None, help="scoreboard minute, e.g. 63' (default: full time)")
+    p.add_argument("--lang", choices=["auto", "vi", "en"], default="auto")
+    p.add_argument("--trace", action="store_true", help="print the agent trace")
+    p.add_argument("--json", action="store_true", help="print the ClaimResult as JSON")
+    p.set_defaults(func=_cmd_claim)
+
+    p = sub.add_parser("moments", help="list the key moments of a match")
+    source(p)
+    p.add_argument("--min-importance", type=int, choices=[1, 2, 3], default=1)
+    p.add_argument("--json", action="store_true", help="one Moment JSON per line")
+    p.set_defaults(func=_cmd_moments)
+
+    p = sub.add_parser("eval", help="run the claim evaluation sets")
+    p.add_argument("--file", action="append", help="eval JSON file (repeatable); default: both")
+    p.add_argument("--provider", choices=["mock", "github", "foundry"], default="mock")
+    p.set_defaults(func=_cmd_eval)
+
+    p = sub.add_parser("serve", help="run the API (REST + WebSocket)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.set_defaults(func=_cmd_serve)
     return parser
 
 
@@ -237,6 +393,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except InvalidEventError as exc:
         print(f"invalid data: {exc}", file=sys.stderr)
         return 1
+    except ConfigError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
     except PunditError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -1,0 +1,235 @@
+{
+  "name": "dominant_loser-42 labelled claims (design section 13.6)",
+  "heldout": false,
+  "match": {
+    "scenario": "dominant_loser",
+    "seed": 42
+  },
+  "claims": [
+    {
+      "id": "e01",
+      "text": "Đội nhà áp đảo hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%",
+        "possession:kestrel_athletic:H2": "39%",
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1",
+        "xg:harbor_lions:H2": "2.24",
+        "xg:kestrel_athletic:H2": "0.24",
+        "momentum:harbor_lions:H2": "0.91",
+        "momentum:kestrel_athletic:H2": "-0.91"
+      },
+      "note": "4/4 rubric: possession 61%, shots 15-1, xG 2.24-0.24, momentum 0.91"
+    },
+    {
+      "id": "e02",
+      "text": "Harbor dominated the second half",
+      "expected": "TRUE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%",
+        "possession:kestrel_athletic:H2": "39%",
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1",
+        "xg:harbor_lions:H2": "2.24",
+        "xg:kestrel_athletic:H2": "0.24",
+        "momentum:harbor_lions:H2": "0.91",
+        "momentum:kestrel_athletic:H2": "-0.91"
+      }
+    },
+    {
+      "id": "e03",
+      "text": "Kestrel áp đảo hiệp 2",
+      "expected": "FALSE",
+      "expect_display": {
+        "possession:kestrel_athletic:H2": "39%",
+        "possession:harbor_lions:H2": "61%",
+        "shots:kestrel_athletic:H2": "1",
+        "shots:harbor_lions:H2": "15",
+        "xg:kestrel_athletic:H2": "0.24",
+        "xg:harbor_lions:H2": "2.24",
+        "momentum:kestrel_athletic:H2": "-0.91",
+        "momentum:harbor_lions:H2": "0.91"
+      }
+    },
+    {
+      "id": "e04",
+      "text": "HAR không áp đảo hiệp 2",
+      "expected": "FALSE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%",
+        "possession:kestrel_athletic:H2": "39%",
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1",
+        "xg:harbor_lions:H2": "2.24",
+        "xg:kestrel_athletic:H2": "0.24",
+        "momentum:harbor_lions:H2": "0.91",
+        "momentum:kestrel_athletic:H2": "-0.91"
+      },
+      "note": "negation of e01"
+    },
+    {
+      "id": "e05",
+      "text": "HAR có nhiều cú sút hơn KES trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1"
+      }
+    },
+    {
+      "id": "e06",
+      "text": "Harbor had twice as many shots as Kestrel in the second half",
+      "expected": "TRUE",
+      "expect_display": {
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1"
+      },
+      "note": "ratio 15 >= 0.9 x 2"
+    },
+    {
+      "id": "e07",
+      "text": "KES chỉ có 1 cú sút trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "shots:kestrel_athletic:H2": "1"
+      }
+    },
+    {
+      "id": "e08",
+      "text": "HAR kiểm soát bóng khoảng 60% trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%"
+      },
+      "note": "61% within the approx tolerance (5 points)"
+    },
+    {
+      "id": "e09",
+      "text": "HAR kiểm soát bóng 70% trong hiệp 2",
+      "expected": "FALSE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%"
+      },
+      "note": "61% is more than 2 x 2.5 points away from 70%"
+    },
+    {
+      "id": "e10",
+      "text": "Kestrel had more corners than Harbor in the second half",
+      "expected": "FALSE",
+      "expect_display": {
+        "corners:kestrel_athletic:H2": "0",
+        "corners:harbor_lions:H2": "7"
+      }
+    },
+    {
+      "id": "e11",
+      "text": "KES chưa có quả phạt góc nào trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "corners:kestrel_athletic:H2": "0"
+      },
+      "note": "zero count, coverage evidence"
+    },
+    {
+      "id": "e12",
+      "text": "Hai đội phạm lỗi ngang nhau trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "fouls:harbor_lions:H2": "5",
+        "fouls:kestrel_athletic:H2": "5"
+      }
+    },
+    {
+      "id": "e13",
+      "text": "HAR pressing mạnh hơn KES trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "ppda:harbor_lions:H2": "5.34",
+        "ppda:kestrel_athletic:H2": "13.20"
+      },
+      "note": "PPDA 5.34 vs 13.20: lower PPDA = stronger pressing"
+    },
+    {
+      "id": "e14",
+      "text": "HAR áp đảo hiệp 2 nhưng vẫn thua",
+      "expected": "TRUE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%",
+        "possession:kestrel_athletic:H2": "39%",
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1",
+        "xg:harbor_lions:H2": "2.24",
+        "xg:kestrel_athletic:H2": "0.24",
+        "momentum:harbor_lions:H2": "0.91",
+        "momentum:kestrel_athletic:H2": "-0.91",
+        "score:harbor_lions:FULL": "1",
+        "score:kestrel_athletic:FULL": "2"
+      },
+      "note": "4/4 and final score 1-2"
+    },
+    {
+      "id": "e15",
+      "text": "HAR áp đảo hiệp 2 và thắng trận",
+      "expected": "PARTLY_TRUE",
+      "expect_display": {
+        "possession:harbor_lions:H2": "61%",
+        "possession:kestrel_athletic:H2": "39%",
+        "shots:harbor_lions:H2": "15",
+        "shots:kestrel_athletic:H2": "1",
+        "xg:harbor_lions:H2": "2.24",
+        "xg:kestrel_athletic:H2": "0.24",
+        "momentum:harbor_lions:H2": "0.91",
+        "momentum:kestrel_athletic:H2": "-0.91",
+        "score:harbor_lions:FULL": "1",
+        "score:kestrel_athletic:FULL": "2"
+      },
+      "note": "first clause true, second false"
+    },
+    {
+      "id": "e16",
+      "text": "HAR có 14 cú sút trong hiệp 2",
+      "expected": "PARTLY_TRUE",
+      "expect_display": {
+        "shots:harbor_lions:H2": "15"
+      },
+      "note": "actual 15: off by one with value >= 5"
+    },
+    {
+      "id": "e17",
+      "text": "Calder ghi bàn trong hiệp 2",
+      "expected": "TRUE",
+      "expect_display": {
+        "score:harbor_lions-09:H2": "1"
+      },
+      "note": "Calder scored at 63'"
+    },
+    {
+      "id": "e18",
+      "text": "Kestrel won despite lower xG",
+      "expected": "TRUE",
+      "expect_display": {
+        "score:kestrel_athletic:FULL": "2",
+        "score:harbor_lions:FULL": "1",
+        "xg:kestrel_athletic:FULL": "0.96",
+        "xg:harbor_lions:FULL": "2.73"
+      },
+      "note": "guaranteed by the scenario expectation xG FULL home > away"
+    },
+    {
+      "id": "e19",
+      "text": "HAR áp đảo hiệp 2",
+      "expected": "INSUFFICIENT_DATA",
+      "at": "30'",
+      "expect_reason": "future_window",
+      "note": "asked at 30': the second half is in the future"
+    },
+    {
+      "id": "e20",
+      "text": "Trọng tài thiên vị Harbor",
+      "expected": "INSUFFICIENT_DATA",
+      "expect_reason": "unsupported_claim",
+      "note": "referee bias is not measurable"
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "name": "dominant_loser-42 held-out phrasings (never used to tune the parser)",
+  "heldout": true,
+  "match": {
+    "scenario": "dominant_loser",
+    "seed": 42
+  },
+  "claims": [
+    {
+      "id": "h01",
+      "text": "Harbor dồn ép trong 45 phút cuối",
+      "expected": "TRUE",
+      "note": "dominance in the second half"
+    },
+    {
+      "id": "h02",
+      "text": "Đội khách gần như không sút được hiệp hai",
+      "expected": "TRUE",
+      "note": "KES 1 shot in the second half"
+    },
+    {
+      "id": "h03",
+      "text": "Kestrel scored more goals than Harbor",
+      "expected": "TRUE",
+      "note": "2-1"
+    },
+    {
+      "id": "h04",
+      "text": "Harbor finished with more corners",
+      "expected": "TRUE",
+      "note": "10 corners to 4"
+    },
+    {
+      "id": "h05",
+      "text": "The visitors had more shots in the first half",
+      "expected": "FALSE",
+      "note": "6 shots each"
+    },
+    {
+      "id": "h06",
+      "text": "Ribas scored the opener",
+      "expected": "TRUE",
+      "note": "Ribas scored at 27', the first goal"
+    },
+    {
+      "id": "h07",
+      "text": "HAR có tỷ lệ chuyền chính xác cao hơn KES trong hiệp 2",
+      "expected": "TRUE",
+      "note": "84% vs 77%"
+    },
+    {
+      "id": "h08",
+      "text": "Kestrel kept more of the ball in the first half",
+      "expected": "FALSE",
+      "note": "possession 45% vs 55%"
+    },
+    {
+      "id": "h09",
+      "text": "Harbor không có quả phạt góc nào trong hiệp 2",
+      "expected": "FALSE",
+      "note": "Harbor had 7"
+    },
+    {
+      "id": "h10",
+      "text": "Momentum nghiêng hẳn về Harbor sau giờ nghỉ",
+      "expected": "TRUE",
+      "note": "momentum 0.91 in the second half"
+    }
+  ]
+}

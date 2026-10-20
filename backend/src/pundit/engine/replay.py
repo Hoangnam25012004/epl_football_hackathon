@@ -59,6 +59,15 @@ class FakeClock:
         self.t += seconds
 
 
+class SteppingClock(FakeClock):
+    """FakeClock that yields to the event loop on every sleep: a replay runs as fast as possible
+    while requests and WebSocket clients still get their turn (API tests, instant demos)."""
+
+    async def sleep(self, seconds: float) -> None:
+        await super().sleep(seconds)
+        await asyncio.sleep(0)
+
+
 @dataclass(frozen=True)
 class ReplayItem:
     event: Event

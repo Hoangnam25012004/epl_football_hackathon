@@ -1,0 +1,222 @@
+{
+  "$defs": {
+    "Fact": {
+      "additionalProperties": false,
+      "description": "A number that may be said out loud. Shared by the claim verifier, moments and Day 3.",
+      "properties": {
+        "derived": {
+          "default": false,
+          "title": "Derived",
+          "type": "boolean"
+        },
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "evidence_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Event Ids",
+          "type": "array"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label_en": {
+          "title": "Label En",
+          "type": "string"
+        },
+        "label_vi": {
+          "title": "Label Vi",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "unit": {
+          "enum": [
+            "count",
+            "percent",
+            "xg",
+            "meters",
+            "kmh",
+            "minutes",
+            "ratio",
+            "index",
+            "rating"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "key",
+        "label_vi",
+        "label_en",
+        "value",
+        "unit",
+        "display",
+        "evidence_event_ids"
+      ],
+      "title": "Fact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "clock_ms": {
+      "title": "Clock Ms",
+      "type": "integer"
+    },
+    "display_minute": {
+      "title": "Display Minute",
+      "type": "string"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/Fact"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "importance": {
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "title": "Importance",
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "goal",
+        "goal_overturned",
+        "red_card",
+        "yellow_card",
+        "big_chance",
+        "rocket_shot",
+        "dangerous_spell",
+        "momentum_shift",
+        "substitution",
+        "period_start",
+        "period_end",
+        "full_time"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "match_id": {
+      "title": "Match Id",
+      "type": "string"
+    },
+    "period": {
+      "title": "Period",
+      "type": "integer"
+    },
+    "player": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Player"
+    },
+    "related_moment_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Related Moment Ids",
+      "type": "array"
+    },
+    "seq": {
+      "title": "Seq",
+      "type": "integer"
+    },
+    "team": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Team"
+    },
+    "trigger_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Trigger Event Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "match_id",
+    "kind",
+    "importance",
+    "team",
+    "player",
+    "period",
+    "clock_ms",
+    "display_minute",
+    "trigger_event_ids",
+    "facts",
+    "seq"
+  ],
+  "title": "Moment",
+  "type": "object"
+}

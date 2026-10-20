@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "as_of_seq": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "As Of Seq"
+    },
+    "include_trace": {
+      "default": false,
+      "title": "Include Trace",
+      "type": "boolean"
+    },
+    "language": {
+      "default": "auto",
+      "enum": [
+        "auto",
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "match_id": {
+      "maxLength": 64,
+      "pattern": "^[a-z0-9_]+-\\d+$",
+      "title": "Match Id",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 300,
+      "minLength": 3,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "match_id",
+    "text"
+  ],
+  "title": "ClaimRequest",
+  "type": "object"
+}

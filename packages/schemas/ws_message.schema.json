@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "match_id": {
+      "title": "Match Id",
+      "type": "string"
+    },
+    "n": {
+      "minimum": 0,
+      "title": "N",
+      "type": "integer"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "type": {
+      "enum": [
+        "hello",
+        "event",
+        "snapshot",
+        "moment",
+        "claim",
+        "status",
+        "resync"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "v": {
+      "const": 1,
+      "default": 1,
+      "title": "V",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "type",
+    "n",
+    "match_id",
+    "payload"
+  ],
+  "title": "WsMessage",
+  "type": "object"
+}

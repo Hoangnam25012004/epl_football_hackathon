@@ -1,0 +1,750 @@
+{
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "dominance",
+            "compare",
+            "value"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "negated": {
+          "default": false,
+          "title": "Negated",
+          "type": "boolean"
+        },
+        "op": {
+          "anyOf": [
+            {
+              "enum": [
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "==",
+                "~"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Subject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ratio"
+        },
+        "subject": {
+          "$ref": "#/$defs/Subject"
+        },
+        "text_span": {
+          "default": "",
+          "title": "Text Span",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "window": {
+          "discriminator": {
+            "mapping": {
+              "minute": "#/$defs/MinuteWindow",
+              "rolling": "#/$defs/RollingWindow"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MinuteWindow"
+            },
+            {
+              "$ref": "#/$defs/RollingWindow"
+            }
+          ],
+          "title": "Window"
+        }
+      },
+      "required": [
+        "kind",
+        "subject",
+        "window"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "AssertionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion": {
+          "$ref": "#/$defs/Assertion"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/Fact"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "SUPPORTED",
+            "PARTIAL",
+            "CONTRADICTED",
+            "INSUFFICIENT"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "rationale_code": {
+          "title": "Rationale Code",
+          "type": "string"
+        },
+        "reason_code": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "unsupported_claim",
+            "unknown_entity",
+            "ambiguous_entity",
+            "future_window",
+            "no_data_in_window",
+            "low_sample",
+            "as_of_out_of_range"
+          ],
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assertion",
+        "outcome",
+        "facts",
+        "rationale_code"
+      ],
+      "title": "AssertionResult",
+      "type": "object"
+    },
+    "Fact": {
+      "additionalProperties": false,
+      "description": "A number that may be said out loud. Shared by the claim verifier, moments and Day 3.",
+      "properties": {
+        "derived": {
+          "default": false,
+          "title": "Derived",
+          "type": "boolean"
+        },
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "evidence_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Event Ids",
+          "type": "array"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label_en": {
+          "title": "Label En",
+          "type": "string"
+        },
+        "label_vi": {
+          "title": "Label Vi",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "unit": {
+          "enum": [
+            "count",
+            "percent",
+            "xg",
+            "meters",
+            "kmh",
+            "minutes",
+            "ratio",
+            "index",
+            "rating"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "key",
+        "label_vi",
+        "label_en",
+        "value",
+        "unit",
+        "display",
+        "evidence_event_ids"
+      ],
+      "title": "Fact",
+      "type": "object"
+    },
+    "GuardrailReport": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "violations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/GuardrailViolation"
+          },
+          "title": "Violations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "title": "GuardrailReport",
+      "type": "object"
+    },
+    "GuardrailViolation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "UNVERIFIED_NUMBER",
+            "MISSING_EVIDENCE",
+            "VERDICT_MISMATCH",
+            "UNSAFE_CONTENT",
+            "EMPTY",
+            "TOO_LONG"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Span"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "title": "GuardrailViolation",
+      "type": "object"
+    },
+    "MinuteWindow": {
+      "additionalProperties": false,
+      "description": "Window on the football-minute axis, optionally restricted to one half.",
+      "properties": {
+        "end_min": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Min"
+        },
+        "kind": {
+          "const": "minute",
+          "default": "minute",
+          "title": "Kind",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "start_min": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Min"
+        }
+      },
+      "title": "MinuteWindow",
+      "type": "object"
+    },
+    "RollingWindow": {
+      "additionalProperties": false,
+      "description": "Window on the played-time axis (`match_ms`), for \"the last N minutes\".",
+      "properties": {
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "rolling",
+          "default": "rolling",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "RollingWindow",
+      "type": "object"
+    },
+    "Subject": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "team",
+            "player",
+            "both_teams"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "TraceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "attempt": {
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "input": {
+          "additionalProperties": true,
+          "title": "Input",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "tool",
+            "llm",
+            "guardrail",
+            "fallback"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "additionalProperties": true,
+          "title": "Output",
+          "type": "object"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error",
+            "retry",
+            "fallback",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "parent_id",
+        "agent",
+        "kind",
+        "name",
+        "input",
+        "output",
+        "status",
+        "attempt",
+        "start_ms",
+        "duration_ms",
+        "model",
+        "error"
+      ],
+      "title": "TraceSpan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Returned by POST /claims/verify and broadcast on the WebSocket (without trace).",
+  "properties": {
+    "analyst_source": {
+      "enum": [
+        "llm",
+        "rule"
+      ],
+      "title": "Analyst Source",
+      "type": "string"
+    },
+    "as_of_display": {
+      "title": "As Of Display",
+      "type": "string"
+    },
+    "as_of_seq": {
+      "title": "As Of Seq",
+      "type": "integer"
+    },
+    "assertions": {
+      "items": {
+        "$ref": "#/$defs/AssertionResult"
+      },
+      "title": "Assertions",
+      "type": "array"
+    },
+    "claim_id": {
+      "title": "Claim Id",
+      "type": "string"
+    },
+    "degraded": {
+      "items": {
+        "enum": [
+          "analyst_fallback",
+          "analyst_disagreement",
+          "explainer_fallback",
+          "circuit_open",
+          "orchestrator_fallback"
+        ],
+        "type": "string"
+      },
+      "title": "Degraded",
+      "type": "array"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "explanation": {
+      "title": "Explanation",
+      "type": "string"
+    },
+    "explanation_source": {
+      "enum": [
+        "llm",
+        "template"
+      ],
+      "title": "Explanation Source",
+      "type": "string"
+    },
+    "guardrail": {
+      "$ref": "#/$defs/GuardrailReport"
+    },
+    "headline": {
+      "items": {
+        "$ref": "#/$defs/Fact"
+      },
+      "title": "Headline",
+      "type": "array"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "match_id": {
+      "title": "Match Id",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "reason_code": {
+      "enum": [
+        "ok",
+        "unsupported_claim",
+        "unknown_entity",
+        "ambiguous_entity",
+        "future_window",
+        "no_data_in_window",
+        "low_sample",
+        "as_of_out_of_range"
+      ],
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "timings_ms": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Timings Ms",
+      "type": "object"
+    },
+    "trace": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/TraceSpan"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trace"
+    },
+    "verdict": {
+      "enum": [
+        "TRUE",
+        "PARTLY_TRUE",
+        "FALSE",
+        "INSUFFICIENT_DATA"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "claim_id",
+    "match_id",
+    "as_of_seq",
+    "as_of_display",
+    "text",
+    "language",
+    "verdict",
+    "reason_code",
+    "assertions",
+    "headline",
+    "explanation",
+    "explanation_source",
+    "analyst_source",
+    "model",
+    "evidence_event_ids",
+    "guardrail",
+    "degraded",
+    "timings_ms"
+  ],
+  "title": "ClaimResult",
+  "type": "object"
+}
