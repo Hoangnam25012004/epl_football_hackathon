@@ -252,5 +252,6 @@
   - _Category chính:_ Best Multi-Agent System (đã chốt 20/10)
   - _Ngôn ngữ claim:_ tiếng Việt + tiếng Anh; câu giải thích theo ngôn ngữ của claim (đã chốt 20/10)
   - _LLM tạm khi chưa có Azure:_ GitHub Models (tương thích OpenAI, chung adapter với Foundry); mock là mặc định cho dev/CI (đã chốt 20/10)
-  - _Orchestrator:_ Microsoft Agent Framework Workflows, ghim phiên bản sau spike; dự phòng là runner `asyncio` (đã chốt 20/10). Chi tiết: [docs/day2-design.md](docs/day2-design.md)
+  - _Orchestrator:_ Microsoft Agent Framework Workflows, đã spike và ghim `agent-framework-core==1.22.0`, `agent-framework-openai==1.17.0`; một workflow mới cho mỗi claim; runner `asyncio` giữ làm lưới an toàn `orchestrator_fallback` (đã chốt 20/10). Chi tiết: [docs/day2-design.md](docs/day2-design.md) §9.5, §19
+  - _Day 2:_ xong tầng A (mock) ngày 20/10: Claim Verifier + Guardrail + MomentDetector + API/WebSocket + CLI `claim / moments / eval / serve`. RuleAnalyst luôn đối chiếu spec của LLM; lệch thì dùng luật và gắn cờ `analyst_disagreement`. Tầng B chờ `GITHUB_TOKEN` (model mặc định `openai/gpt-4.1-mini`, xác minh khi có token)
   - _Azure:_ Free Account bằng email trường bị từ chối ("not eligible", 20/10); đang thử tài khoản Microsoft cá nhân / Azure for Students

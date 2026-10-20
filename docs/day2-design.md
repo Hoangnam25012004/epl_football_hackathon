@@ -1,7 +1,7 @@
 # Detailed Design — Ngày 2 (22/10): Orchestrator · Claim Verifier · Guardrail · Moment Detector · API
 
 > Liên quan: [claude.md](../claude.md) · [checklist.md](../checklist.md) (mục Ngày 2) · [day1-design.md](day1-design.md) (nền dữ liệu, v1.3)
-> Phiên bản: v1.0 (20/10/2026) · Người thực hiện: 1 người · Python 3.12
+> Phiên bản: v1.1 (20/10/2026, đã xây dựng xong tầng A — xem §19 "As-built") · Người thực hiện: 1 người · Python 3.12
 > Chiến lược: **mock trước, LLM thật sau.** Mọi chức năng chạy và được test đầy đủ với mock. Sau đó gắn GitHub Models (LLM thật tạm thời), rồi Microsoft Foundry khi có Azure, chỉ bằng cách đổi cấu hình.
 
 ---
@@ -555,6 +555,21 @@ Ghim phiên bản `agent-framework-*`, rồi viết một script nhỏ (không c
 
 Kết quả ghi vào mục này (tên lớp, chữ ký hàm thật).
 
+**Kết quả spike (20/10, `agent-framework-core==1.22.0`, `agent-framework-openai==1.17.0`, Python 3.12.15):**
+
+| # | Hạng mục | Kết quả |
+|---|---|---|
+| 1 | Executor + message Pydantic | ✅ `class X(Executor)` với `super().__init__(id=...)`; `@handler async def h(self, msg: T, ctx: WorkflowContext[Out, WorkflowOut])`; `ctx.send_message(...)`, `ctx.yield_output(...)` |
+| 2 | Cạnh có điều kiện | ✅ `WorkflowBuilder(start_executor=..., max_iterations=...).add_edge(src, dst, condition=lambda m: isinstance(m, X)).build()` |
+| 3 | Vòng lặp có điều kiện dừng | ✅ Guardrail → Explainer dừng nhờ `attempt` nằm trong message |
+| 4 | 10 workflow song song | ⚠️ Một instance **không** chạy song song được (`WorkflowException: Workflow is already running`). Dựng workflow mới cho mỗi request: build + run ≈ 2,3 ms; 10 workflow riêng chạy song song không lẫn trạng thái (17 ms) |
+| 5 | Exception trong executor | ⚠️ Lan ra `workflow.run()`. Mọi executor tự bắt lỗi và chuyển sang nhánh fallback; ClaimService còn một lưới an toàn `orchestrator_fallback` |
+| 6 | Stream sự kiện workflow | Không dùng: trace tự ghi bằng `TraceRecorder` (span id tất định). MAF log mỗi superstep ở mức INFO, `pundit serve` hạ xuống WARNING |
+| 7 | Chạy offline | ✅ |
+| 8 | Client tương thích OpenAI | ✅ (offline) `OpenAIChatCompletionClient(model=..., async_client=AsyncOpenAI(base_url=..., max_retries=0, http_client=...))` + `Agent(client=..., instructions=...)`; `await agent.run(text, options={"response_format": Model, "temperature": 0})` gửi `POST {base_url}/chat/completions` với `response_format = {"type": "json_schema", "json_schema": {..., "strict": true}}`; `response.value` là model đã parse (`ValidationError` nếu sai). Chưa gọi GitHub Models thật vì chưa có token |
+
+Strict mode của OpenAI không nhận `oneOf` (union có discriminator của `Window`), nên LLM điền một DTO phẳng (`llm/dto.py`) rồi được chuyển sang `ClaimSpec` (§19).
+
 **Phương án dự phòng:** nếu spike thất bại (API không ổn định hoặc lỗi trên Python 3.12), dùng một runner `asyncio` nhỏ (khoảng 80 dòng) với cùng các message và cạnh. MAF khi đó chỉ còn được dùng làm client LLM, và vẫn là hero technology. Logic agent không phải sửa vì không phụ thuộc MAF (L6).
 
 ---
@@ -891,5 +906,110 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 | 2 | LLM thật tạm thời khi chưa có Azure | ✅ **GitHub Models** (endpoint tương thích OpenAI, dùng chung adapter với Foundry); mock vẫn là mặc định cho dev / CI |
 | 3 | Orchestrator | ✅ **Microsoft Agent Framework Workflows**, phiên bản ghim sau spike; dự phòng là runner `asyncio` |
 | 4 | Vai trò của LLM | ✅ Chỉ hiểu claim (structured output) và viết câu giải thích; phán quyết và số liệu do code tất định |
-| 5 | Kết quả spike | ⏳ Ghi vào mục 9.5 sau bước 0 |
-| 6 | Model GitHub Models / Foundry | ⏳ Chọn sau spike / khi có Azure |
+| 5 | Kết quả spike | ✅ MAF 1.22 dùng được (§9.5); một workflow mới cho mỗi claim; runner `asyncio` giữ lại làm lưới an toàn `orchestrator_fallback` |
+| 6 | Model GitHub Models / Foundry | ⏳ Mặc định `openai/gpt-4.1-mini` cho GitHub Models (đổi bằng `GITHUB_MODELS_MODEL`, xác minh khi có token); Foundry chọn khi có Azure |
+
+---
+
+## 19. As-built (20/10/2026): những gì đã xây dựng, khác biệt so với thiết kế, kết quả đo
+
+Tầng A của Definition of Done đã đạt; tầng B chờ `GITHUB_TOKEN` / Azure. Các mục dưới đây bổ sung (không thay thế) các mục trên.
+
+### 19.1. Đồ thị workflow thực tế (MAF, 9 executor)
+
+```
+ClaimIntake ─► ClaimAnalyst (LLM | mock) ─► RuleAnalyst (đối chiếu) ─► EvidenceCollector ─► Judge ─┬─► Explainer ─► Guardrail ─► Publisher
+     │                                                                                          │        ▲   │ retry      ▲
+     └────────── as_of ngoài phạm vi ──────────────────────────────────────► TemplateExplainer ◄┘        └───┘            │
+                                                                                     └──────────────────► Guardrail ─────┘
+```
+
+- **RuleAnalyst luôn chạy**, kể cả khi LLM thành công (thay cho nhánh "fail → RuleAnalyst" của §9.1):
+  - LLM lỗi / hết giờ / sai schema 2 lần → dùng spec của luật, cờ `analyst_fallback` (hoặc `circuit_open`).
+  - Luật không hiểu claim (và claim không bị luật đánh dấu "ngoài phạm vi") → dùng spec của LLM: LLM mở rộng độ phủ.
+  - Hai spec cùng nghĩa → dùng spec của LLM.
+  - Hai spec khác nghĩa → dùng spec của luật, cờ mới **`analyst_disagreement`**. Đây là cách bắt lỗi `wrong_entity` (§13.4) và cũng là chốt chặn khi LLM hiểu sai đội.
+- Spec của LLM còn qua `validate_spec(..., claim=...)` có **kiểm tra grounding**: cầu thủ phải được nêu tên trong claim; claim về đội phải nêu một đội (hoặc "đội nhà", "hai đội"...).
+- **Lưới an toàn `orchestrator_fallback`:** nếu chính workflow MAF lỗi, ClaimService chạy lại cùng các bước (`orchestration/steps.py`) bằng vòng lặp asyncio, không gọi LLM. Hai đường dùng chung code; có test chứng minh hai đường cho cùng kết quả.
+- Bơm lỗi mock áp dụng **cho từng claim** (mỗi claim có bộ đếm mới), nên demo `MOCK_LLM_FAULTS=explainer:hallucinate:2` cho thấy cảnh Guardrail chặn số bịa ở mọi claim.
+
+### 19.2. Thay đổi hợp đồng (chỉ thêm, so với §3)
+
+| Hợp đồng | Thêm |
+|---|---|
+| `Degraded` | `analyst_disagreement`, `orchestrator_fallback` |
+| `Fact` | `metric`, `team`, `player` (template và UI không phải tách `key`) |
+| `ClaimResult` | `analyst_source` (`llm` \| `rule`), `model` (`mock` hoặc tên model) |
+| `MatchContext` | `as_of_clock_ms`, `finished`; `teams` / `players` có `aliases` |
+| `Moment` | `related_moment_ids` (`goal_overturned` trỏ về moment `goal`) |
+| Message nội bộ | `AnalystOutcome`, `ExplainRequest`, `TemplateRequest`, `DraftForReview` (có `content_filtered`), `Publication` |
+| JSON Schema | `claim_request`, `claim_result`, `moment`, `ws_message` trong `packages/schemas/` |
+
+Metric mới trong REGISTRY (33 metric): `yellow_cards` (tính cả thẻ vàng thứ hai), `red_cards` (thẻ đỏ trực tiếp + thẻ vàng thứ hai), `tackles`, `interceptions`.
+
+### 19.3. Quy tắc phân tích claim đã chốt khi làm
+
+- Từ điển VI và EN **tách riêng**; claim tiếng Anh không bao giờ dùng từ điển tiếng Việt.
+- Một âm tiết tiếng Việt khớp **có dấu** ("thẻ" ≠ "thế", "lỗi" ≠ "lợi", "chó" ≠ "cho"); cụm từ nhiều âm tiết và tên riêng khớp bản bỏ dấu. Tên cầu thủ Việt không dùng một âm tiết làm bí danh ("Bảo" sẽ trùng "bao nhiêu").
+- Vế kết quả (thắng / thua / hoà) mặc định **cả trận**; vế chỉ số kế thừa cửa sổ của claim; vế không có chủ ngữ kế thừa chủ ngữ của vế trước.
+- Bị động: "bị áp đảo", "were dominated" → chủ thể là đối thủ; "dominated by X", "bị X áp đảo" → chủ thể là X.
+- "chưa có … nào", "no …" → `== 0`; "gần như không", "hardly any" → `<= 2`; "bàn thua", "conceded" → bàn của đối thủ; "bàn bị VAR huỷ" → `var_overturns`.
+- "hiệp đầu" chỉ khớp khi có dấu ("hiệp đấu" là "trận đấu" nói chung).
+- Một vế có vị ngữ mà không đọc được → **từ chối cả claim** (`unsupported_claim`), không kiểm chứng một nửa.
+
+### 19.4. Judge và Guardrail
+
+- Bằng chứng phủ cho giá trị 0 = evidence của `ball_in_play_time` trong cửa sổ (các event mở đầu possession).
+- Fact phái sinh: hiệu số dùng **giá trị tuyệt đối** ("chênh 2.00 xG"), tỷ lệ hiển thị gọn ("15", "1.9").
+- Metric không xác định (ví dụ PPDA khi đối thủ không có pha phòng ngự nào) → `INSUFFICIENT` với `rationale_code = "ppda_unavailable"`, không đoán.
+- Guardrail, ngoài §7:
+  - **Gợi ý đơn vị:** số có "%" chỉ khớp Fact phần trăm; số đứng trước danh từ đếm ("cú sút", "corners") chỉ khớp Fact đếm; số sau "xG" chỉ khớp Fact xG. "kiểm soát bóng 15%" khi có 15 cú sút vẫn bị chặn.
+  - **Cặp số "a-b"** phải là tỷ số tại `as_of` hoặc một cặp Fact cùng chỉ số của hai bên ("15-1" cú sút).
+  - Số âm được đọc đúng dấu ("momentum -0.91"); "1-2" không phải số âm.
+  - Phút được phép: mốc cửa sổ và đồng hồ tại `as_of` (kể cả "45+2"); phút khác (ví dụ "phút 63" của một bàn thắng) bị chặn.
+  - Tín hiệu `content_filter` của nhà cung cấp → `UNSAFE_CONTENT` → retry rồi template.
+
+### 19.5. Moment Detector
+
+- `momentum_shift` chỉ đánh giá từ phút thứ 10 (cửa sổ 10' đầy đủ); khi bị cooldown thì bỏ qua, không dồn lại.
+- Fact của `dangerous_spell` chỉ ghi khi giá trị > 0; tỷ số 0 trong moment dùng event kích hoạt làm bằng chứng.
+- Đã kiểm chứng: `dominant_loser-42` có đúng 3 `goal` (27', 63', 78'); `comeback_var-7` có `goal_overturned` ở 36' trỏ về bàn 35'; `red_card_swing-7` có `red_card` 52'. Đường live (MatchState → detector) cho kết quả giống hệt `detect_all` trên 8 trận.
+
+### 19.6. API và WebSocket
+
+- `hello` / `resync` mang `n` hiện tại (không tăng); message tiếp theo là `n + 1`.
+- `POST /claims/verify` trả kết quả **không kèm trace** trừ khi `include_trace=true`; `GET /claims/{id}` luôn có trace.
+- `GET /matches/{id}/moments?since=` lọc theo `seq` của event.
+- Bắt đầu lại sau `stop` sẽ phát tiếp từ event chưa áp dụng; moment không đổi.
+- `pundit serve` đọc `backend/.env` (không commit; mẫu ở `backend/.env.example`), biến môi trường luôn được ưu tiên.
+
+### 19.7. Hiệu chỉnh rubric "áp đảo" (đo trên dữ liệu sinh, §5.3)
+
+| Trận / cửa sổ | Seed 0–7: k của đội nhà | k của đội khách |
+|---|---|---|
+| `dominant_loser` H2 | 4, 4, 4, 4, 4, 4, 4, 4 | 0 × 8 |
+| `red_card_swing` từ 55' | 3, 3, 3, 4, 4, 4, 4, 4 | 0 × 8 |
+| `comeback_var` từ 60' | 3 × 7, 4 | 0 × 7, 1 |
+| `balanced`, 12 seed × 2 hiệp × 2 đội | k = 0: 25 · 1: 10 · 2: 6 · 3: 6 · 4: 1 | |
+
+Kỳ vọng của §5.3 đều đạt; hằng số giữ nguyên.
+
+### 19.8. Kết quả test và eval
+
+| Hạng mục | Kết quả |
+|---|---|
+| Test mặc định (không mạng, không secret) | **1210 test xanh** (Day 1 + Day 2), 121 s trên máy Windows dev; coverage **94,9%** (CI yêu cầu ≥ 85%) |
+| Test Day 2 | 706: agents 448 (bảng 86 claim, fuzz, mutation test, 84 tổ hợp verdict), LLM offline 53, workflow 58 (ma trận lỗi 36 tổ hợp, circuit breaker, ngân sách), metamorphic C1–C8 61, API/WS 34, eval 25, contract 13, CLI 7, perf 3, live 4 (opt-in) |
+| Eval mock, 20 claim gán nhãn | **20/20 đúng**, khớp mọi con số kỳ vọng |
+| Verdict sai (cả 2 bộ) | **0** |
+| Held-out (10 claim) | 9/10 có verdict và đều đúng; 1 claim ("Momentum nghiêng hẳn về Harbor sau giờ nghỉ") được từ chối an toàn |
+| Câu bị chặn lọt ra ngoài | 0 |
+| Độ trễ claim (mock, trong process) | p50 18 ms, p95 36 ms (ngân sách 150 ms); `POST /claims/verify` < 300 ms; MomentDetector ≈ 0,03 ms / event |
+| ruff, ruff format, mypy strict | sạch |
+
+Lưu ý: mục tiêu "toàn bộ test < 90 s" của §13.1 chưa đạt trên máy Windows (riêng Day 1 đã khoảng 80–100 s); test perf vẫn tách riêng như Day 1.
+
+### 19.9. Việc còn lại
+
+- **Tầng B:** có `GITHUB_TOKEN` thì chạy `uv run pytest -m live` và `uv run pundit eval --provider github`, ghi model / độ trễ vào §18. Khi có Azure: làm theo §8.5 (thêm `azure-identity`, `LLM_PROVIDER=foundry`).
+- Độ phủ của bộ phân tích luật: claim ngoài từ điển được từ chối an toàn; LLM là đường mở rộng độ phủ khi có token.

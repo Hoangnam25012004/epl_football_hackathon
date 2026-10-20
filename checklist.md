@@ -63,21 +63,24 @@
 
 > Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day2-design.md](docs/day2-design.md). Làm **mock trước**, sau đó dùng GitHub Models làm LLM thật tạm thời, và chuyển sang Foundry khi có Azure.
 
-- [ ] **P0** Khung Orchestrator (Microsoft Agent Framework / Semantic Kernel) kết nối model trên Foundry
-- [ ] **P0** Đăng ký Stats Tools thành tool / function cho agent
-- [ ] **P0** Mock LLM + biến `USE_MOCK_LLM` để dev và test không tốn quota
-- [ ] **P0** **Moment Detector** (rule-based): bàn thắng, thẻ, chuỗi tấn công nguy hiểm, momentum đổi chiều
-- [ ] **P0** **Claim Verifier**: claim → tool calls → verdict `TRUE / PARTLY_TRUE / FALSE / INSUFFICIENT_DATA` + lý do + evidence
-- [ ] **P0** **Guardrail**: so mọi con số trong output với kết quả Stats Tools; chặn nếu sai hoặc thiếu `evidence`
-- [ ] **P0** Ghi **Agent Trace** (agent, tool, input, output, thời gian)
-- [ ] **P0** Shared match state + handoff có kiểu dữ liệu giữa các agent; retry / fallback khi một agent lỗi (tiêu chí của Best Multi-Agent System)
-- [ ] **P0** API: `POST /claims/verify`, WebSocket `/ws/match/{id}` đẩy event + moment
-- [ ] **P0** Fallback: khi Foundry lỗi hoặc timeout, trả template deterministic
-- [ ] **P1** Bắt đầu bộ eval: 20 claim mẫu có đáp án cho kịch bản 1
+- [x] **P0** Khung Orchestrator: Microsoft Agent Framework 1.22 Workflows (9 executor, cạnh có điều kiện theo kiểu message). Adapter GitHub Models / Foundry đã viết và test offline; **gọi model thật: chờ token / Azure** (tầng B)
+- [x] **P0** Đăng ký Stats Tools thành tool / function cho agent (catalog `get_stat` / `compare_stat`, MAF `FunctionTool`, dùng chung cho EvidenceCollector, agent Ngày 3 và MCP Ngày 6)
+- [x] **P0** Mock LLM + biến `USE_MOCK_LLM` để dev và test không tốn quota (kèm bơm lỗi `MOCK_LLM_FAULTS`)
+- [x] **P0** **Moment Detector** (rule-based): bàn thắng, VAR huỷ bàn, thẻ, cơ hội lớn, cú sút mạnh, chuỗi tấn công nguy hiểm, momentum đổi chiều, thay người, hết hiệp
+- [x] **P0** **Claim Verifier**: claim → tool calls → verdict `TRUE / PARTLY_TRUE / FALSE / INSUFFICIENT_DATA` + lý do + evidence
+- [x] **P0** **Guardrail**: so mọi con số trong output với kết quả Stats Tools; chặn nếu sai hoặc thiếu `evidence`
+- [x] **P0** Ghi **Agent Trace** (agent, tool, input, output, thời gian)
+- [x] **P0** Shared match state + handoff có kiểu dữ liệu giữa các agent; retry / fallback khi một agent lỗi (tiêu chí của Best Multi-Agent System)
+- [x] **P0** API: `POST /claims/verify`, WebSocket `/ws/match/{id}` đẩy event + moment
+- [x] **P0** Fallback: khi Foundry lỗi hoặc timeout, trả template deterministic
+- [x] **P1** Bắt đầu bộ eval: 20 claim mẫu có đáp án cho kịch bản 1 (+ 10 claim held-out)
 
 **Hoàn thành khi** (2 tầng, xem day2-design §0):
-- **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
-- **B (LLM thật):** cùng kết quả đó qua GitHub Models (khi có token), rồi qua Foundry (khi có Azure); bộ eval 20 claim không có verdict sai nào.
+
+- [x] **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
+- [ ] **B (LLM thật):** cùng kết quả đó qua GitHub Models (khi có token), rồi qua Foundry (khi có Azure); bộ eval 20 claim không có verdict sai nào.
+
+**Kết quả (20/10):** 1210 test xanh (không cần mạng), coverage 94,9%; eval mock: 20/20 đúng, 0 verdict sai trên cả 2 bộ, held-out 9/10 có verdict (claim còn lại được từ chối an toàn), p95 36 ms. Chi tiết: day2-design §19.
 
 ---
 
