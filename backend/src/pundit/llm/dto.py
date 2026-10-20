@@ -126,6 +126,17 @@ def _subject(s: LlmSubject, match: MatchContext, where: str) -> Subject:
     return Subject(kind="player", player=players[key])
 
 
+def _ratio(a: LlmAssertion) -> float | None:
+    """Small models fill `ratio` even when the claim states none: 1 (or less than 0) means
+    "no ratio". "Half as many" (0.5 with op "<") is the same claim as ratio 2 with op "<"."""
+    ratio = a.ratio
+    if ratio is None or ratio <= 0 or ratio == 1:
+        return None
+    if ratio < 1 and a.op in ("<", "<="):
+        return 1 / ratio
+    return ratio
+
+
 def _assertion(a: LlmAssertion, ctx: ClaimContext, where: str) -> Assertion:
     match = ctx.match
     try:
@@ -136,7 +147,7 @@ def _assertion(a: LlmAssertion, ctx: ClaimContext, where: str) -> Assertion:
             metric=a.metric if a.kind != "dominance" else None,
             op=a.op if a.kind != "dominance" else None,
             value=a.value if a.kind == "value" else None,
-            ratio=a.ratio if a.kind == "compare" else None,
+            ratio=_ratio(a) if a.kind == "compare" else None,
             window=to_window(a.window, match.as_of_ms, where),
             negated=a.negated,
             approx=a.approx or a.op == "~",

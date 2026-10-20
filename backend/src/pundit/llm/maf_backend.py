@@ -1,7 +1,8 @@
-"""Real LLM adapter (docs/day2-design.md section 8.3): GitHub Models or Microsoft Foundry through
-Microsoft Agent Framework's OpenAI-compatible chat client (Chat Completions + structured output).
+"""Real LLM adapter (docs/day2-design.md section 8.3): Microsoft Foundry, a local Ollama model or
+any OpenAI-compatible endpoint, through Microsoft Agent Framework's OpenAI-compatible chat client
+(Chat Completions + structured output).
 
-Both providers speak the same API; only the base URL and the credential change. The HTTP client
+Every provider speaks the same API; only the base URL and the credential change. The HTTP client
 never retries (`max_retries=0`): retries are decided by orchestration/resilience.py, so a slow
 provider cannot multiply the attempts.
 """
@@ -145,32 +146,27 @@ def build_backend(
     """The backend of the configured provider (never called in mock mode)."""
     timeout = settings.llm_timeout_s + 1.0
     extra: dict[str, Any] = {"http_client": http_client} if http_client is not None else {}
-    if settings.provider == "github":
-        assert settings.github_token is not None
-        oai = AsyncOpenAI(
-            base_url=settings.github_models_endpoint,
-            api_key=settings.github_token.get_secret_value(),
-            max_retries=0,
-            timeout=timeout,
-            **extra,
+    api_key: str | Callable[[], Awaitable[str]]
+    if settings.provider in ("ollama", "openai"):
+        assert settings.base_url is not None
+        base_url = settings.base_url
+        # Ollama and most local servers ignore the key, but the SDK needs a non-empty one.
+        api_key = (
+            settings.llm_api_key.get_secret_value()
+            if settings.llm_api_key is not None
+            else settings.provider
         )
-        model = settings.github_models_model
     elif settings.provider == "foundry":
-        assert settings.foundry_endpoint is not None and settings.foundry_model_deployment
-        api_key: str | Callable[[], Awaitable[str]] = (
+        assert settings.foundry_endpoint is not None
+        base_url = foundry_base_url(settings.foundry_endpoint)
+        api_key = (
             settings.foundry_api_key.get_secret_value()
             if settings.foundry_api_key is not None
             else _entra_token_provider()
         )
-        oai = AsyncOpenAI(
-            base_url=foundry_base_url(settings.foundry_endpoint),
-            api_key=api_key,
-            max_retries=0,
-            timeout=timeout,
-            **extra,
-        )
-        model = settings.foundry_model_deployment
     else:
-        raise ConfigError("build_backend needs LLM_PROVIDER=github or foundry")
+        raise ConfigError("build_backend needs LLM_PROVIDER=ollama, openai or foundry")
+    oai = AsyncOpenAI(base_url=base_url, api_key=api_key, max_retries=0, timeout=timeout, **extra)
+    model = settings.model_name
     client = OpenAIChatCompletionClient(model=model, async_client=oai)
     return MafChatBackend(client, model=model)

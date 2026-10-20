@@ -121,3 +121,36 @@ def test_dominance_ignores_stray_fields() -> None:
     spec = convert(assertion(metric="shots", op=">", value=3))
     a = spec.assertions[0]
     assert (a.metric, a.op, a.value) == (None, None, None)
+
+
+@pytest.mark.parametrize(
+    ("ratio", "op", "expected"),
+    [(None, ">", None), (1.0, ">", None), (0.0, ">", None), (2.0, ">", 2.0), (0.5, "<", 2.0)],
+)
+def test_ratio_noise_from_small_models(
+    ratio: float | None, op: str, expected: float | None
+) -> None:
+    compare = assertion(
+        kind="compare",
+        other=LlmSubject(kind="team", id="kestrel_athletic"),
+        metric="shots",
+        op=op,
+        ratio=ratio,
+    )
+    assert convert(compare).assertions[0].ratio == expected
+
+
+def test_a_ratio_below_one_with_more_is_still_an_error() -> None:
+    compare = assertion(
+        kind="compare",
+        other=LlmSubject(kind="team", id="kestrel_athletic"),
+        metric="shots",
+        op=">",
+        ratio=0.5,
+    )
+    spec = convert(compare)
+    from helpers import match_context
+
+    from pundit.agents.spec_validation import validate_spec
+
+    assert any("ratio must be > 1" in e for e in validate_spec(spec, match_context()))

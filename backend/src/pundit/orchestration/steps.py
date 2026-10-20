@@ -240,7 +240,11 @@ class ClaimSteps:
             if errors:
                 feedback = errors
                 retry = attempt < MAX_LLM_ATTEMPTS
-                call.finish({"errors": errors}, status="retry" if retry else "error")
+                call.finish(
+                    {"errors": errors},
+                    status="retry" if retry else "error",
+                    error=f"invalid spec: {'; '.join(errors)}"[:300],
+                )
                 continue
             call.finish({"assertions": len(spec.assertions), "reason": spec.unsupported_reason})
             span.finish({"assertions": len(spec.assertions)})
@@ -391,7 +395,14 @@ class ClaimSteps:
             return DraftForReview(judged=judged, draft=empty, content_filtered=True)
         except LlmError as exc:  # timeout, provider error, invalid output
             run.breaker.record_failure()
-            span.finish(status="error", error=str(exc)[:300])
+            failure = (
+                "timeout"
+                if isinstance(exc, LlmTimeout)
+                else "invalid_output"
+                if isinstance(exc, LlmOutputError)
+                else "error"
+            )
+            span.finish({"failure": failure}, status="error", error=str(exc)[:300])
             return TemplateRequest(judged=judged, reason="llm_failed")
         except Exception as exc:
             run.breaker.record_failure()
@@ -440,7 +451,7 @@ class ClaimSteps:
                 violations=(GuardrailViolation(code="UNSAFE_CONTENT", detail=CONTENT_FILTER),),
             )
         else:
-            report = check_judged(draft.text, judged)
+            report = check_judged(draft.text, judged, model_text=draft.source == "llm")
         run.time("guardrail", span)
         if report.passed:
             span.finish({"passed": True})

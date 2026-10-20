@@ -1,6 +1,5 @@
 """WebSocket protocol (design section 11.3): hello, ordering, two clients, late clients."""
 
-import threading
 from collections.abc import Iterator
 from typing import Any
 
@@ -75,19 +74,23 @@ def test_claims_are_broadcast_without_trace(client: TestClient) -> None:
 
 
 def test_late_client_gets_the_state_in_hello(client: TestClient) -> None:
-    client.post("/matches", json={"scenario": "comeback_var", "seed": 7, "speed": 1000})
-    done = threading.Event()
+    client.post(
+        "/matches",
+        json={"scenario": "comeback_var", "seed": 7, "speed": 1000, "autostart": False},
+    )
     with client.websocket_connect("/ws/match/comeback_var-7") as ws:
         ws.receive_json()
+        # started after the hello: an autostarted replay could finish before the client
+        # subscribes, and the "finished" status would then never reach it (only the hello)
+        client.post("/matches/comeback_var-7/start")
         read_until_finished(ws)
-        done.set()
     client.post(
         "/claims/verify", json={"match_id": "comeback_var-7", "text": "Ironvale thắng trận"}
     )
     with client.websocket_connect("/ws/match/comeback_var-7") as late:
         hello = late.receive_json()
     payload = hello["payload"]
-    assert done.is_set() and payload["match"]["status"] == "finished"
+    assert payload["match"]["status"] == "finished"
     assert payload["snapshot"]["score"] == {"ironvale_united": 3, "saltmarsh_rovers": 2}
     assert any(m["kind"] == "goal_overturned" for m in payload["moments"])
     assert payload["claims"][0]["verdict"] == "TRUE"

@@ -81,3 +81,26 @@ def test_seq_at() -> None:
     assert seq is not None
     assert events[seq].period == 1 and events[seq].clock_ms < 30 * 60_000
     assert events[seq + 1].clock_ms >= 30 * 60_000 or events[seq + 1].period == 2
+
+
+@pytest.mark.parametrize(
+    ("faults", "unavailable", "invalid", "working"),
+    [
+        ("", False, False, True),
+        ("analyst:timeout", True, False, False),  # never answered: only the fallback ran
+        ("analyst:error", True, False, False),
+        ("analyst:invalid_json:2", False, True, False),  # answered, never usable
+        ("analyst:invalid_json:1", False, False, True),  # the retry fixed it
+        ("explainer:timeout", True, False, False),
+        ("explainer:invalid_json", False, True, True),  # specs fine, template text
+    ],
+)
+def test_llm_health_separates_unavailable_from_unusable(
+    faults: str, unavailable: bool, invalid: bool, working: bool
+) -> None:
+    """`pundit eval --provider X` must fail when the model is down, not when it is weak."""
+    result = run(run_eval([LABELLED], mock_service(mock_llm_faults=faults)))
+    assert (result.llm_failures > 0) == unavailable, faults
+    assert (result.llm_invalid > 0) == invalid, faults
+    assert result.llm_working() == working, faults
+    assert not result.wrong and result.leaks == 0  # the fallbacks stay correct

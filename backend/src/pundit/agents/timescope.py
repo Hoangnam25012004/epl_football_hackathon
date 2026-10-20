@@ -36,6 +36,8 @@ _PATTERNS: tuple[tuple[ScopeKind, str], ...] = (
     # Vietnamese
     ("h1", r"hiep\s+(?:1|mot|dau\s+tien|thu\s+nhat)"),
     ("h2", r"hiep\s+(?:2|hai|sau|thu\s+hai)"),
+    # "sau giờ nghỉ (giữa hiệp)", "sau khi nghỉ giữa hiệp": after the break
+    ("h2", r"sau\s+(?:khi\s+)?(?:gio\s+|thoi\s+gian\s+)?nghi(?:\s+giua\s+(?:hiep|tran))?"),
     ("last", rf"{N1}\s+phut\s+(?:cuoi(?:\s+cung)?|gan\s+(?:nhat|day)|vua\s+qua|qua)"),
     ("first", rf"{N1}\s+phut\s+dau(?:\s+tien)?"),
     (

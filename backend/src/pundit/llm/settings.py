@@ -3,6 +3,12 @@
 `USE_MOCK_LLM=true` (the default) ignores every provider setting. With a real provider, a
 missing variable stops the program at start-up with a clear message instead of failing on the
 first claim. Secrets are `SecretStr`: they never appear in `repr`, logs or traces.
+
+Providers:
+- `ollama`: a local model through Ollama's OpenAI-compatible endpoint (development, no account);
+- `openai`: any OpenAI-compatible endpoint (`LLM_BASE_URL`, `LLM_MODEL`, optional `LLM_API_KEY`);
+- `foundry`: Microsoft Foundry, the target for the submission.
+GitHub Models was retired on 2026-07-30 and is no longer a provider.
 """
 
 import os
@@ -15,12 +21,20 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pundit.domain.errors import PunditError
 from pundit.llm.faults import FaultPlan
 
-Provider = Literal["mock", "github", "foundry"]
-DEFAULT_GITHUB_ENDPOINT = "https://models.github.ai/inference"
-DEFAULT_GITHUB_MODEL = "openai/gpt-4.1-mini"
+Provider = Literal["mock", "ollama", "openai", "foundry"]
+RealProvider = Literal["ollama", "openai", "foundry"]
+REAL_PROVIDERS: tuple[RealProvider, ...] = ("ollama", "openai", "foundry")
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1"
+DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
+DEFAULT_TIMEOUTS = (4.0, 8.0)  # LLM_TIMEOUT_S, CLAIM_BUDGET_S for hosted models
+# A local model on a laptop CPU needs far longer than a hosted one; still bounded.
+PROVIDER_TIMEOUTS: dict[str, tuple[float, float]] = {"ollama": (90.0, 200.0)}
 DEFAULT_CORS = "http://localhost:3000"
 TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
 FALSE_WORDS = frozenset({"0", "false", "no", "off"})
+RETIRED = {
+    "github": "GitHub Models was retired on 2026-07-30: use LLM_PROVIDER=ollama (local) or foundry",
+}
 
 
 class ConfigError(PunditError):
@@ -31,17 +45,16 @@ class Settings(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     use_mock_llm: bool = True
-    llm_provider: Literal["github", "foundry"] | None = None
-    github_token: SecretStr | None = None
-    github_models_endpoint: str = DEFAULT_GITHUB_ENDPOINT
-    github_models_model: str = DEFAULT_GITHUB_MODEL
+    llm_provider: RealProvider | None = None
+    llm_base_url: str | None = None  # ollama (has a default) / openai (required)
+    llm_model: str | None = None  # ollama (has a default) / openai (required)
+    llm_api_key: SecretStr | None = None  # openai (optional; local servers need none)
     foundry_endpoint: str | None = None
     foundry_model_deployment: str | None = None
-    foundry_api_key: SecretStr | None = (
-        None  # dev only; Entra ID (az login / managed identity) otherwise
-    )
-    llm_timeout_s: float = Field(default=4.0, gt=0)
-    claim_budget_s: float = Field(default=8.0, gt=0)
+    # dev only; Entra ID (az login / managed identity) otherwise
+    foundry_api_key: SecretStr | None = None
+    llm_timeout_s: float = Field(default=DEFAULT_TIMEOUTS[0], gt=0)
+    claim_budget_s: float = Field(default=DEFAULT_TIMEOUTS[1], gt=0)
     mock_llm_faults: str = ""
     mock_llm_latency_ms: float = Field(default=0.0, ge=0)
     cors_origins: tuple[str, ...] = (DEFAULT_CORS,)
@@ -53,9 +66,20 @@ class Settings(BaseModel):
         return self.llm_provider
 
     @property
+    def base_url(self) -> str | None:
+        """Chat Completions base URL of the ollama / openai providers."""
+        if self.provider == "ollama":
+            return self.llm_base_url or DEFAULT_OLLAMA_BASE_URL
+        if self.provider == "openai":
+            return self.llm_base_url
+        return None
+
+    @property
     def model_name(self) -> str:
-        if self.provider == "github":
-            return self.github_models_model
+        if self.provider == "ollama":
+            return self.llm_model or DEFAULT_OLLAMA_MODEL
+        if self.provider == "openai":
+            return self.llm_model or "openai"
         if self.provider == "foundry":
             return self.foundry_model_deployment or "foundry"
         return "mock"
@@ -107,18 +131,16 @@ class Settings(BaseModel):
             return parsed
 
         use_mock = flag("USE_MOCK_LLM", True)
-        provider = get("LLM_PROVIDER")
-        if provider is not None:
-            provider = provider.lower()
+        provider = (get("LLM_PROVIDER") or "").lower() or None
         if not use_mock:
-            if provider not in ("github", "foundry"):
-                problems.append(
-                    "USE_MOCK_LLM=false needs LLM_PROVIDER=github or LLM_PROVIDER=foundry"
-                )
-            elif provider == "github" and get("GITHUB_TOKEN") is None:
-                problems.append(
-                    "LLM_PROVIDER=github needs GITHUB_TOKEN (a token with GitHub Models access)"
-                )
+            if provider in RETIRED:
+                problems.append(RETIRED[provider])
+            elif provider not in REAL_PROVIDERS:
+                problems.append("USE_MOCK_LLM=false needs LLM_PROVIDER=ollama, openai or foundry")
+            elif provider == "openai":
+                for name in ("LLM_BASE_URL", "LLM_MODEL"):
+                    if get(name) is None:
+                        problems.append(f"LLM_PROVIDER=openai needs {name}")
             elif provider == "foundry":
                 for name in ("FOUNDRY_ENDPOINT", "FOUNDRY_MODEL_DEPLOYMENT"):
                     if get(name) is None:
@@ -129,17 +151,19 @@ class Settings(BaseModel):
                 FaultPlan.parse(faults)
             except ValueError as exc:
                 problems.append(f"MOCK_LLM_FAULTS: {exc}")
+        active = provider if not use_mock and provider in REAL_PROVIDERS else None
+        timeout, budget = PROVIDER_TIMEOUTS.get(active or "", DEFAULT_TIMEOUTS)
         settings_values: dict[str, object] = {
             "use_mock_llm": use_mock,
-            "llm_provider": provider if provider in ("github", "foundry") else None,
-            "github_token": SecretStr(token) if (token := get("GITHUB_TOKEN")) else None,
-            "github_models_endpoint": get("GITHUB_MODELS_ENDPOINT") or DEFAULT_GITHUB_ENDPOINT,
-            "github_models_model": get("GITHUB_MODELS_MODEL") or DEFAULT_GITHUB_MODEL,
+            "llm_provider": provider if provider in REAL_PROVIDERS else None,
+            "llm_base_url": get("LLM_BASE_URL"),
+            "llm_model": get("LLM_MODEL"),
+            "llm_api_key": SecretStr(key) if (key := get("LLM_API_KEY")) else None,
             "foundry_endpoint": get("FOUNDRY_ENDPOINT"),
             "foundry_model_deployment": get("FOUNDRY_MODEL_DEPLOYMENT"),
-            "foundry_api_key": SecretStr(key) if (key := get("FOUNDRY_API_KEY")) else None,
-            "llm_timeout_s": number("LLM_TIMEOUT_S", 4.0),
-            "claim_budget_s": number("CLAIM_BUDGET_S", 8.0),
+            "foundry_api_key": SecretStr(fkey) if (fkey := get("FOUNDRY_API_KEY")) else None,
+            "llm_timeout_s": number("LLM_TIMEOUT_S", timeout),
+            "claim_budget_s": number("CLAIM_BUDGET_S", budget),
             "mock_llm_faults": faults,
             "mock_llm_latency_ms": number("MOCK_LLM_LATENCY_MS", 0.0),
             "cors_origins": tuple(
@@ -152,11 +176,14 @@ class Settings(BaseModel):
 
 
 def read_env_file(path: Path) -> dict[str, str]:
-    """KEY=VALUE lines of a .env file (comments and blank lines ignored, quotes stripped)."""
+    """KEY=VALUE lines of a .env file (comments and blank lines ignored, quotes stripped).
+    Windows editors add a BOM and PowerShell 5.1 `>` writes UTF-16: both are read."""
     values: dict[str, str] = {}
     if not path.is_file():
         return values
-    for line in path.read_text(encoding="utf-8").splitlines():
+    data = path.read_bytes()
+    utf16 = data.startswith((b"\xff\xfe", b"\xfe\xff"))
+    for line in data.decode("utf-16" if utf16 else "utf-8-sig").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue

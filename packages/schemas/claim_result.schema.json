@@ -310,7 +310,11 @@
             "VERDICT_MISMATCH",
             "UNSAFE_CONTENT",
             "EMPTY",
-            "TOO_LONG"
+            "TOO_LONG",
+            "WRONG_COMPARISON",
+            "WRONG_ATTRIBUTION",
+            "FRAGMENT",
+            "UNGROUNDED"
           ],
           "title": "Code",
           "type": "string"

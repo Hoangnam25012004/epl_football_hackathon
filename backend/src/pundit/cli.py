@@ -15,11 +15,18 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from pundit.agents.contracts import ClaimRequest, ClaimResult, Moment, WsMessage
 from pundit.agents.moments import detect_all
 from pundit.domain.errors import InvalidEventError, PunditError
 from pundit.domain.events import EVENT_ADAPTER, PassEvent
-from pundit.domain.matchtime import RollingWindow, minute_exact, parse_window
+from pundit.domain.matchtime import (
+    RollingWindow,
+    minute_exact,
+    parse_display_minute,
+    parse_window,
+)
 from pundit.domain.meta import MatchMeta
 from pundit.engine.generator import generate
 from pundit.engine.io import match_hash, read_match, summary_json, write_match
@@ -219,7 +226,8 @@ def _print_claim(result: ClaimResult, *, trace: bool) -> None:
             if not fact.derived:
                 label = fact.label_vi if vi else fact.label_en
                 events = len(fact.evidence_event_ids)
-                print(f"            {label} = {fact.display}   [{events} events]")
+                noun = "event" if events == 1 else "events"
+                print(f"            {label} = {fact.display}   [{events} {noun}]")
     ids = result.evidence_event_ids
     sample = ", ".join(ids[:3]) + (" ..." if len(ids) > 3 else "")
     print(f"EVIDENCE  {len(ids)} event ids: {sample}")
@@ -296,6 +304,14 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         print(line)
     min_accuracy = 1.0 if settings.provider == "mock" else 0.9
     passed = report.passed(require_full_accuracy=False) and report.accuracy >= min_accuracy
+    if settings.provider != "mock" and not report.llm_working():
+        print(
+            "LLM NOT WORKING: the real model gave no usable answer or was unavailable (timeout "
+            "or error) on more than 20% of the claims, so this run mostly tested the "
+            "deterministic fallback. Check the provider, the server or key, and the network "
+            "(pundit claim --trace)."
+        )
+        passed = False
     print("PASSED" if passed else "FAILED")
     return 0 if passed else 1
 
@@ -309,6 +325,44 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     logging.getLogger("agent_framework").setLevel(logging.WARNING)  # one line per superstep
     uvicorn.run(create_app(load_settings(ENV_FILE)), host=args.host, port=args.port)
     return 0
+
+
+def _window_arg(text: str) -> str:
+    try:
+        parse_window(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
+    return text
+
+
+def _minute_arg(text: str) -> str:
+    if text.strip().upper() == "FT":
+        return text
+    try:
+        parse_display_minute(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{exc} (e.g. 30', 45+2', 63' or FT)") from None
+    return text
+
+
+def _positive(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if value <= 0:
+        raise argparse.ArgumentTypeError(f"must be > 0, got {text}")
+    return value
+
+
+def _non_negative(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"must be >= 0, got {text}")
+    return value
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -331,18 +385,23 @@ def _parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("replay", help="replay a match in real time")
     source(p)
-    p.add_argument("--speed", type=float, default=20.0)
+    p.add_argument("--speed", type=_positive, default=20.0)
     p.add_argument(
-        "--from-minute", type=float, default=0.0, help="scoreboard minute; 45 and above = 2nd half"
+        "--from-minute",
+        type=_non_negative,
+        default=0.0,
+        help="scoreboard minute; 45 and above = 2nd half",
     )
-    p.add_argument("--status-every", type=float, default=5.0, help="minutes; 0 disables")
+    p.add_argument("--status-every", type=_non_negative, default=5.0, help="minutes; 0 disables")
     p.add_argument("--compact", action="store_true", help="hide passes, pressure and stoppages")
     p.add_argument("--max-events", type=int, default=0, help="stop after N printed lines")
     p.set_defaults(func=_cmd_replay)
 
     p = sub.add_parser("stats", help="print the stats table for both teams")
     source(p)
-    p.add_argument("--window", default="FULL", help="FULL, H1, H2, 60-75, 75-, -30")
+    p.add_argument(
+        "--window", type=_window_arg, default="FULL", help="FULL, H1, H2, 60-75, 75-, -30"
+    )
     p.set_defaults(func=_cmd_stats)
 
     p = sub.add_parser("validate", help="check every invariant of a JSONL match")
@@ -359,7 +418,9 @@ def _parser() -> argparse.ArgumentParser:
     p = sub.add_parser("claim", help="verify a claim against a match (Vietnamese or English)")
     p.add_argument("text", help='the claim, e.g. "Đội nhà áp đảo hiệp 2"')
     source(p)
-    p.add_argument("--at", default=None, help="scoreboard minute, e.g. 63' (default: full time)")
+    p.add_argument(
+        "--at", type=_minute_arg, default=None, help="scoreboard minute, e.g. 63' (default: FT)"
+    )
     p.add_argument("--lang", choices=["auto", "vi", "en"], default="auto")
     p.add_argument("--trace", action="store_true", help="print the agent trace")
     p.add_argument("--json", action="store_true", help="print the ClaimResult as JSON")
@@ -373,7 +434,7 @@ def _parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("eval", help="run the claim evaluation sets")
     p.add_argument("--file", action="append", help="eval JSON file (repeatable); default: both")
-    p.add_argument("--provider", choices=["mock", "github", "foundry"], default="mock")
+    p.add_argument("--provider", choices=["mock", "ollama", "openai", "foundry"], default="mock")
     p.set_defaults(func=_cmd_eval)
 
     p = sub.add_parser("serve", help="run the API (REST + WebSocket)")
@@ -399,6 +460,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     except PunditError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(map(str, e['loc'])) or 'input'}: {e['msg']}" for e in exc.errors()
+        )
+        print(f"error: {problems}", file=sys.stderr)
+        return 2
+    except (ValueError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     return code
 
 

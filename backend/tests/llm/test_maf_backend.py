@@ -24,9 +24,16 @@ from pundit.llm.ports import ContentFiltered, LlmError, LlmOutputError
 from pundit.llm.settings import ConfigError, Settings
 from pundit.orchestration.service import ClaimService
 
-TOKEN = "ghp_offline_test_token_123"
-GITHUB = Settings.from_env(
-    {"USE_MOCK_LLM": "false", "LLM_PROVIDER": "github", "GITHUB_TOKEN": TOKEN}
+TOKEN = "sk-offline-test-key-123"
+BASE_URL = "https://llm.example.test/v1"
+COMPATIBLE = Settings.from_env(
+    {
+        "USE_MOCK_LLM": "false",
+        "LLM_PROVIDER": "openai",
+        "LLM_BASE_URL": BASE_URL,
+        "LLM_MODEL": "test-model-mini",
+        "LLM_API_KEY": TOKEN,
+    }
 )
 W_H2 = {"type": "second_half", "minutes": None, "start_minute": None, "end_minute": None}
 
@@ -89,7 +96,7 @@ class FakeEndpoint:
         loaded: dict[str, Any] = json.loads(self.requests[index].content)
         return loaded
 
-    def backend(self, settings: Settings = GITHUB) -> MafChatBackend:
+    def backend(self, settings: Settings = COMPATIBLE) -> MafChatBackend:
         return build_backend(
             settings, http_client=httpx.AsyncClient(transport=httpx.MockTransport(self))
         )
@@ -108,10 +115,10 @@ def test_analyst_request_and_answer() -> None:
         ("dominance", "harbor_lions", "H2")
     ]
     request = endpoint.requests[0]
-    assert str(request.url) == "https://models.github.ai/inference/chat/completions"
+    assert str(request.url) == f"{BASE_URL}/chat/completions"
     assert request.headers["authorization"] == f"Bearer {TOKEN}"
     body = endpoint.body()
-    assert body["model"] == "openai/gpt-4.1-mini" and body["temperature"] == 0
+    assert body["model"] == "test-model-mini" and body["temperature"] == 0
     schema = body["response_format"]
     assert schema["type"] == "json_schema" and schema["json_schema"]["strict"] is True
     assert schema["json_schema"]["name"] == "LlmClaimSpec"
@@ -198,7 +205,9 @@ def explainer_answer(text: str) -> httpx.Response:
 
 def verify_with(endpoint: FakeEndpoint, text: str) -> Any:
     backend = endpoint.backend()
-    service = ClaimService(GITHUB, ports=lambda: (LlmClaimAnalyst(backend), LlmExplainer(backend)))
+    service = ClaimService(
+        COMPATIBLE, ports=lambda: (LlmClaimAnalyst(backend), LlmExplainer(backend))
+    )
     request = ClaimRequest(match_id="dominant_loser-42", text=text, include_trace=True)
     return run(service.verify(request, source(), claim_id="dominant_loser-42-c0001"))
 
@@ -230,7 +239,7 @@ def test_end_to_end_with_the_llm_path() -> None:
     result = verify_with(endpoint, "Đội nhà áp đảo hiệp 2")
     assert result.verdict == "TRUE" and result.degraded == ()
     assert (result.analyst_source, result.explanation_source) == ("llm", "llm")
-    assert result.explanation == explanation and result.model == "openai/gpt-4.1-mini"
+    assert result.explanation == explanation and result.model == "test-model-mini"
     assert TOKEN not in result.model_dump_json()  # never in the result or the trace
 
 
@@ -316,3 +325,21 @@ def test_foundry_without_key_needs_azure_identity() -> None:
 def test_mock_settings_cannot_build_a_backend() -> None:
     with pytest.raises(ConfigError):
         build_backend(Settings())
+
+
+def test_ollama_defaults_reach_the_local_server() -> None:
+    settings = Settings.from_env({"USE_MOCK_LLM": "false", "LLM_PROVIDER": "ollama"})
+    endpoint = FakeEndpoint(ok(DOMINANCE_SPEC))
+    run(LlmClaimAnalyst(endpoint.backend(settings)).analyze(claim_context("Đội nhà áp đảo hiệp 2")))
+    request = endpoint.requests[0]
+    assert str(request.url) == "http://127.0.0.1:11434/v1/chat/completions"
+    assert request.headers["authorization"] == "Bearer ollama"  # placeholder, ignored by Ollama
+    assert endpoint.body()["model"] == "qwen2.5:3b"
+
+
+def test_retired_provider_text_answers_are_errors() -> None:
+    """GitHub Models now answers a bare "OK" (text/plain): that must be an LLM error."""
+    plain = httpx.Response(200, text="OK\n", headers={"content-type": "text/plain"})
+    analyst = LlmClaimAnalyst(FakeEndpoint(plain).backend())
+    with pytest.raises(LlmError):
+        run(analyst.analyze(claim_context("Đội nhà áp đảo hiệp 2")))

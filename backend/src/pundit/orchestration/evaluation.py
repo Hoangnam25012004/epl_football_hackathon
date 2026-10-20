@@ -21,6 +21,23 @@ from pundit.engine.generator import generate
 from pundit.engine.match import GeneratedMatch
 from pundit.orchestration.service import ClaimService, StaticSource
 
+LLM_AGENTS = frozenset({"ClaimAnalyst", "Explainer"})
+UNAVAILABLE = frozenset({"timeout", "budget", "error", "circuit_open"})
+
+
+def llm_failures_of(result: ClaimResult) -> set[str]:
+    """How the LLM calls of a claim failed (from its trace): "timeout", "budget", "error",
+    "circuit_open" (the model was not available) or "invalid_output" (it answered twice with
+    something unusable)."""
+    found = {
+        span.output["failure"]
+        for span in result.trace or ()
+        if span.agent in LLM_AGENTS and isinstance(span.output.get("failure"), str)
+    }
+    if "circuit_open" in result.degraded:
+        found.add("circuit_open")
+    return found
+
 
 class EvalCase(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -156,6 +173,40 @@ class EvalReport:
             return values[0]
         return statistics.quantiles(values, n=100, method="inclusive")[round(quantile * 100) - 1]
 
+    @property
+    def llm_failures(self) -> int:
+        """Claims where the model was not available: a call timed out or failed, or the open
+        circuit skipped it. Unusable answers are quality, counted in `llm_invalid`."""
+        return sum(bool(llm_failures_of(row.result) & UNAVAILABLE) for row in self.rows)
+
+    @property
+    def llm_invalid(self) -> int:
+        """Claims where the model answered but its spec or text was unusable (rules / template)."""
+        return sum("invalid_output" in llm_failures_of(row.result) for row in self.rows)
+
+    @property
+    def llm_analyst_answers(self) -> int:
+        """Claims whose spec came from the LLM (it agreed with the rules or extended them)."""
+        return sum(r.result.analyst_source == "llm" for r in self.rows)
+
+    @property
+    def llm_disagreements(self) -> int:
+        """Claims where the LLM spec contradicted the rules and the rules were used."""
+        return sum("analyst_disagreement" in r.result.degraded for r in self.rows)
+
+    @property
+    def llm_explanations(self) -> int:
+        return sum(r.result.explanation_source == "llm" for r in self.rows)
+
+    def llm_working(self, *, max_failure_share: float = 0.2) -> bool:
+        """The model answered: it gave at least one usable spec and was unavailable on at most
+        `max_failure_share` of the claims. Invalid answers, disagreements and rejected drafts
+        are quality, reported but not counted here."""
+        if not self.rows:
+            return False
+        answered = self.llm_analyst_answers + self.llm_disagreements
+        return answered > 0 and self.llm_failures / len(self.rows) <= max_failure_share
+
     def passed(self, *, require_full_accuracy: bool) -> bool:
         ok = not self.wrong and self.leaks == 0 and not self.fact_mismatches
         return ok and (self.accuracy == 1.0 or not require_full_accuracy)
@@ -176,6 +227,12 @@ class EvalReport:
             f"LLM drafts rejected by the guardrail: {self.rejected_drafts}",
             f"rejected text published (leaks): {self.leaks}",
             f"fact mismatches: {len(self.fact_mismatches)}",
+            f"LLM spec used: {self.llm_analyst_answers} of {len(self.rows)} claims; "
+            f"LLM spec overruled by the rules: {self.llm_disagreements}; "
+            f"LLM explanations published: {self.llm_explanations}",
+            f"claims with the LLM unavailable (timeout or error, fallback used): "
+            f"{self.llm_failures}; with an unusable LLM answer (rules or template used): "
+            f"{self.llm_invalid}",
             f"latency p50 {self.latency(0.5):.0f} ms, p95 {self.latency(0.95):.0f} ms",
         ]
         out += [f"  {m}" for m in self.fact_mismatches]

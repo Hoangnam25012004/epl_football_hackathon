@@ -115,3 +115,44 @@ def test_eval_fails_on_a_wrong_label(tmp_path: Path, capsys: pytest.CaptureFixtu
     broken.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     assert main(["eval", "--file", str(broken)]) == 1
     assert "FAILED" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["claim", "HAR áp đảo", "--scenario", "dominant_loser", "--at", "abc"], "--at"),
+        (["claim", "HAR áp đảo", "--scenario", "dominant_loser", "--at", "99'"], "--at"),
+        (["stats", "--scenario", "dominant_loser", "--window", "xyz"], "--window"),
+        (["replay", "--scenario", "dominant_loser", "--speed", "0"], "--speed"),
+        (["replay", "--scenario", "dominant_loser", "--from-minute", "-5"], "--from-minute"),
+    ],
+)
+def test_bad_values_are_usage_errors(
+    argv: list[str], message: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(argv)
+    assert exit_info.value.code == 2
+    err = capsys.readouterr().err
+    assert f"argument {message}" in err and "Traceback" not in err
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["claim", "HAR áp đảo", "--file", "missing.events.jsonl"], "No such file"),
+        (["eval", "--file", "missing.json"], "No such file"),
+        (["claim", "ab", "--scenario", "dominant_loser"], "at least 3 characters"),
+    ],
+)
+def test_bad_input_has_no_traceback(
+    argv: list[str], message: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(argv) == 2
+    err = capsys.readouterr().err
+    assert message in err and "Traceback" not in err
+
+
+def test_claim_at_full_time(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["claim", "HAR áp đảo hiệp 2", "--scenario", "dominant_loser", "--at", "FT"]) == 0
+    assert "VERDICT   TRUE" in capsys.readouterr().out

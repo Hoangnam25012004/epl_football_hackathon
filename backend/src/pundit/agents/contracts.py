@@ -51,6 +51,10 @@ ViolationCode = Literal[
     "UNSAFE_CONTENT",
     "EMPTY",
     "TOO_LONG",
+    "WRONG_COMPARISON",  # "7 is less than 0": every number is true, the relation is not
+    "WRONG_ATTRIBUTION",  # a true number given to the wrong team or player
+    "FRAGMENT",  # an explanation that does not stand alone ("... và KES chỉ có 1 cú sút")
+    "UNGROUNDED",  # a model's sentence about the match without any number from the facts
 ]
 MomentKind = Literal[
     "goal",
