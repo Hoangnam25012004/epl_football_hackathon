@@ -126,8 +126,9 @@ class MatchState:
             return None
         return expected[1] if expected[0] == self._ball.possession_id else None
 
-    def view(self) -> LogView:
-        return self._log.view()
+    def view(self, upto: int | None = None) -> LogView:
+        """Immutable prefix of the first `upto` applied events (all of them by default)."""
+        return self._log.view(upto)
 
     def __len__(self) -> int:
         return len(self._log)

@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from pundit.domain.events import Event, GoalEvent, PassEvent, ShotEvent, VarCheckEvent
+from pundit.domain.events import CardEvent, Event, GoalEvent, PassEvent, ShotEvent, VarCheckEvent
 from pundit.domain.log import LogView
 from pundit.domain.pitch import FINAL_THIRD_X, in_box
 from pundit.stats.registry import MetricParams, make_result, metric
@@ -117,7 +117,7 @@ def xg(view: LogView, params: MetricParams) -> StatResult:
     return make_result(view, "xg", params, value=total, evidence=[e.id for e in shots_])
 
 
-def _is_final_third_entry(event: Event) -> bool:
+def is_final_third_entry(event: Event) -> bool:
     return (
         isinstance(event, PassEvent)
         and event.outcome == "complete"
@@ -126,7 +126,7 @@ def _is_final_third_entry(event: Event) -> bool:
     )
 
 
-def _is_box_entry(event: Event) -> bool:
+def is_box_entry(event: Event) -> bool:
     return (
         isinstance(event, PassEvent)
         and event.outcome == "complete"
@@ -146,7 +146,7 @@ def _is_box_entry(event: Event) -> bool:
     supports_player=True,
 )
 def final_third_entries(view: LogView, params: MetricParams) -> StatResult:
-    return _count(view, params, "final_third_entries", ("pass",), _is_final_third_entry)
+    return _count(view, params, "final_third_entries", ("pass",), is_final_third_entry)
 
 
 @metric(
@@ -158,7 +158,7 @@ def final_third_entries(view: LogView, params: MetricParams) -> StatResult:
     supports_player=True,
 )
 def box_entries(view: LogView, params: MetricParams) -> StatResult:
-    return _count(view, params, "box_entries", ("pass",), _is_box_entry)
+    return _count(view, params, "box_entries", ("pass",), is_box_entry)
 
 
 @metric(
@@ -200,6 +200,66 @@ def fouls(view: LogView, params: MetricParams) -> StatResult:
 )
 def cards(view: LogView, params: MetricParams) -> StatResult:
     return _count(view, params, "cards", ("card",))
+
+
+@metric(
+    name="yellow_cards",
+    unit="count",
+    definition="Yellow cards received; a second yellow counts as a yellow (and as a red).",
+    description_en="Yellow cards",
+    description_vi="Số thẻ vàng",
+    supports_player=True,
+)
+def yellow_cards(view: LogView, params: MetricParams) -> StatResult:
+    return _count(
+        view,
+        params,
+        "yellow_cards",
+        ("card",),
+        lambda e: isinstance(e, CardEvent) and e.color in ("yellow", "second_yellow"),
+    )
+
+
+@metric(
+    name="red_cards",
+    unit="count",
+    definition="Sendings-off: straight reds and second yellows.",
+    description_en="Red cards",
+    description_vi="Số thẻ đỏ",
+    supports_player=True,
+)
+def red_cards(view: LogView, params: MetricParams) -> StatResult:
+    return _count(
+        view,
+        params,
+        "red_cards",
+        ("card",),
+        lambda e: isinstance(e, CardEvent) and e.color in ("second_yellow", "red"),
+    )
+
+
+@metric(
+    name="tackles",
+    unit="count",
+    definition="Tackles attempted, won or lost.",
+    description_en="Tackles",
+    description_vi="Số pha tắc bóng",
+    supports_player=True,
+)
+def tackles(view: LogView, params: MetricParams) -> StatResult:
+    return _count(view, params, "tackles", ("tackle",))
+
+
+@metric(
+    name="interceptions",
+    unit="count",
+    definition="Passes intercepted.",
+    description_en="Interceptions",
+    description_vi="Số pha cắt bóng",
+    supports_player=True,
+)
+def interceptions(view: LogView, params: MetricParams) -> StatResult:
+    return _count(view, params, "interceptions", ("interception",))
 
 
 @metric(
