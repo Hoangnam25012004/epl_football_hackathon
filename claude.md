@@ -251,7 +251,7 @@
   - _Region:_ chưa chốt
   - _Category chính:_ Best Multi-Agent System (đã chốt 20/10)
   - _Ngôn ngữ claim:_ tiếng Việt + tiếng Anh; câu giải thích theo ngôn ngữ của claim (đã chốt 20/10)
-  - _LLM tạm khi chưa có Azure:_ GitHub Models (tương thích OpenAI, chung adapter với Foundry); mock là mặc định cho dev/CI (đã chốt 20/10)
+  - _LLM tạm khi chưa có Azure:_ ~~GitHub Models~~ (đã ngừng hoạt động 30/07/2026, phát hiện 21/10) → **Ollama chạy local**, model `qwen2.5:3b` (CPU), chung adapter OpenAI-compatible với Foundry; mock vẫn là mặc định cho dev/CI (đã chốt 21/10)
   - _Orchestrator:_ Microsoft Agent Framework Workflows, đã spike và ghim `agent-framework-core==1.22.0`, `agent-framework-openai==1.17.0`; một workflow mới cho mỗi claim; runner `asyncio` giữ làm lưới an toàn `orchestrator_fallback` (đã chốt 20/10). Chi tiết: [docs/day2-design.md](docs/day2-design.md) §9.5, §19
-  - _Day 2:_ xong tầng A (mock) ngày 20/10: Claim Verifier + Guardrail + MomentDetector + API/WebSocket + CLI `claim / moments / eval / serve`. RuleAnalyst luôn đối chiếu spec của LLM; lệch thì dùng luật và gắn cờ `analyst_disagreement`. Tầng B chờ `GITHUB_TOKEN` (model mặc định `openai/gpt-4.1-mini`, xác minh khi có token)
+  - _Day 2:_ xong tầng A (mock) ngày 20/10: Claim Verifier + Guardrail + MomentDetector + API/WebSocket + CLI `claim / moments / eval / serve`. RuleAnalyst luôn đối chiếu spec của LLM; lệch thì dùng luật và gắn cờ `analyst_disagreement`. Tầng B: đã chạy với Ollama local (21/10); Foundry chờ Azure. Rà soát Day 1–2 ngày 21/10: thêm luật Guardrail `WRONG_COMPARISON` / `WRONG_ATTRIBUTION` / `FRAGMENT` / `UNGROUNDED` (mỗi câu model viết về trận phải dẫn số), oracle test 4.652 claim, CLI không còn traceback khi nhập sai (chi tiết: day2-design §19.10)
   - _Azure:_ Free Account bằng email trường bị từ chối ("not eligible", 20/10); đang thử tài khoản Microsoft cá nhân / Azure for Students

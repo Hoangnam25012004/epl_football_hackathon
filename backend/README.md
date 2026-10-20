@@ -47,14 +47,23 @@ $env:MOCK_LLM_FAULTS = "explainer:hallucinate:2"; uv run pundit claim "Đội nh
 
 The mock LLM is the default: no network, no secret. Settings come from environment variables and
 an optional `backend/.env` (never committed; template in [.env.example](.env.example)).
-Environment variables win over the file. A real LLM is one switch away:
+Environment variables win over the file. A real LLM is one switch away.
+
+Local model with [Ollama](https://ollama.com) (no account, no key; GitHub Models was retired on
+2026-07-30):
 
 ```powershell
-# GitHub Models (interim): put GITHUB_TOKEN in backend/.env, then
-$env:USE_MOCK_LLM = "false"; $env:LLM_PROVIDER = "github"
-uv run pundit eval --provider github       # about 40 requests
-uv run pytest -m live
+winget install Ollama.Ollama ; ollama pull qwen2.5:3b     # once, about 1.9 GB
+# backend/.env: USE_MOCK_LLM=false and LLM_PROVIDER=ollama (model and URL have defaults)
+uv run pundit claim "Đội nhà áp đảo hiệp 2" --scenario dominant_loser --seed 42 --trace
+uv run pundit eval --provider ollama      # 30 claims, 20-40 min on a laptop CPU
+uv run pytest -m live                     # LIVE_EVAL=1 also runs the 30-claim evaluation
 ```
+
+On a CPU a claim takes 20-90 s (the first call loads the model), so `ollama` gets longer timeouts
+(`LLM_TIMEOUT_S=90`, `CLAIM_BUDGET_S=200`). Set `USE_MOCK_LLM=true` again for fast runs. Any other
+OpenAI-compatible server works with `LLM_PROVIDER=openai`, `LLM_BASE_URL`, `LLM_MODEL` and
+`LLM_API_KEY`.
 
 Microsoft Foundry: set `LLM_PROVIDER=foundry`, `FOUNDRY_ENDPOINT`, `FOUNDRY_MODEL_DEPLOYMENT`, and
 sign in with `az login` (Entra ID, needs `uv add azure-identity`) or, for development only,
@@ -68,7 +77,7 @@ uv run pytest                      # everything except the slow sweep and live L
 uv run pytest -m slow              # 100 seeds x 4 scenarios
 uv run pytest -m perf              # time budgets (also run without coverage in CI)
 uv run pytest -m "not slow and not perf and not live" --cov=pundit   # coverage run (CI)
-uv run pytest -m live              # real LLM, opt-in, needs GITHUB_TOKEN or Foundry settings
+uv run pytest -m live              # real LLM, opt-in: provider from backend/.env, else local Ollama
 ```
 
 When the generator changes on purpose, refresh the golden files and review the summary diff:

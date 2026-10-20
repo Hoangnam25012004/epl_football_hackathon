@@ -61,9 +61,9 @@
 
 ## Ngày 2 — 22/10: Orchestrator + Claim Verifier + Guardrail trên Foundry
 
-> Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day2-design.md](docs/day2-design.md). Làm **mock trước**, sau đó dùng GitHub Models làm LLM thật tạm thời, và chuyển sang Foundry khi có Azure.
+> Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day2-design.md](docs/day2-design.md). Làm **mock trước**, sau đó dùng Ollama chạy local làm LLM thật tạm thời (GitHub Models đã ngừng 30/07/2026), và chuyển sang Foundry khi có Azure.
 
-- [x] **P0** Khung Orchestrator: Microsoft Agent Framework 1.22 Workflows (9 executor, cạnh có điều kiện theo kiểu message). Adapter GitHub Models / Foundry đã viết và test offline; **gọi model thật: chờ token / Azure** (tầng B)
+- [x] **P0** Khung Orchestrator: Microsoft Agent Framework 1.22 Workflows (9 executor, cạnh có điều kiện theo kiểu message). Adapter OpenAI-compatible dùng chung cho Ollama / Foundry; đã gọi model thật qua Ollama (`qwen2.5:3b`), **Foundry: chờ Azure**
 - [x] **P0** Đăng ký Stats Tools thành tool / function cho agent (catalog `get_stat` / `compare_stat`, MAF `FunctionTool`, dùng chung cho EvidenceCollector, agent Ngày 3 và MCP Ngày 6)
 - [x] **P0** Mock LLM + biến `USE_MOCK_LLM` để dev và test không tốn quota (kèm bơm lỗi `MOCK_LLM_FAULTS`)
 - [x] **P0** **Moment Detector** (rule-based): bàn thắng, VAR huỷ bàn, thẻ, cơ hội lớn, cú sút mạnh, chuỗi tấn công nguy hiểm, momentum đổi chiều, thay người, hết hiệp
@@ -78,9 +78,19 @@
 **Hoàn thành khi** (2 tầng, xem day2-design §0):
 
 - [x] **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
-- [ ] **B (LLM thật):** cùng kết quả đó qua GitHub Models (khi có token), rồi qua Foundry (khi có Azure); bộ eval 20 claim không có verdict sai nào.
+- [x] **B1 (LLM thật, local):** Ollama `qwen2.5:3b` (21/10): bộ eval 20 claim đúng 20/20, 0 verdict sai, held-out 10/10, không câu sai nào lọt Guardrail.
+- [ ] **B2 (Foundry):** chạy lại `pundit eval --provider foundry` khi có Azure (GitHub Models đã ngừng 30/07/2026).
 
 **Kết quả (20/10):** 1210 test xanh (không cần mạng), coverage 94,9%; eval mock: 20/20 đúng, 0 verdict sai trên cả 2 bộ, held-out 9/10 có verdict (claim còn lại được từ chối an toàn), p95 36 ms. Chi tiết: day2-design §19.
+
+**Rà soát (21/10):**
+
+- 1355 test xanh, coverage 96%; slow, perf và live đều xanh.
+- Oracle test 4.652 claim: 100% đúng.
+- Smoke test API thật: 25/25.
+- Guardrail thêm 4 luật (`WRONG_COMPARISON`, `WRONG_ATTRIBUTION`, `FRAGMENT`, `UNGROUNDED`); kiểm tra spec đối chiếu cửa sổ thời gian với claim.
+- CLI không còn traceback khi nhập sai; `.env` có BOM hoặc UTF-16 đọc được; sửa một test WebSocket bị treo do race.
+- Chi tiết: day2-design §19.10.
 
 ---
 

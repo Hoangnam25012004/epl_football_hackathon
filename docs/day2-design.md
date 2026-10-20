@@ -1,8 +1,8 @@
 # Detailed Design — Ngày 2 (22/10): Orchestrator · Claim Verifier · Guardrail · Moment Detector · API
 
 > Liên quan: [claude.md](../claude.md) · [checklist.md](../checklist.md) (mục Ngày 2) · [day1-design.md](day1-design.md) (nền dữ liệu, v1.3)
-> Phiên bản: v1.1 (20/10/2026, đã xây dựng xong tầng A — xem §19 "As-built") · Người thực hiện: 1 người · Python 3.12
-> Chiến lược: **mock trước, LLM thật sau.** Mọi chức năng chạy và được test đầy đủ với mock. Sau đó gắn GitHub Models (LLM thật tạm thời), rồi Microsoft Foundry khi có Azure, chỉ bằng cách đổi cấu hình.
+> Phiên bản: v1.2 (21/10/2026: GitHub Models đã ngừng hoạt động, LLM thật tạm thời là Ollama chạy local — xem §19.10) · Người thực hiện: 1 người · Python 3.12
+> Chiến lược: **mock trước, LLM thật sau.** Mọi chức năng chạy và được test đầy đủ với mock. Sau đó gắn một LLM thật tạm thời (Ollama chạy local, vì GitHub Models đã ngừng ngày 30/07/2026), rồi Microsoft Foundry khi có Azure, chỉ bằng cách đổi cấu hình.
 
 ---
 
@@ -15,7 +15,7 @@ Ngày 2 xây **bộ não kiểm chứng** của Pundit Copilot: nhận một nh�
 | Tầng | Điều kiện | Kiểm tra bằng |
 |---|---|---|
 | **A — Mock** (bắt buộc trong Ngày 2) | Gửi claim *"Đội nhà áp đảo hiệp 2"* cho `dominant_loser-42` (tính tới hết trận) → verdict **TRUE**, kèm số liệu: kiểm soát bóng 61% so với 39%, sút 15–1, xG 2.24–0.24, momentum 0.91, cùng danh sách event ID. Toàn bộ test xanh, không cần mạng | `uv run pundit claim "Đội nhà áp đảo hiệp 2" --scenario dominant_loser --seed 42` và `POST /claims/verify` |
-| **B — LLM thật** | Cùng claim đó qua **GitHub Models** (ngay khi có token), sau đó qua **Foundry** (khi có Azure), cho ra **cùng verdict, cùng số liệu**. Bộ eval 20 claim: tỷ lệ verdict sai = 0, độ chính xác ≥ 90%, và không có số liệu bịa nào lọt qua Guardrail | `uv run pytest -m live`, `uv run pundit eval --provider github` |
+| **B — LLM thật** | Cùng claim đó qua **Ollama local** (dev), sau đó qua **Foundry** (khi có Azure), cho ra **cùng verdict, cùng số liệu**. Bộ eval 20 claim: tỷ lệ verdict sai = 0, độ chính xác ≥ 90%, và không có số liệu bịa nào lọt qua Guardrail | `uv run pytest -m live`, `uv run pundit eval --provider ollama` (rồi `foundry`) |
 
 **Ngoài phạm vi Ngày 2** (thuộc Ngày 3–6): Talking-Point Agent, Graphics Agent, Vietnamese Commentator, Personalization, giọng đọc, UI, MCP server, deploy Azure, tạm dừng/tua (pause/seek) phiên phát lại.
 
@@ -60,7 +60,7 @@ Ngày 2 xây **bộ não kiểm chứng** của Pundit Copilot: nhận một nh�
 | Agent | Loại | Vào → Ra | LLM? |
 |---|---|---|---|
 | **ClaimIntake** | Tất định | `ClaimRequest` → `ClaimContext` (ghim `as_of_seq`, nhận diện ngôn ngữ) | Không |
-| **ClaimAnalyst** | LLM (GitHub Models / Foundry) hoặc rule-based | `ClaimContext` → `ClaimAnalysis` (`ClaimSpec`) | Có / Không |
+| **ClaimAnalyst** | LLM (Ollama / Foundry) hoặc rule-based | `ClaimContext` → `ClaimAnalysis` (`ClaimSpec`) | Có / Không |
 | **EvidenceCollector** | Gọi tool | `ClaimAnalysis` → `EvidenceBundle` (các tool call tới Stats Tools) | Không |
 | **Judge** | Tất định (rubric) | `EvidenceBundle` → `JudgedClaim` | Không |
 | **Explainer** | LLM hoặc template | `JudgedClaim` → `ExplanationDraft` | Có / Không |
@@ -95,7 +95,7 @@ backend/src/pundit/
 ├─ llm/
 │  ├─ ports.py                 # ClaimAnalystPort, ExplainerPort (Protocol)
 │  ├─ mock.py                  # MockLLM = rule analyst + template explainer + fault injection
-│  ├─ maf_backend.py           # adapter MAF, client tương thích OpenAI (GitHub Models / Foundry)
+│  ├─ maf_backend.py           # adapter MAF, client tương thích OpenAI (Ollama / OpenAI-compatible / Foundry)
 │  ├─ prompts.py               # prompt + few-shot (có version)
 │  └─ settings.py              # đọc biến môi trường, kiểm tra cấu hình khi khởi động
 ├─ orchestration/
@@ -414,6 +414,10 @@ API dùng chung: `check(text, facts, language, context) -> GuardrailReport`.
 | `MISSING_EVIDENCE` | Verdict khác `INSUFFICIENT_DATA` thì mọi Fact được dùng phải có ít nhất 1 event ID |
 | `VERDICT_MISMATCH` | Văn bản chứa nhãn verdict (VI: "đúng", "sai", "đúng một phần", "không đủ dữ liệu"; EN: "true", "false", "partly", "insufficient"). So khớp cụm dài nhất trước |
 | `UNSAFE_CONTENT` | Danh sách từ cấm VI/EN (xúc phạm, phân biệt đối xử), cộng với tín hiệu bộ lọc nội dung của Foundry (`content_filter`) |
+| `WRONG_COMPARISON` *(thêm 21/10)* | Hai số cùng chỉ số của hai bên bị so sánh ngược chiều ("7 ... less than 0", "61%, kém KES … 39%"). Câu "X … cao / nhiều hơn Y" chỉ có một số ("KES kiểm soát bóng cao hơn HAR 61%") thì so trực tiếp Fact của X và Y cho chỉ số mà mệnh đề đó dẫn. Từ tiếng Việt "nhiều / cao / ít / thấp…" chỉ là so sánh khi có "hơn" đi sau; "hơn nhiều" là từ nhấn mạnh. Với PPDA (thấp hơn là mạnh hơn), "PPDA cao hơn" hiểu theo nghĩa đen, còn "pressing tầm cao hơn" nghĩa là PPDA thấp hơn |
+| `WRONG_ATTRIBUTION` *(thêm 21/10)* | Số đúng nhưng đặt cạnh đội / cầu thủ không sở hữu nó, hoặc cặp "a-b" ngược thứ tự đội (kể cả "X … hơn Y 15-1": cặp là (X, Y)). Không xét hiệu số / tỷ lệ khi mệnh đề nói "chênh lệch / gấp / difference / ratio", và đoạn ngay sau "hơn / than" ("cao hơn KES với 61%" có thể là số của chủ ngữ) |
+| `FRAGMENT` *(thêm 21/10, chỉ cho câu giải thích verdict)* | Câu bắt đầu hoặc kết thúc bằng "...", hoặc bắt đầu bằng "và / nhưng / còn / and / but" |
+| `UNGROUNDED` *(thêm 21/10, chỉ cho câu do model viết)* | Một câu nói về đội, cầu thủ hay kết quả trận (kể cả "họ", "they", "thắng", "score"…) mà không dẫn số nào. Câu định nghĩa ("PPDA thấp hơn nghĩa là pressing mạnh hơn") không bị tính |
 
 ### 7.2. Trích số và đối chiếu
 - **Mẫu trích:** số nguyên, số thập phân (`2.24`, và cả `2,24` khi có đúng 1–2 chữ số sau dấu phẩy và không có khoảng trắng), phần trăm (`61%`, "61 phần trăm"), tỷ số `1-2` / `1–2`, phút (`63'`, "phút 63"), và **chữ số đếm 0–20 khi đứng ngay trước một danh từ chỉ số** ("hai cú sút", "three corners").
@@ -437,7 +441,7 @@ API dùng chung: `check(text, facts, language, context) -> GuardrailReport`.
 
 ---
 
-## 8. Tầng LLM: mock → GitHub Models → Foundry
+## 8. Tầng LLM: mock → Ollama (local) → Foundry
 
 ### 8.1. Ports (`llm/ports.py`)
 
@@ -452,7 +456,7 @@ class ExplainerPort(Protocol):
 | Cấu hình | ClaimAnalyst | Explainer |
 |---|---|---|
 | `USE_MOCK_LLM=true` (mặc định, CI) | `RuleClaimAnalyst` | `TemplateExplainer` |
-| `LLM_PROVIDER=github` | `LlmClaimAnalyst(GitHubModelsBackend)` | `LlmExplainer(...)` |
+| `LLM_PROVIDER=ollama` / `openai` | `LlmClaimAnalyst(MafChatBackend)` | `LlmExplainer(...)` |
 | `LLM_PROVIDER=foundry` | `LlmClaimAnalyst(FoundryBackend)` | `LlmExplainer(...)` |
 | Fallback (luôn có) | `RuleClaimAnalyst` | `TemplateExplainer` |
 
@@ -474,10 +478,12 @@ Số đi kèm là số lần lỗi trước khi chạy bình thường. Dùng ch
 
   | Provider | Endpoint | Xác thực | Model |
   |---|---|---|---|
-  | GitHub Models | `https://models.github.ai/inference` (cần xác minh lại ở spike) | `GITHUB_TOKEN` (token có quyền GitHub Models) | Một model "mini" có structured output, ví dụ họ `gpt-4.1-mini` hoặc `gpt-4o-mini`; chọn theo catalog lúc spike |
+  | Ollama (dev, local) | `http://127.0.0.1:11434/v1` | Không cần (SDK nhận khoá giả `ollama`) | `qwen2.5:3b` (Q4_K_M, ~1,9 GB), chạy CPU |
+  | OpenAI-compatible | `LLM_BASE_URL` | `LLM_API_KEY` (tuỳ chọn) | `LLM_MODEL` |
   | Foundry | `https://<resource>.openai.azure.com/openai/v1` | Entra ID (`DefaultAzureCredential`); API key chỉ dùng khi dev | Tên deployment trong Foundry |
 
-- **Lưu ý về GitHub Models:** đang ở public preview, giới hạn khoảng 150 request/ngày cho model nhỏ và 8k token đầu vào mỗi request (số liệu từ nguồn bên thứ ba). Vì vậy chỉ dùng để thử prompt và chạy eval, **không** chạy trong CI.
+- **GitHub Models đã ngừng hoạt động ngày 30/07/2026** (phát hiện 21/10: `models.github.ai` trả `OK` dạng text cho mọi yêu cầu; chứng chỉ TLS đúng của GitHub, DNS đúng). Provider `github` đã bị xoá; `LLM_PROVIDER=github` báo lỗi cấu hình rõ ràng.
+- **Ollama trên CPU** (i5-1240P, 16 GB RAM): prompt analyst ~2,5k token mất ~75 s lần đầu, ~20 s khi cache phần đầu prompt còn nóng; explainer 5–15 s. Vì vậy timeout mặc định cho `ollama` là 90 s / 200 s (§8.4). Chỉ dùng để dev và chạy eval, **không** chạy trong CI.
 - **Structured output:** ưu tiên `response_format` (Pydantic). Nếu không được thì dùng JSON mode, bỏ code fence, rồi parse. Cuối cùng luôn qua `validate_spec`.
 - Mỗi lần gọi có timeout riêng. Không tự retry ở tầng HTTP; retry do `resilience.py` quyết định để tránh nhân đôi số lần thử.
 
@@ -486,10 +492,10 @@ Số đi kèm là số lần lỗi trước khi chạy bình thường. Dùng ch
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
 | `USE_MOCK_LLM` | `true` | `true` thì bỏ qua mọi cấu hình provider |
-| `LLM_PROVIDER` | — | `github` \| `foundry` |
-| `GITHUB_TOKEN`, `GITHUB_MODELS_ENDPOINT`, `GITHUB_MODELS_MODEL` | — | Cho provider `github` |
+| `LLM_PROVIDER` | — | `ollama` \| `openai` \| `foundry` |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | ollama: `http://127.0.0.1:11434/v1`, `qwen2.5:3b` | Cho `ollama` (có mặc định) và `openai` (bắt buộc URL + model) |
 | `FOUNDRY_ENDPOINT`, `FOUNDRY_MODEL_DEPLOYMENT` | — | Theo claude.md §6.3 |
-| `LLM_TIMEOUT_S` · `CLAIM_BUDGET_S` | `4` · `8` | Thời gian tối đa cho mỗi lần gọi LLM · cho cả một claim |
+| `LLM_TIMEOUT_S` · `CLAIM_BUDGET_S` | `4` · `8` (`ollama`: `90` · `200`) | Thời gian tối đa cho mỗi lần gọi LLM · cho cả một claim |
 | `MOCK_LLM_FAULTS`, `MOCK_LLM_LATENCY_MS` | — | Test / demo |
 | `CORS_ORIGINS` | `http://localhost:3000` | Cho frontend Ngày 4 |
 
@@ -498,8 +504,8 @@ Khi khởi động, nếu `USE_MOCK_LLM=false` mà thiếu biến bắt buộc t
 ### 8.5. Danh sách việc khi gắn Foundry (ngay khi có Azure, khoảng 1 giờ)
 1. Tạo Foundry resource và deploy một model mini; ghi region và model vào claude.md §8.
 2. Đặt `LLM_PROVIDER=foundry` cùng các biến Foundry; chạy `az login` khi dev.
-3. `uv run pytest -m live --provider foundry` và `uv run pundit eval --provider foundry`.
-4. So sánh với GitHub Models: verdict phải giống nhau trên bộ eval; ghi độ trễ p50/p95.
+3. `uv run pytest -m live` (provider lấy từ `backend/.env`; hoặc đặt `LIVE_PROVIDER=foundry`) và `uv run pundit eval --provider foundry`. Bước này cũng là lúc thêm `azure-identity` (`uv add azure-identity`).
+4. So sánh với Ollama: verdict phải giống nhau trên bộ eval; ghi độ trễ p50/p95.
 5. Kiểm tra tín hiệu `content_filter` được map đúng sang `UNSAFE_CONTENT`.
 
 ---
@@ -566,7 +572,7 @@ Kết quả ghi vào mục này (tên lớp, chữ ký hàm thật).
 | 5 | Exception trong executor | ⚠️ Lan ra `workflow.run()`. Mọi executor tự bắt lỗi và chuyển sang nhánh fallback; ClaimService còn một lưới an toàn `orchestrator_fallback` |
 | 6 | Stream sự kiện workflow | Không dùng: trace tự ghi bằng `TraceRecorder` (span id tất định). MAF log mỗi superstep ở mức INFO, `pundit serve` hạ xuống WARNING |
 | 7 | Chạy offline | ✅ |
-| 8 | Client tương thích OpenAI | ✅ (offline) `OpenAIChatCompletionClient(model=..., async_client=AsyncOpenAI(base_url=..., max_retries=0, http_client=...))` + `Agent(client=..., instructions=...)`; `await agent.run(text, options={"response_format": Model, "temperature": 0})` gửi `POST {base_url}/chat/completions` với `response_format = {"type": "json_schema", "json_schema": {..., "strict": true}}`; `response.value` là model đã parse (`ValidationError` nếu sai). Chưa gọi GitHub Models thật vì chưa có token |
+| 8 | Client tương thích OpenAI | ✅ (offline) `OpenAIChatCompletionClient(model=..., async_client=AsyncOpenAI(base_url=..., max_retries=0, http_client=...))` + `Agent(client=..., instructions=...)`; `await agent.run(text, options={"response_format": Model, "temperature": 0})` gửi `POST {base_url}/chat/completions` với `response_format = {"type": "json_schema", "json_schema": {..., "strict": true}}`; `response.value` là model đã parse (`ValidationError` nếu sai). Chưa gọi GitHub Models thật vì chưa có token (dịch vụ sau đó được xác nhận đã ngừng, §19.10) |
 
 Strict mode của OpenAI không nhận `oneOf` (union có discriminator của `Window`), nên LLM điền một DTO phẳng (`llm/dto.py`) rồi được chuyển sang `ClaimSpec` (§19).
 
@@ -641,7 +647,7 @@ Mọi message có dạng `{v: 1, type, n, match_id, payload}`. Trong đó `n` t�
 ### 11.4. CLI mới
 - `pundit claim "<text>" --scenario S --seed N [--at "63'"] [--lang auto] [--trace]`: in verdict, Fact, câu giải thích và tóm tắt trace.
 - `pundit serve [--host] [--port]`: chạy uvicorn với `create_app()`.
-- `pundit eval [--file] [--provider mock|github|foundry]`: chạy bộ eval, in báo cáo (mục 13.6).
+- `pundit eval [--file] [--provider mock|ollama|openai|foundry]`: chạy bộ eval, in báo cáo (mục 13.6).
 - `pundit moments --scenario S --seed N`: in danh sách moment của cả trận.
 
 ---
@@ -684,7 +690,7 @@ class TraceSpan(BaseModel):
 | Workflow | `tests/workflow/` | Workflow MAF với mock: luồng chuẩn, ma trận lỗi, circuit breaker | ~40 |
 | API | `tests/api/` | REST + WebSocket qua `TestClient`, `FakeClock` | ~25 |
 | Eval | `tests/eval/` | 20 claim + bộ held-out (mục 13.6) | ~4 |
-| Live (opt-in) | `tests/live/` | GitHub Models / Foundry, chỉ chạy với `-m live` | ~5 |
+| Live (opt-in) | `tests/live/` | Ollama / Foundry, chỉ chạy với `-m live` | ~5 |
 | Perf | `tests/perf/` | Ngân sách thời gian (mục 13.8) | ~4 |
 
 Toàn bộ test mặc định chạy trong **dưới 90 s**, không cần mạng.
@@ -790,10 +796,10 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
   | Độ trễ p50 / p95 | Báo cáo | Báo cáo |
 
 ### 13.7. Test live (chỉ chạy khi có biến môi trường)
-- Đánh dấu `@pytest.mark.live`; tự bỏ qua nếu thiếu `GITHUB_TOKEN` / biến Foundry.
+- Đánh dấu `@pytest.mark.live`; provider lấy từ `backend/.env`, nếu không có thì thử Ollama local; tự bỏ qua nếu không cấu hình hoặc không kết nối được.
 - **Nội dung:**
   - 3 claim smoke.
-  - Chạy bộ eval: khoảng 20 claim × tối đa 2 lần gọi = 40 request, vừa giới hạn hằng ngày của GitHub Models.
+  - Chạy bộ eval 30 claim: rất lâu trên CPU nên chỉ chạy khi `LIVE_EVAL=1` (hoặc dùng `pundit eval --provider ollama`).
   - Kiểm tra structured output.
   - Kiểm tra map `content_filter`.
 - Không chạy trong CI.
@@ -815,7 +821,7 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 2. `MOCK_LLM_FAULTS=explainer:hallucinate:2 pundit claim ...` → trace có `rejected`, rồi `fallback`; câu công bố là template. **Đây là cảnh demo Guardrail.**
 3. `pundit serve`, mở `/docs` (Swagger) và thử `POST /claims/verify`. Dùng một client WebSocket đơn giản xem `hello` / `event` / `moment`.
 4. `pundit moments --scenario comeback_var --seed 7` → có `goal_overturned` ở khoảng 37'.
-5. Nếu đã có token: `pundit eval --provider github` và ghi kết quả vào mục 18.
+5. `pundit eval --provider ollama` (khi có Azure: `--provider foundry`) và ghi kết quả vào mục 19.
 
 ---
 
@@ -823,7 +829,7 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 
 | # | Bước | Thời lượng | Đầu ra | Gate |
 |---|---|---|---|---|
-| 0 | Spike MAF (+ GitHub Models nếu đã có token) | 1:00 | Ghi chú API ở mục 9.5, phiên bản ghim trong `pyproject` | Workflow thử có rẽ nhánh, vòng lặp, chạy song song |
+| 0 | Spike MAF (+ LLM thật nếu có) | 1:00 | Ghi chú API ở mục 9.5, phiên bản ghim trong `pyproject` | Workflow thử có rẽ nhánh, vòng lặp, chạy song song |
 | 1 | Contracts + xuất schema | 0:45 | `contracts.py`, schema mới | Test contract |
 | 2 | Ngôn ngữ, thực thể, phạm vi thời gian, từ điển | 1:15 | `language`, `entities`, `timescope`, `lexicon` | Bảng test |
 | 3 | RuleClaimAnalyst + `validate_spec` | 1:30 | `analyst_rules`, `spec_validation` | ≥ 60 ca + fuzz |
@@ -834,7 +840,7 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 | 8 | MomentDetector | 1:00 | `moments` | Lô = luồng; moment theo kịch bản |
 | 9 | Session + API + WebSocket + CLI | 2:00 | `api/*`, lệnh CLI mới | Test API/WS, test đồng thời |
 | 10 | Bộ eval + `pundit eval` | 1:00 | File eval, runner | Mock 100%; tỷ lệ verdict sai = 0 |
-| 11 | Adapter LLM thật (GitHub Models) + test live | 1:00 | `llm/maf_backend`, `prompts` | `-m live` xanh (nếu có token) |
+| 11 | Adapter LLM thật (Ollama / Foundry) + test live | 1:00 | `llm/maf_backend`, `prompts` | `-m live` xanh (nếu có token) |
 | 12 | Gate cuối | 0:30 | Coverage, tài liệu, checklist, commit | DoD tầng A (+ B nếu có token) |
 
 **Tổng khoảng 14 giờ.** Nếu trễ, cắt theo thứ tự:
@@ -876,11 +882,11 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 | Rủi ro | Khả năng | Phương án |
 |---|---|---|
 | API của MAF khác tài liệu, hoặc lỗi trên Python 3.12 | Trung bình | Spike ở bước 0; nếu thất bại dùng runner `asyncio` (mục 9.5) |
-| GitHub Models giới hạn request hoặc đổi chính sách (đang preview) | Trung bình | Mock là mặc định; test live tốn rất ít request; Foundry là đích cuối |
+| LLM thật tạm thời không dùng được (GitHub Models đã ngừng 30/07/2026) | Đã xảy ra | Ollama chạy local thay thế; mock là mặc định; Foundry là đích cuối |
 | Bộ phân tích rule-based không phủ hết cách nói | Cao | Fail-safe; LLM là đường chính khi có; bộ held-out đo độ phủ một cách trung thực |
 | Rubric "áp đảo" gây tranh cãi | Trung bình | Hằng số có tài liệu; hiển thị đủ 4 chỉ báo để người xem tự đánh giá; hiệu chỉnh trên dữ liệu |
 | LLM thật chậm (> 5 s) | Trung bình | Một lần gọi Analyst; INSUFFICIENT dùng template; ngân sách + fallback |
-| Azure chưa có trước ngày nộp bài | Trung bình | Giữ GitHub Models (thuộc GitHub, cũng là hero tech); Foundry gắn vào chỉ cần đổi biến môi trường |
+| Azure chưa có trước ngày nộp bài | Trung bình | Agent Framework vẫn là hero tech; Ollama giữ đường LLM thật cho dev; Foundry gắn vào chỉ cần đổi biến môi trường. Cần Azure trước khoảng 24/10 |
 | Ngày 2 quá tải (14 giờ) | Cao | Thứ tự cắt ở mục 14 |
 
 ---
@@ -903,17 +909,17 @@ Dữ liệu là trận golden `dominant_loser-42` (Day 1 v1.3). `as_of` mặc đ
 | # | Quyết định | Kết quả |
 |---|---|---|
 | 1 | Ngôn ngữ claim | ✅ **Tiếng Việt + tiếng Anh**; câu giải thích theo ngôn ngữ của claim |
-| 2 | LLM thật tạm thời khi chưa có Azure | ✅ **GitHub Models** (endpoint tương thích OpenAI, dùng chung adapter với Foundry); mock vẫn là mặc định cho dev / CI |
+| 2 | LLM thật tạm thời khi chưa có Azure | ~~GitHub Models~~ (đã ngừng 30/07/2026) → ✅ **Ollama local** (21/10), dùng chung adapter OpenAI-compatible với Foundry; mock vẫn là mặc định cho dev / CI |
 | 3 | Orchestrator | ✅ **Microsoft Agent Framework Workflows**, phiên bản ghim sau spike; dự phòng là runner `asyncio` |
 | 4 | Vai trò của LLM | ✅ Chỉ hiểu claim (structured output) và viết câu giải thích; phán quyết và số liệu do code tất định |
 | 5 | Kết quả spike | ✅ MAF 1.22 dùng được (§9.5); một workflow mới cho mỗi claim; runner `asyncio` giữ lại làm lưới an toàn `orchestrator_fallback` |
-| 6 | Model GitHub Models / Foundry | ⏳ Mặc định `openai/gpt-4.1-mini` cho GitHub Models (đổi bằng `GITHUB_MODELS_MODEL`, xác minh khi có token); Foundry chọn khi có Azure |
+| 6 | Model LLM thật | ✅ Dev: `qwen2.5:3b` qua Ollama (máy CPU, 21/10). ⏳ Foundry: chọn khi có Azure |
 
 ---
 
 ## 19. As-built (20/10/2026): những gì đã xây dựng, khác biệt so với thiết kế, kết quả đo
 
-Tầng A của Definition of Done đã đạt; tầng B chờ `GITHUB_TOKEN` / Azure. Các mục dưới đây bổ sung (không thay thế) các mục trên.
+Tầng A của Definition of Done đã đạt; tầng B đạt với Ollama local (§19.10), còn chờ Azure cho Foundry. Các mục dưới đây bổ sung (không thay thế) các mục trên.
 
 ### 19.1. Đồ thị workflow thực tế (MAF, 9 executor)
 
@@ -1011,5 +1017,90 @@ Lưu ý: mục tiêu "toàn bộ test < 90 s" của §13.1 chưa đạt trên m�
 
 ### 19.9. Việc còn lại
 
-- **Tầng B:** có `GITHUB_TOKEN` thì chạy `uv run pytest -m live` và `uv run pundit eval --provider github`, ghi model / độ trễ vào §18. Khi có Azure: làm theo §8.5 (thêm `azure-identity`, `LLM_PROVIDER=foundry`).
-- Độ phủ của bộ phân tích luật: claim ngoài từ điển được từ chối an toàn; LLM là đường mở rộng độ phủ khi có token.
+- **Tầng B:** Ollama local đã chạy (§19.10). Khi có Azure: làm theo §8.5 (thêm `azure-identity`, `LLM_PROVIDER=foundry`), chạy `uv run pytest -m live` và `uv run pundit eval --provider foundry`.
+- Độ phủ của bộ phân tích luật: claim ngoài từ điển được từ chối an toàn; LLM là đường mở rộng độ phủ (`qwen2.5:3b` local còn yếu; Foundry khi có Azure).
+
+### 19.10. Cập nhật 21/10: LLM thật bằng Ollama và rà soát lại Day 1–2
+
+**Bối cảnh.** GitHub Models đã ngừng hoạt động ngày 30/07/2026: `models.github.ai` trả `OK` (text/plain) cho mọi yêu cầu, kể cả khi không có token; DNS và chứng chỉ TLS vẫn đúng của GitHub. Azure chưa có. Vì vậy LLM thật dùng cho dev là **Ollama chạy local**; Foundry vẫn là đích cuối, chỉ cần đổi cấu hình (§8.5).
+
+**Thay đổi**
+
+| Phần | Thay đổi |
+|---|---|
+| Provider | `mock \| ollama \| openai \| foundry`. Bỏ `github`; đặt `LLM_PROVIDER=github` sẽ báo lỗi cấu hình kèm hướng dẫn. `ollama` mặc định `http://127.0.0.1:11434/v1` + `qwen2.5:3b`, timeout 90 s mỗi lần gọi và 200 s mỗi claim. `openai` dùng cho mọi server OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`). File `.env` lưu bằng Notepad (có BOM) hoặc bằng `>` của PowerShell 5.1 (UTF-16) giờ đều đọc được |
+| Prompt (`analyst-v2`, `explainer-v4`) | Phần tĩnh (luật, ví dụ, danh mục đội / cầu thủ / chỉ số) nằm trong system message để Ollama dùng lại cache đầu prompt. Prompt còn khoảng 2,5k token (trước đây khoảng 4,5k, có nguy cơ bị cắt vì context mặc định của Ollama là 4096 token). Analyst mất khoảng 75 s ở lần gọi đầu, khoảng 20 s khi cache còn nóng. Explainer: câu hoàn chỉnh, mỗi câu về trận đấu phải dẫn một con số |
+| Guardrail | Thêm 4 luật, đều do output thật của `qwen2.5:3b` làm lộ ra (bảng §7.1): **`WRONG_COMPARISON`**, **`WRONG_ATTRIBUTION`**, **`FRAGMENT`**, **`UNGROUNDED`** (chi tiết bên dưới) |
+| DTO | Model nhỏ hay điền `ratio` ngược với "ít hơn" (0.5 thay vì 2): đọc lại thành 1/ratio; ratio ≤ 0 hoặc = 1 bị bỏ |
+| Kiểm tra spec | **Cửa sổ thời gian phải có căn cứ trong claim.** Khi bộ luật đọc được cụm thời gian ("hiệp 2", "sau giờ nghỉ", "15 phút cuối"), cửa sổ của LLM phải đúng là cửa sổ đó, hoặc dựng từ con số claim viết ra. Cả trận chỉ được dùng khi claim không có từ chỉ thời gian, hoặc cho một vế đứng cạnh vế đã có thời gian ("áp đảo hiệp 2 và thắng trận"). Nếu claim không có từ chỉ thời gian, mốc phút phải là số claim viết ra, mốc hiệp (0, 45, 90 trên trục phút chính xác) hoặc phút hiện tại. Phản hồi cho LLM nêu đúng cửa sổ cần dùng ("the claim's time words mean second_half"). `qwen2.5:3b` lần lượt đọc "sau giờ nghỉ" thành "từ phút 84" (bằng chứng của 12 phút cuối), "từ phút 46" (bỏ sót phút đầu hiệp 2), "từ phút 45" (lấn sang bù giờ hiệp 1) rồi "cả trận" ("chênh lệch xG 1.77" thay vì 2.00). Giờ nó được trả lại cho đến khi chọn `second_half`, hoặc hệ thống dùng luật. Bộ luật cũng đã hiểu "sau giờ nghỉ / sau khi nghỉ giữa hiệp" là hiệp 2, như "after the break" bên tiếng Anh |
+| Eval | Báo cáo sức khoẻ LLM, tách **không khả dụng** (timeout, lỗi, circuit mở) khỏi **trả lời không dùng được** (spec / câu chữ hỏng hai lần, dùng luật hoặc template). `pundit eval --provider X` báo **FAILED** khi model chưa từng cho spec dùng được, hoặc không khả dụng ở quá 20% số claim. Trước đây eval vẫn báo PASSED nhờ fallback, che mất việc token không hoạt động |
+| Trace | Span `error` luôn có lý do (spec trượt kiểm tra: `invalid spec: ...`); span Explainer lỗi ghi `failure` = `timeout` / `invalid_output` / `error` |
+| Test live | Provider lấy từ `backend/.env`, nếu không có thì thử Ollama; tự bỏ qua khi không kết nối được. Khẳng định model khả dụng (không timeout, không lỗi); model nhỏ được phép trả lời kém, vì luật và template sẽ thay. Eval 30 claim chỉ chạy khi `LIVE_EVAL=1` |
+
+**Bốn luật Guardrail mới: số đúng nhưng câu sai**
+
+Cả bốn đều lấy từ output thật của model:
+
+- `WRONG_COMPARISON`: câu "7 corners in the second half for HAR is less than 0 for KES" có số nào cũng đúng, nhưng quan hệ sai. Tương tự "HAR … 61%, kém KES nhiều hơn 39%".
+- `WRONG_ATTRIBUTION`: số đúng nhưng đặt cạnh đội khác, hoặc tỷ số "a-b" ngược thứ tự.
+- `FRAGMENT`: chỉ áp dụng cho câu giải thích verdict, ví dụ "... và KES chỉ có 1 cú sút trong hiệp 2.".
+- `UNGROUNDED`: chỉ áp dụng cho câu do model viết. Ví dụ "KES có chênh lệch xG lớn hơn HAR" hay "The score difference in the first half is tied": không có số nào để đối chiếu, và đều sai.
+
+Rà 26 câu giải thích của LLM đã được đăng ở lần eval thứ hai, có 6 câu sai về nghĩa dù số liệu đúng; luật `UNGROUNDED` và từ "kém" chặn được 4 câu trong số đó.
+
+Lần eval thứ ba và thứ tư lộ thêm hai câu sai:
+
+- "KES … tỷ lệ số cú sút cao hơn HAR 15-1" (15 là của HAR). Đã sửa: sau "X … hơn Y", cặp "a-b" phải theo thứ tự (X, Y).
+- "KES kiểm soát bóng cao hơn HAR 61%" (chỉ có một số). Đã sửa: hướng so sánh giữa X và Y được đối chiếu trực tiếp với Fact của chỉ số mà mệnh đề dẫn ra.
+
+Hai câu vẫn lọt:
+
+- "15 shots, twice as many as Kestrel's 1": chữ "twice" không phải con số.
+- "Calder ghi bàn …, nâng tỷ số lên 1-2": tỷ số là ngữ cảnh được phép, nhưng không đúng tại thời điểm bàn thắng.
+
+Hai câu này cần một model tốt hơn (Foundry).
+
+Hai lỗi chặn nhầm câu đúng cũng được tìm thấy và sửa:
+
+- "cao hơn KES … với 61%": sau "hơn / than", con số có thể là của chủ ngữ.
+- "gấp 15 lần Kestrel", "goal difference is 1": hiệu số và tỷ lệ không thuộc đội nào, nhưng chỉ được miễn xét khi chính mệnh đề đó nói "chênh lệch / gấp / difference / ratio…". Nhờ vậy "…, Harbor scored 2" vẫn bị bắt.
+
+Ngoài ra, "nhiều / cao / ít" đứng một mình ("pressing tầm cao", "nhiều cú sút") không phải phép so sánh; "hơn nhiều" chỉ là từ nhấn mạnh.
+
+**Rà soát Day 1–2: lỗi tìm thấy và đã sửa**
+
+- CLI: giá trị sai (`stats --window xyz`, `replay --speed 0`, `claim --at abc`, file không tồn tại, claim dưới 3 ký tự) từng in traceback. Nay là lỗi dùng lệnh, exit 2, kèm thông báo ngắn; `--at FT` được chấp nhận. CLI in "[1 events]" → "[1 event]".
+- `.env` có BOM thì biến đầu tiên bị bỏ qua mà không báo gì; `.env` UTF-16 thì không đọc được.
+- Guardrail: 4 lỗ hổng và 2 trường hợp chặn nhầm nêu ở trên.
+- Eval: model yếu (trả lời sai định dạng) bị tính như model không chạy, khiến `pundit eval --provider ollama` lúc PASSED lúc FAILED (17–20%, sát ngưỡng).
+- Kiểm tra spec: cửa sổ thời gian của LLM không được đối chiếu với câu claim ("sau giờ nghỉ" → "từ phút 84" / 46 / 45 / cả trận). Bộ luật chưa hiểu "sau giờ nghỉ".
+- Test treo: `test_late_client_gets_the_state_in_hello` có race. Replay tự chạy với đồng hồ tức thời có thể xong trước khi WebSocket kết nối, khi đó `receive_json()` chờ mãi. Sửa bằng cách start sau khi nhận `hello`. Sản phẩm vẫn đúng: `hello` đã mang trạng thái `finished`.
+
+**Kiểm tra bổ sung**
+
+- **Oracle test** (`tests/property/test_claim_oracle.py`):
+  - 4.652 claim sinh tự động trên 4 kịch bản, đối chiếu với kết quả tính độc lập từ Stats Tools, không đi qua parser hay Judge.
+  - Phạm vi: 8 chỉ số đếm, kiểm soát bóng, xG; 5 cửa sổ (H1, H2, cả trận, "từ phút 60", "15 phút cuối"); người ghi bàn và người sút nhiều nhất; tiếng Việt và tiếng Anh.
+  - Kết quả: **100% đúng, 0 từ chối, 0 sai**.
+  - Template của các claim này đều qua Guardrail ở chế độ "model text" (mock explainer dùng chính template).
+- **Test metamorphic cho luật quan hệ** (`tests/agents/test_guardrail_relations.py`): 510 câu đúng, viết theo 14 kiểu tiếng Việt và tiếng Anh (5 chỉ số, 3 cửa sổ, 2 trận, 2 chiều đội), kể cả cặp "a-b" sau "hơn" và câu chỉ có một số, đều qua. 220 câu sai (tráo số, đảo chiều so sánh, đảo cặp số, đảo hai đội trong câu một số) đều bị chặn.
+- **Smoke test API thật** (`pundit serve`, mock): 25/25 kiểm tra đạt.
+  - REST: healthz, tạo trận, replay hết trận, 3 moment bàn thắng, `moments?since=`, claim tiếng Việt TRUE và tiếng Anh FALSE, trace chỉ trả khi xin, 404 / 422.
+  - WebSocket: hello, event, moment, snapshot, số thứ tự `n` không đứt; trận không tồn tại bị từ chối.
+  - Vòng đời: dừng giữa trận rồi chạy tiếp; log server không có lỗi.
+- **Chạy tay các lệnh Day 1** (`scenarios`, `stats`, `replay --compact`, `generate`) với output chuyển hướng ra file: không traceback, tiếng Việt và tên cầu thủ giữ nguyên.
+
+**Kết quả**
+
+| Hạng mục | Kết quả |
+|---|---|
+| Test mặc định (không mạng) | **1355 xanh** (+145 so với 20/10); 17 test slow / perf / live tách riêng; coverage **96%**; 4 phút 53 giây kèm coverage |
+| `-m slow` · `-m perf` | 8 xanh (1 phút 30 giây) · 5 xanh |
+| `-m live` (Ollama) | 3 xanh + 1 bỏ qua (eval 30 claim cần `LIVE_EVAL=1`), 1 phút 26 giây |
+| Eval với Ollama (`qwen2.5:3b`, CPU i5-1240P) | Bộ có nhãn **20/20**, **0 verdict sai** trên cả 2 bộ, held-out **10/10** (mock 9/10). 0 câu bị chặn lọt ra, 0 số liệu lệch. LLM không khả dụng 0/30; trả lời không dùng được 5/30 (luật hoặc template thay). Spec của LLM được dùng 18/30, bị luật bác 7 lần. Câu giải thích của LLM được đăng 23/30; 12 bản nháp bị chặn, cả 12 lần chặn đều đúng sau khi đọc lại. p50 30 s, p95 52 s |
+| ruff, ruff format, mypy strict | sạch |
+
+**Lưu ý vận hành**
+
+- `backend/.env` trên máy dev đang đặt `USE_MOCK_LLM=false` + `LLM_PROVIDER=ollama`, nên `pundit claim` mất 20–90 s. Đặt lại `USE_MOCK_LLM=true` khi cần chạy nhanh. Test mặc định không đọc file này.
+- `qwen2.5:3b` đủ để chứng minh đường LLM thật chạy được, nhưng câu chữ còn yếu: nhiều câu giải thích phải dùng template. Verdict và số liệu vẫn đúng nhờ RuleAnalyst và Guardrail. Video demo và bản deploy cần Foundry.
