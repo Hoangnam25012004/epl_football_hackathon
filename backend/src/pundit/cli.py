@@ -12,8 +12,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pundit.domain.errors import InvalidEventError, PunditError
-from pundit.domain.events import EVENT_ADAPTER
-from pundit.domain.matchtime import minute_exact, parse_window
+from pundit.domain.events import EVENT_ADAPTER, PassEvent
+from pundit.domain.matchtime import RollingWindow, minute_exact, parse_window
 from pundit.domain.meta import MatchMeta
 from pundit.engine.generator import generate
 from pundit.engine.io import match_hash, read_match, summary_json, write_match
@@ -23,8 +23,10 @@ from pundit.engine.scenarios import SCENARIOS
 from pundit.engine.validate import validate_match
 from pundit.state.match_state import MatchState
 from pundit.stats import REGISTRY, MetricParams, StatResult, compute, display
+from pundit.stats.possession import possession_totals
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+RECENT_MINUTES = 10.0  # window of the "LAST 10'" possession in replay status lines
 DATA_DIR = REPO_ROOT / "data" / "matches"
 GOLDEN_DIR = REPO_ROOT / "backend" / "tests" / "golden" / "data"
 SCHEMA_DIR = REPO_ROOT / "packages" / "schemas"
@@ -94,7 +96,8 @@ def _cmd_replay(args: argparse.Namespace) -> int:
             if item.catching_up:
                 continue
             now = minute_exact(event.period, event.clock_ms)
-            show = not (args.compact and event.type in quiet)
+            is_corner = isinstance(event, PassEvent) and event.play_type == "corner"
+            show = not (args.compact and event.type in quiet and not is_corner)
             status_due = now >= next_status
             if not (show or status_due):
                 continue
@@ -104,7 +107,14 @@ def _cmd_replay(args: argparse.Namespace) -> int:
                 print(line, flush=True)
                 printed += 1
             if status_due:
-                print(status_line(meta, snapshot), flush=True)
+                recent = possession_totals(
+                    state.view(), RollingWindow.last(RECENT_MINUTES, snapshot.as_of_ms)
+                )
+                recent_pct: dict[str, float | None] = {
+                    team: (100.0 * ms / recent.total_ms if recent.total_ms else None)
+                    for team, ms in recent.team_ms.items()
+                }
+                print(status_line(meta, snapshot, recent_pct, RECENT_MINUTES), flush=True)
                 while next_status <= now:
                     next_status += args.status_every
             if args.max_events and printed >= args.max_events:
@@ -191,7 +201,9 @@ def _parser() -> argparse.ArgumentParser:
     p = sub.add_parser("replay", help="replay a match in real time")
     source(p)
     p.add_argument("--speed", type=float, default=20.0)
-    p.add_argument("--from-minute", type=float, default=0.0)
+    p.add_argument(
+        "--from-minute", type=float, default=0.0, help="scoreboard minute; 45 and above = 2nd half"
+    )
     p.add_argument("--status-every", type=float, default=5.0, help="minutes; 0 disables")
     p.add_argument("--compact", action="store_true", help="hide passes, pressure and stoppages")
     p.add_argument("--max-events", type=int, default=0, help="stop after N printed lines")

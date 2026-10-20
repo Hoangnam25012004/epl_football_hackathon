@@ -1,9 +1,10 @@
 # Detailed Design — Ngày 1 (21/10): Schema · Synthetic Match Engine · Match State · Stats Tools
 
 > Liên quan: [claude.md](../claude.md) (tổng quan dự án) · [checklist.md](../checklist.md) (mục Ngày 1)
-> Phiên bản: v1.2 (as-built, 20/10/2026) · Người thực hiện: 1 người · Ngôn ngữ code: Python 3.12
+> Phiên bản: v1.3 (as-built, rà soát sau demo, 20/10/2026) · Người thực hiện: 1 người · Ngôn ngữ code: Python 3.12
 > Thay đổi ở v1.1: kiểm soát bóng tính **theo thời gian bóng lăn** (thêm event `ball_dead`, `ball_recovery` và máy trạng thái bóng, mục 4.4); chốt 4 quyết định ở mục 17.
 > Thay đổi ở v1.2: tài liệu được cập nhật theo code thực tế sau khi triển khai và hiệu chỉnh; các điểm khác với v1.1 được tổng hợp ở **mục 18**.
+> Thay đổi ở v1.3 (rà soát sau demo): sửa `chaos_index` và `--from-minute`, tách bóng hai (`ball_recovery`) khỏi `interception`, hiệu chỉnh lại PPDA / tắc bóng / cự ly chuyền; xem **mục 18.4**.
 
 ---
 
@@ -339,7 +340,7 @@ Cấu hình model: `ConfigDict(frozen=True, extra="forbid")`. Mỗi lớp con kh
 | `pressure` | ✔ (đội phòng ngự) | ✔ | — | `target_player`, `duration_ms` |
 | `tackle` | ✔ (đội phòng ngự) | ✔ | `won` · `lost` | `target_player` |
 | `interception` | ✔ | ✔ | — | `related_ids = [pass_id bị cắt]` |
-| `ball_recovery` | ✔ (đội giành bóng) | ✔ | — | Giành bóng tự do: thủ môn bắt bóng sau cú sút, nhặt bóng bật ra sau pha chặn hoặc dội cột. `related_ids = [shot_id]` |
+| `ball_recovery` | ✔ (đội giành bóng) | ✔ | — | Giành bóng tự do: thủ môn bắt bóng sau cú sút, nhặt bóng bật ra sau pha chặn hoặc dội cột, hoặc nhặt bóng hai sau đường chuyền hỏng của đối thủ. `related_ids = [shot_id]` hoặc `[pass_id hỏng của đối thủ]` |
 | `foul` | ✔ (đội phạm lỗi) | ✔ | — | `fouled_player` |
 | `card` | ✔ | — | — | `color` (`yellow`/`second_yellow`/`red`); `related_ids = [foul_id]` |
 | `offside` | ✔ (đội tấn công) | ✔ | — | `via_var` (bool). `related_ids = [pass_id]`; khi `via_var=true` thì `related_ids = [pass_id, var_check_id]` |
@@ -604,7 +605,7 @@ Tham số chung là `MetricParams(team=None, player=None, window=FULL)`. Mỗi m
 | `speed_alerts` | Các snapshot mà `top_speed_kmh` vượt `SPEED_ALERT_KMH = 33.0` lần đầu, cộng các shot có `speed_kmh >= SHOT_SPEED_ALERT_KMH = 100.0` |
 | `ppda` | Số pass của đối thủ trong 60% sân phía dưới của họ (`x <= 63` theo hệ toạ độ đối thủ) chia cho số pha phòng ngự của đội (tackle + interception + foul có `x >= 42` theo hệ toạ độ của đội). Mẫu số = 0 → insufficient. PPDA càng thấp nghĩa là pressing càng mạnh |
 | `momentum` | Tỷ phần điểm đe doạ trong cửa sổ: shot `1 + 4·xg`, final-third entry `0.6`, box entry `1.0`, corner `0.5`, tackle thắng / interception / ball recovery ở nửa sân đối thủ `0.4`. Kết quả `(T − O) / (T + O)` nằm trong `[-1, 1]` (0 nếu không có điểm nào), dương nghĩa là nghiêng về `team`. Momentum "hiện tại" = cửa sổ `RollingWindow.last(10)`; biểu đồ dùng `momentum_series()` (cửa sổ trượt 10 phút, mỗi phút một điểm) |
-| `chaos_index` | *(scope `match`)* Tính theo phút bóng lăn: `0.5·norm(số possession/phút, 3.0, 4.9) + 0.3·(1 − norm(số pass/possession, 3.6, 5.8)) + 0.2·norm((foul + tackle)/phút, 1.1, 2.3)`, kẹp trong `[0, 1]`. Các mốc là bách phân vị 10–90 của cửa sổ 10 phút trong trận `balanced`, nên một quãng cân bằng cho khoảng 0.5. Nhãn (`label`): `control` nếu < 0.4, `chaos` nếu > 0.6, còn lại `balanced` |
+| `chaos_index` | *(scope `match`)* `chaos = structure × (1 − dominance)`. **structure** = `0.5·norm(số lần đổi đội/phút bóng lăn, 2.4, 4.0) + 0.3·(1 − norm(số pass/spell, 4.2, 6.9)) + 0.2·norm((foul + tackle)/phút bóng lăn, 0.56, 1.45)`; một **spell** là chuỗi possession liên tiếp của cùng một đội, nên restart của đội đang giữ bóng (phạt góc, ném biên, đá phạt) không bị tính là đổi đội. **dominance** = `\|momentum\|` trong cửa sổ. Các mốc chuẩn hoá là bách phân vị 10–90 của cửa sổ 10 phút trong trận `balanced`. Nhãn (`label`): `control` nếu < 0.25, `chaos` nếu > 0.55, còn lại `balanced`. Ý nghĩa: "hỗn loạn" cần bóng đổi chân liên tục **và** không đội nào làm chủ |
 | `var_overturns` | Số bàn thắng của đội bị VAR huỷ (đếm tại thời điểm VAR quyết định) |
 | `tempo` | Số pass mỗi phút khi đội giữ bóng (nhịp trận) |
 
@@ -874,14 +875,14 @@ async def replay(events: Sequence[Event], *, speed: float, clock: Clock,
 **Ba điểm quan trọng:**
 1. Replay **trả về mọi event**, kể cả các event bị tua qua (gắn cờ `catching_up=True`). Nhờ vậy `MatchState` vẫn nhận đủ dữ liệu, và tỷ số khi nhảy tới phút 60 vẫn đúng.
 2. Thời điểm phát được tính theo **lịch tuyệt đối**. Nếu bên nhận xử lý chậm, replay chỉ không ngủ nữa chứ không cộng dồn độ trễ.
-3. `from_minute` dùng **chốt một chiều**: đã bắt đầu phát thì không quay lại chế độ tua, kể cả khi gặp phút bù giờ.
+3. `from_minute` được hiểu **như phút trên bảng tỷ số**: giá trị từ 45 trở lên là hiệp 2, nên phút bù giờ hiệp 1 (45+3' là phút thứ 48 của đồng hồ) không bao giờ bị coi là "phút 48". Điều kiện này đơn điệu theo thứ tự event, nên đã bắt đầu phát thì không quay lại chế độ tua.
 
 ### 11.2. CLI (`python -m pundit` hoặc `pundit`)
 
 | Lệnh | Chức năng |
 |---|---|
 | `generate --scenario S --seed N [--out data/matches] [--print-hash] [--update-golden]` | Ghi `{match_id}.events.jsonl` (UTF-8, LF) và `.meta.json`; in sha256 |
-| `replay (--scenario S --seed N \| --file F) [--speed 20] [--from-minute 60] [--status-every 5]` | In mỗi event một dòng, ví dụ `[ 63'] HAR  GOAL  T. Calder (assist M. Ortega)  1-1`. Cứ mỗi 5 phút trận đấu, in thêm một dòng trạng thái tính live: `[ 65'] POSSESSION HAR 58% - KES 42% \| BALL IN PLAY 38:12` |
+| `replay (--scenario S --seed N \| --file F) [--speed 20] [--from-minute 60] [--status-every 5]` | In mỗi event một dòng, ví dụ `[ 63'] HAR  GOAL  T. Calder (assist M. Ortega)  1-1`. Cứ mỗi 5 phút trận đấu, in thêm một dòng trạng thái tính live, gồm kiểm soát bóng cả trận tới lúc đó và 10 phút gần nhất: `[ 65'] POSSESSION HAR 58% - KES 42% \| LAST 10' HAR 66% - KES 34% \| BALL IN PLAY 38:12`. `--compact` ẩn đường chuyền, pressing, tắc bóng và bóng chết, nhưng giữ lại phạt góc |
 | `stats (--scenario S --seed N \| --file F) [--window FULL\|H1\|H2\|60-75]` | Bảng chỉ số P0 của hai đội, gồm kiểm soát bóng theo thời gian và tổng thời gian bóng lăn |
 | `validate --file F` | Chạy toàn bộ INV-xx trên một file JSONL |
 | `schema [--out packages/schemas]` | Xuất JSON Schema cho `Event`, `MatchMeta`, `StatResult` |
@@ -974,7 +975,7 @@ Cấu hình Hypothesis (`conftest.py`): profile `ci` với `derandomize=True, de
 ### 12.5. Test kịch bản và độ thực tế
 
 - **Kịch bản:** mỗi kịch bản với seed 0–19 đều thoả expectation; trung bình attempt ≤ 3; bàn thắng xuất hiện trong khoảng ±1 phút quanh phút đã định.
-- **Độ thực tế** (`balanced`, 30 seed, so sánh **trung vị mỗi đội**): pass 350–600 · độ chính xác chuyền 72–90% · cú sút 7–18 · trúng đích 2–7 · xG 0.6–2.5 · phạm lỗi 7–15 · phạt góc 2–8 · việt vị 0–4 · thẻ vàng 0–4 · kiểm soát bóng 35–65% · tổng event (không tính `player_physical`) 1 500–2 800. Với cả trận: **thời gian bóng lăn 50–65 phút** (Ngoại hạng Anh thực tế khoảng 55 phút).
+- **Độ thực tế** (`balanced`, 30 seed, so sánh **trung vị mỗi đội**): pass 350–600 · độ chính xác chuyền 72–90% · cú sút 7–18 · trúng đích 2–7 · xG 0.6–2.5 · phạm lỗi 7–15 · phạt góc 2–8 · việt vị 0–4 · thẻ vàng 0–4 · PPDA 8–15 · cự ly chuyền trung bình 14–19 m · tắc bóng 12–30 · cắt bóng 5–30 · kiểm soát bóng 35–65% · tổng event (không tính `player_physical`) 1 500–2 800. Với cả trận: **thời gian bóng lăn 50–65 phút** (Ngoại hạng Anh thực tế khoảng 55 phút).
 - **Hiệu năng** (`perf`): sinh 1 trận dưới 2 giây; toàn bộ chỉ số P0 cho cả trận dưới 50 ms.
 
 ### 12.6. Golden test và quy trình cập nhật
@@ -1106,7 +1107,7 @@ Nguyên tắc: **qua được gate của bước trước mới sang bước sau
 | Hạng mục | Kết quả |
 |---|---|
 | Code | `backend/src/pundit/`: 40 file Python; ruff và mypy `strict` không có lỗi |
-| Test | 483 test (479 chạy mặc định + 4 `slow`); khoảng 40 giây khi không đo coverage; coverage 95.7% (ngưỡng CI 85%) |
+| Test | 517 test (513 chạy mặc định + 4 `slow`); khoảng 40 giây khi không đo coverage; coverage 96% (ngưỡng CI 85%) |
 | Quét rộng | 100 seed × 4 kịch bản = 400 trận: mọi invariant và expectation đều đạt |
 | Tốc độ | Sinh 1 trận (gồm kiểm tra toàn bộ) khoảng 0.2–0.5 giây; toàn bộ chỉ số P0 cho cả trận khoảng 11 ms |
 | Dữ liệu demo | `data/matches/`: `dominant_loser-42`, `comeback_var-7`, `red_card_swing-7` |
@@ -1133,18 +1134,36 @@ Nguyên tắc: **qua được gate của bước trước mới sang bước sau
 | Tham số | v1.1 | Thực tế | Lý do |
 |---|---|---|---|
 | Xác suất sút trong vòng cấm | 0.10 + 0.25·threat | 0.08 + 0.16·threat | Đội áp đảo sút quá nhiều (khoảng 40 cú một hiệp) |
-| Xác suất sút ngoài vòng cấm | 0.02 + 0.06·threat | 0.015 + 0.04·threat | Như trên |
-| Hướng chuyền `dx` | N(−2 + 14·threat, 9) | N(−2 + 10·threat, 9) | Possession quá ngắn |
+| Xác suất sút ngoài vòng cấm | 0.02 + 0.06·threat | 0.03 + 0.05·threat | Thêm cú sút xa xG thấp (khoảng 11 cú sút mỗi đội) |
+| Hướng chuyền | dx ~ N(−2 + 14·threat, 9), dy ~ N(0, 11) | dx ~ N(−2 + 10·threat, 11), dy ~ N(0, 13) | Possession quá ngắn; cự ly chuyền trung bình 13.8 → 15.5 m |
+| Tắc bóng khi bị pressure | 0.10 + 0.25·press | 0.05 + 0.13·press | Tắc bóng gấp 3 thực tế, PPDA chỉ 5.7 |
+| Chuyền hỏng không ra ngoài | 100% `interception` | 40% `interception`, 60% `ball_recovery` (bóng hai) | PPDA 5.7 → 11.4 (Ngoại hạng Anh khoảng 11) |
 | Việt vị | 0.05 + 0.05·threat | 0.02 + 0.03·threat | Giảm từ 5 xuống 2 lần mỗi đội |
 | Phạm lỗi | 0.012 | 0.016 | Đạt khoảng 8–9 lỗi mỗi đội |
 | Thời gian giữ bóng trước hành động | 0.6–3.0 s | 1.0–3.8 s | Giảm từ 640 xuống khoảng 530 đường chuyền mỗi đội |
 | Chờ throw-in · goal kick · free kick | 8–15 · 15–30 · 20–45 s | 10–18 · 18–32 · 22–45 s | Thời gian bóng lăn sát thực tế hơn |
 | Điểm cuối đường chuyền open play | x ≤ 104 | x ≤ 97; tạt bóng tới x 90–99 | xG mỗi cú sút quá cao (khoảng 4 bàn mỗi trận) |
-| Bóng hỏng ra ngoài | — | 50% quả tạt hỏng ra ngoài; 45% bóng qua đường biên ngang được tính là chạm hậu vệ, thành phạt góc | Tăng từ 1 lên khoảng 6 quả phạt góc mỗi đội |
+| Bóng hỏng ra ngoài | — | 40% quả tạt hỏng ra ngoài; 35% bóng qua đường biên ngang được tính là chạm hậu vệ, thành phạt góc | Khoảng 5 quả phạt góc mỗi đội |
 | `dominant_loser` hiệp 2 (HAR) | control 0.78, press 0.8, threat 0.85 | control 0.82, press 0.8, threat 0.45 | Áp đảo bằng kiểm soát bóng thay vì sút liên tục |
 
-**Kết quả trận `balanced`** (16 seed, trung vị mỗi đội): 536 đường chuyền, 85% chính xác, 11 cú sút, 4 trúng đích, xG 1.7, 8 lỗi, 6 phạt góc, 2 việt vị, kiểm soát bóng 50%; thời gian bóng lăn khoảng 61 phút mỗi trận.
+**Kết quả trận `balanced`** (16 seed, trung vị mỗi đội): 521 đường chuyền, 84% chính xác, cự ly 15.5 m, 11 cú sút, 4 trúng đích, xG 1.5, 8 lỗi, 5 phạt góc, 2 việt vị, PPDA 11.4, 21 pha tắc bóng, 21 pha cắt bóng, kiểm soát bóng 50%; thời gian bóng lăn khoảng 61 phút mỗi trận.
 
-**Kết quả `dominant_loser` hiệp 2:** HAR kiểm soát bóng khoảng 61–64% theo thời gian và khoảng 60–62% theo đường chuyền.
+**Kết quả `dominant_loser` hiệp 2:** HAR kiểm soát bóng khoảng 61–64% theo thời gian và khoảng 60–62% theo đường chuyền; `chaos_index` khoảng 0.07 (`control`).
 
-**Giới hạn đã biết:** thời gian bóng lăn khoảng 61 phút hơi cao so với Ngoại hạng Anh thực tế (55–58 phút), nhưng vẫn nằm trong dải chấp nhận 50–65 phút.
+**Giới hạn đã biết:**
+- Thời gian bóng lăn khoảng 61 phút, hơi cao so với Ngoại hạng Anh thực tế (55–58 phút), nhưng vẫn nằm trong dải chấp nhận 50–65 phút.
+- Không mô phỏng dẫn bóng (`carry`), nên `final_third_entries` chỉ đếm đường chuyền và thấp hơn số liệu thực tế (khoảng 31 so với 40–60 mỗi đội mỗi trận).
+
+### 18.4. Rà soát sau demo (v1.3)
+
+Đối chiếu bảng `stats` hiệp 2 của `dominant_loser-42` bằng một script tính lại **độc lập** từ JSON thô (không dùng `pundit.stats`): mọi con số khớp 100%. Các vấn đề tìm thấy và đã sửa:
+
+| # | Vấn đề | Nguyên nhân | Cách sửa | Test chặn lại |
+|---|---|---|---|---|
+| 1 | `chaos_index` báo **chaos** (0.88) cho hiệp 2 mà HAR áp đảo (kiểm soát bóng 61%, momentum +0.77) | Đếm mỗi restart của đội đang giữ bóng (phạt góc, ném biên, đá phạt) là một lần đổi possession; không xét đội nào đang làm chủ | Đếm theo **spell** (chỉ khi bóng đổi đội) và nhân với `1 − \|momentum\|`; hiệu chỉnh lại mốc | `test_one_sided_spells_read_as_control`, `test_a_restart_by_the_same_team_is_not_a_transition`, `test_chaos_index_stays_in_range` |
+| 2 | `replay --from-minute 48` bắt đầu ở **45+4' hiệp 1** | So sánh theo `minute_exact`, mà bù giờ hiệp 1 trùng số phút với hiệp 2 | Hiểu như phút trên bảng tỷ số: từ 45 trở lên là hiệp 2 | `test_from_minute_reads_like_a_scoreboard` |
+| 3 | PPDA 5.7 và 52 pha cắt bóng mỗi đội (thực tế khoảng 11 và 9–10) | Tắc bóng quá nhiều; mọi đường chuyền hỏng đều ghi là `interception` | Giảm tắc bóng; 60% đường chuyền hỏng thành `ball_recovery` (bóng hai) | Dải PPDA, tắc bóng, cắt bóng, cự ly chuyền trong `test_realism.py` |
+| 4 | Dòng trạng thái replay chỉ có kiểm soát bóng cả trận, nên không thấy được đội nào đang ép sân lúc đó | — | Thêm `LAST 10'` | `test_replay_prints_events_and_status` |
+| 5 | `--compact` ẩn cả phạt góc, khiến chuỗi "sút bị chặn → phạt góc → đánh đầu ghi bàn" trông như hai cú sút liên tiếp | — | `--compact` giữ lại phạt góc | `test_compact_replay_keeps_corners` |
+
+Sau khi sửa, `dominant_loser-42` cần đến attempt 1 mới thoả expectation (vẫn tất định, cùng seed luôn ra cùng trận). Dữ liệu demo và golden đã được sinh lại.

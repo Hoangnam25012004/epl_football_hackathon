@@ -62,6 +62,19 @@ def test_from_minute_fast_forwards_but_yields_everything() -> None:
     assert state.phase == "post"
 
 
+@pytest.mark.parametrize("seed", range(4))
+def test_from_minute_reads_like_a_scoreboard(seed: int) -> None:
+    """48 means 48' of the second half, never 45+3' of the first half."""
+    match = generated("red_card_swing", seed)
+    for from_minute, expected_type in ((48, None), (45, "period_start"), (0, "match_start")):
+        items = collect(match.events, FakeClock(), speed=1e6, from_minute=from_minute)
+        first = next(item.event for item in items if not item.catching_up)
+        if from_minute >= 45:
+            assert first.period == 2
+        if expected_type is not None:
+            assert first.type == expected_type
+
+
 def test_half_time_pause_is_added_once() -> None:
     match = generated("balanced", 1)
     clock = FakeClock()

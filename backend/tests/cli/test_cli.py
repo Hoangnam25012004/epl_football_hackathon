@@ -50,7 +50,28 @@ def test_replay_prints_events_and_status(capsys: pytest.CaptureFixture[str]) -> 
     assert code == 0
     out = capsys.readouterr().out.splitlines()
     assert any("KICK-OFF" in line for line in out)
-    assert any("POSSESSION HAR" in line for line in out)
+    assert any("POSSESSION HAR" in line and "LAST 10' HAR" in line for line in out)
+
+
+def test_compact_replay_keeps_corners(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(
+        [
+            "replay",
+            "--scenario",
+            "dominant_loser",
+            "--seed",
+            "42",
+            "--speed",
+            "100000",
+            "--compact",
+            "--status-every",
+            "0",
+        ]
+    )
+    assert code == 0
+    out = capsys.readouterr().out.splitlines()
+    assert any(" CORNER " in line for line in out)
+    assert not any(" PASS " in line for line in out)
 
 
 def test_schema_and_scenarios(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

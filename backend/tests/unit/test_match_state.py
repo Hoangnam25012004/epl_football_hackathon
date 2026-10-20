@@ -8,6 +8,7 @@ from builders import MatchBuilder
 
 from pundit.domain.errors import InvalidEventError
 from pundit.domain.events import (
+    BallRecoveryEvent,
     CardEvent,
     GoalEvent,
     MatchStartEvent,
@@ -329,6 +330,36 @@ def test_rejected_event_leaves_state_usable() -> None:
     rejects("INV-09", b, lambda: b.at("0:03").pass_("H8", "H19"))
     b.at("0:03").pass_("H8", "H6")
     assert b.state.ball_carrier == b.p("H6")
+
+
+def test_loose_ball_recovery_after_a_failed_pass() -> None:
+    b = kicked_off()
+    b.at("0:05").pass_("H8", outcome="incomplete")
+    rejects(  # the passer's own team cannot "recover" its own failed pass as a turnover
+        "INV-05",
+        b,
+        lambda: b.emit(
+            BallRecoveryEvent,
+            team=b.team_of("H6"),
+            player=b.p("H6"),
+            x=50.0,
+            y=30.0,
+            related_ids=(b.last("pass").id,),
+            possession_id=2,
+            possession_team=b.team_of("H6"),
+        ),
+    )
+    b.emit(
+        BallRecoveryEvent,
+        team=b.team_of("A4"),
+        player=b.p("A4"),
+        x=50.0,
+        y=30.0,
+        related_ids=(b.last("pass").id,),
+        possession_id=2,
+        possession_team=b.team_of("A4"),
+    )
+    assert b.state.ball.holder == b.team_of("A4")
 
 
 def test_physical_event_is_valid_any_time() -> None:

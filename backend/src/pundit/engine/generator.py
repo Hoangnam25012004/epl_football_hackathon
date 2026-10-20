@@ -101,17 +101,18 @@ PHYSICAL_EVERY_MS = 5 * MS_PER_MINUTE
 
 # Behaviour parameters, calibrated against EPL-like ranges (see tests/scenario/test_realism.py).
 PRESS_BASE, PRESS_FACTOR = 0.15, 0.45  # chance of a pressure event before an action
-TACKLE_BASE, TACKLE_FACTOR, TACKLE_WIN = 0.10, 0.25, 0.55
+TACKLE_BASE, TACKLE_FACTOR, TACKLE_WIN = 0.05, 0.13, 0.55
+INTERCEPTION_SHARE = 0.4  # failed passes read cleanly; the rest become loose-ball recoveries
 FOUL_RATE = 0.016
 SHOT_BOX_BASE, SHOT_BOX_THREAT = 0.08, 0.16
-SHOT_OUTSIDE_BASE, SHOT_OUTSIDE_THREAT = 0.015, 0.04
-PASS_DX_BASE, PASS_DX_THREAT, PASS_DX_SIGMA = -2.0, 10.0, 9.0
-PASS_DY_SIGMA = 11.0
+SHOT_OUTSIDE_BASE, SHOT_OUTSIDE_THREAT = 0.03, 0.05
+PASS_DX_BASE, PASS_DX_THREAT, PASS_DX_SIGMA = -2.0, 10.0, 11.0
+PASS_DY_SIGMA = 13.0
 OFFSIDE_BASE, OFFSIDE_THREAT = 0.02, 0.03
 CROSS_CHANCE = 0.55
 DWELL_MS = (1_000, 3_800)  # time on the ball before an action (outfield player)
-CROSS_OUT_SHARE = 0.5  # failed crosses that end up out of play instead of intercepted
-BYLINE_DEFLECTION = 0.45  # passes out over the byline touched last by a defender -> corner
+CROSS_OUT_SHARE = 0.4  # failed crosses that end up out of play instead of intercepted
+BYLINE_DEFLECTION = 0.35  # passes out over the byline touched last by a defender -> corner
 OPEN_PLAY_MAX_X = 97.0  # defenders keep open-play passes out of the six-yard area
 
 E = TypeVar("E", bound=EventBase)
@@ -609,8 +610,11 @@ class MatchSim:
             fx = round_coord(clamp(fx, 0.5, PITCH_LENGTH - 0.5))
             fy = round_coord(clamp(fy, 0.5, PITCH_WIDTH - 0.5))
             cutter = self.pick(opp, fx, roles=interceptor_roles)
+            # A clean read of the pass is an interception; otherwise the ball runs loose and
+            # the opponent picks up the second ball (a recovery, which PPDA does not count).
+            clean = intercept_frac is not None or flow.random() < INTERCEPTION_SHARE
             self.emit(
-                InterceptionEvent,
+                InterceptionEvent if clean else BallRecoveryEvent,
                 team=opp,
                 player=cutter,
                 x=fx,
@@ -620,7 +624,7 @@ class MatchSim:
             )
             self.carrier = cutter
             self.bx, self.by = fx, fy
-            self.possession_started("interception")
+            self.possession_started("interception" if clean else "ball_recovery")
         elif outcome == "out":
             self.advance(duration)
             self.dead(team, "out_of_play", sent.id)

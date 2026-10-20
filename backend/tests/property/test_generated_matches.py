@@ -160,6 +160,29 @@ def test_dominant_side_controls_by_time_and_by_passes(seed: int) -> None:  # M13
     assert (compute(view, "pass_share", MetricParams(team=home, window=H2)).value or 0) >= 55
 
 
+@pytest.mark.parametrize("seed", SEEDS)
+def test_one_sided_spells_read_as_control(seed: int) -> None:
+    """A half one team dominates must never be labelled chaos (it was before the fix)."""
+    dominated = [
+        ("dominant_loser", H2),
+        ("red_card_swing", MinuteWindow(period=2, start_min=55)),
+    ]
+    for scenario, window in dominated:
+        result = compute(
+            generated(scenario, seed).view(), "chaos_index", MetricParams(window=window)
+        )
+        assert result.label == "control", (scenario, result.value)
+
+
+@pytest.mark.parametrize(("scenario", "seed"), CASES[::2])
+def test_chaos_index_stays_in_range(scenario: str, seed: int) -> None:
+    view = generated(scenario, seed).view()
+    for window in (FULL, H1, H2, MinuteWindow(start_min=20, end_min=30)):
+        result = compute(view, "chaos_index", MetricParams(window=window))
+        assert result.value is not None and 0.0 <= result.value <= 1.0
+        assert result.label in ("control", "balanced", "chaos")
+
+
 @pytest.mark.parametrize(("scenario", "seed"), CASES[::3])
 def test_physical_snapshots_are_plausible(scenario: str, seed: int) -> None:
     match = generated(scenario, seed)

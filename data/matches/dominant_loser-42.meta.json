@@ -4,12 +4,12 @@
   "match_id": "dominant_loser-42",
   "scenario": "dominant_loser",
   "seed": 42,
-  "attempt": 0,
+  "attempt": 1,
   "synthetic": true,
   "disclaimer": "Synthetic data. Fictional teams and players. Not affiliated with the Premier League.",
   "competition": "Synthetic League",
   "venue": "Quayside Arena",
-  "referee": "Marta Esteve",
+  "referee": "Lena Brückner",
   "kickoff_utc": "2026-10-24T14:00:00Z",
   "weather": "cloudy",
   "home": {
@@ -82,7 +82,7 @@
       "kestrel_athletic-20"
     ]
   },
-  "home_attacks_right_p1": true,
+  "home_attacks_right_p1": false,
   "players": {
     "harbor_lions-01": {
       "id": "harbor_lions-01",

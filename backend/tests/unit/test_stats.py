@@ -216,6 +216,19 @@ def test_chaos_and_tempo() -> None:
     assert tempo.numerator == 5 and tempo.denominator == pytest.approx(25 / 60)
 
 
+def test_a_restart_by_the_same_team_is_not_a_transition() -> None:
+    from pundit.stats.tactical import spell_starts
+
+    b = MatchBuilder()
+    kick_off = b.at("0:00").kick_off("H9", "H8")
+    b.at("0:10").foul("A4")
+    b.ball_dead("foul")
+    b.at("0:40").free_kick("H8", "H6", x=44.0, y=34.0)  # same team again: same spell
+    b.at("0:45").pass_("H6", outcome="incomplete")
+    cut = b.at("0:46").interception("A5")  # the ball changes hands: new spell
+    assert spell_starts(b.view(), MetricParams()) == [kick_off.id, cut.id]
+
+
 # --------------------------------------------------------------------------- registry
 
 

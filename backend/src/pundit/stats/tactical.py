@@ -17,12 +17,13 @@ from pundit.stats.result import StatResult
 from pundit.stats.select import in_window, select
 
 # Control vs chaos normalisation bounds: 10th-90th percentiles of 10-minute windows in
-# balanced generated matches, so a balanced spell scores about 0.5 (docs, section 7.3).
-CHAOS_TURNOVERS_PER_MIN = (3.0, 4.9)
-CHAOS_PASSES_PER_POSSESSION = (3.6, 5.8)
-CHAOS_DUELS_PER_MIN = (1.1, 2.3)
-CHAOS_CONTROL_BELOW = 0.4
-CHAOS_CHAOS_ABOVE = 0.6
+# balanced generated matches (docs, section 7.3). Label thresholds were checked on halves:
+# balanced halves sit around 0.35-0.47, one-sided spells below 0.15.
+CHAOS_TRANSITIONS_PER_MIN = (2.4, 4.0)
+CHAOS_PASSES_PER_SPELL = (4.2, 6.9)
+CHAOS_DUELS_PER_MIN = (0.56, 1.45)
+CHAOS_CONTROL_BELOW = 0.25
+CHAOS_CHAOS_ABOVE = 0.55
 
 
 @metric(
@@ -149,13 +150,28 @@ def _norm(value: float, bounds: tuple[float, float]) -> float:
     return max(0.0, min(1.0, (value - low) / (high - low)))
 
 
+def spell_starts(view: LogView, params: MetricParams) -> list[str]:
+    """First event of every spell in the window: a spell is consecutive possessions of one team,
+    so a restart by the team that already had the ball (corner, throw-in) is not a transition."""
+    starts: list[str] = []
+    previous_team: str | None = None
+    for interval in possession_timeline(view):
+        if not in_window(view.get(interval.start_event_id), params.window):
+            continue
+        if interval.team != previous_team:
+            starts.append(interval.start_event_id)
+        previous_team = interval.team
+    return starts
+
+
 @metric(
     name="chaos_index",
     unit="index",
     definition=(
-        "Control vs chaos, 0..1 per minute of ball in play: 0.5*turnover rate + "
-        "0.3*(1 - passes per possession) + 0.2*duel rate, each normalised. "
-        "Label: control < 0.4, chaos > 0.6, otherwise balanced."
+        "Control vs chaos, 0..1: structure x (1 - dominance). Structure = 0.5*transitions "
+        "per minute of ball in play + 0.3*(1 - passes per spell) + 0.2*duels per minute, "
+        "each normalised; dominance = |momentum| in the window. Chaos needs frequent changes "
+        "of possession AND no side in control. Label: control < 0.25, chaos > 0.55."
     ),
     description_en="Control vs chaos index",
     description_vi="Chỉ số kiểm soát / hỗn loạn",
@@ -164,20 +180,20 @@ def _norm(value: float, bounds: tuple[float, float]) -> float:
 def chaos_index(view: LogView, params: MetricParams) -> StatResult:
     totals = possession_totals(view, params.window)
     in_play_minutes = totals.total_ms / MS_PER_MINUTE
-    starts = [
-        interval.start_event_id
-        for interval in possession_timeline(view)
-        if in_window(view.get(interval.start_event_id), params.window)
-    ]
+    starts = spell_starts(view, params)
     if in_play_minutes < 1.0 or not starts:
         return make_result(view, "chaos_index", params, value=None, evidence=[])
     passes = len(select(view, types=("pass",), window=params.window))
     duels = len(select(view, types=("foul", "tackle"), window=params.window))
-    value = (
-        0.5 * _norm(len(starts) / in_play_minutes, CHAOS_TURNOVERS_PER_MIN)
-        + 0.3 * (1.0 - _norm(passes / len(starts), CHAOS_PASSES_PER_POSSESSION))
+    structure = (
+        0.5 * _norm((len(starts) - 1) / in_play_minutes, CHAOS_TRANSITIONS_PER_MIN)
+        + 0.3 * (1.0 - _norm(passes / len(starts), CHAOS_PASSES_PER_SPELL))
         + 0.2 * _norm(duels / in_play_minutes, CHAOS_DUELS_PER_MIN)
     )
+    home = view.meta.team_ids[0]
+    swing = momentum(view, MetricParams(team=home, window=params.window)).value
+    dominance = abs(swing) if swing is not None else 0.0
+    value = structure * (1.0 - dominance)
     if value < CHAOS_CONTROL_BELOW:
         label = "control"
     elif value > CHAOS_CHAOS_ABOVE:

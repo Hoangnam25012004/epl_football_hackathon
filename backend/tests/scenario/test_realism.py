@@ -22,7 +22,22 @@ BANDS = {
     "corners": (2, 8),
     "offsides": (0, 4),
     "cards": (0, 4),
+    "ppda": (8, 15),
+    "pass_length_avg": (14, 19),
 }
+
+
+def test_duels_are_realistic() -> None:
+    tackles, interceptions = [], []
+    for seed in SEEDS:
+        match = generated("balanced", seed)
+        for team in match.meta.team_ids:
+            tackles.append(sum(e.type == "tackle" and e.team == team for e in match.events))
+            interceptions.append(
+                sum(e.type == "interception" and e.team == team for e in match.events)
+            )
+    assert 12 <= statistics.median(tackles) <= 30
+    assert 5 <= statistics.median(interceptions) <= 30
 
 
 @pytest.fixture(scope="module")

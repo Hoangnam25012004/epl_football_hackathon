@@ -251,7 +251,13 @@ class MatchState:
                 )
         elif isinstance(e, BallRecoveryEvent):
             if e.related_ids:
-                self._related(e, 0, (ShotEvent,))
+                cause = self._related(e, 0, (ShotEvent, PassEvent))
+                if isinstance(cause, PassEvent) and not (
+                    cause.outcome == "incomplete" and cause.team != e.team
+                ):
+                    raise self._fail(
+                        "INV-05", e, "a recovery can only follow an opponent's failed pass"
+                    )
         elif isinstance(e, CardEvent):
             if e.related_ids:
                 foul = self._related(e, 0, (FoulEvent,))

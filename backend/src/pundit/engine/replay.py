@@ -75,10 +75,19 @@ async def replay(
 ) -> AsyncIterator[ReplayItem]:
     if speed <= 0:
         raise ValueError("speed must be > 0")
+    # Minutes are read like a scoreboard: from 45 onwards means the second half, so first-half
+    # stoppage time (45+3' is minute 48 of the clock) never counts as "minute 48".
+    start_period = 1 if from_minute < 45 else 2
     live = started = False
     anchor_wall, anchor_ms, pause = 0.0, 0, 0.0
     for event in events:
-        live = live or minute_exact(event.period, event.clock_ms) >= from_minute
+        live = live or (
+            event.period > start_period
+            or (
+                event.period == start_period
+                and minute_exact(event.period, event.clock_ms) >= from_minute
+            )
+        )
         if not live:
             yield ReplayItem(event, catching_up=True)
             continue
@@ -154,18 +163,25 @@ def describe_event(event: Event, meta: MatchMeta, snapshot: MatchSnapshot) -> st
     return f"[{format_minute(event.period, event.clock_ms):>6}] {team:<3} {text}"
 
 
-def status_line(meta: MatchMeta, snapshot: MatchSnapshot) -> str:
-    """Live possession (ball-in-play time) status line."""
+def _split(meta: MatchMeta, pct: dict[str, float | None]) -> str:
     home, away = meta.home.team, meta.away.team
-    home_pct = snapshot.possession_pct[home.id]
-    away_pct = snapshot.possession_pct[away.id]
+    home_pct, away_pct = pct.get(home.id), pct.get(away.id)
     if home_pct is None or away_pct is None:
-        possession = "POSSESSION n/a"
-    else:
-        possession = (
-            f"POSSESSION {home.short_name} {home_pct:.0f}% - {away.short_name} {away_pct:.0f}%"
-        )
+        return "n/a"
+    return f"{home.short_name} {home_pct:.0f}% - {away.short_name} {away_pct:.0f}%"
+
+
+def status_line(
+    meta: MatchMeta,
+    snapshot: MatchSnapshot,
+    recent_pct: dict[str, float | None] | None = None,
+    recent_minutes: float = 10.0,
+) -> str:
+    """Live possession (ball-in-play time) for the match so far and, if given, a recent window."""
+    recent = ""
+    if recent_pct is not None:
+        recent = f" | LAST {recent_minutes:g}' {_split(meta, recent_pct)}"
     return (
-        f"[{snapshot.clock_display:>6}] {possession} | "
-        f"BALL IN PLAY {format_clock(snapshot.ball_in_play_ms)}"
+        f"[{snapshot.clock_display:>6}] POSSESSION {_split(meta, snapshot.possession_pct)}"
+        f"{recent} | BALL IN PLAY {format_clock(snapshot.ball_in_play_ms)}"
     )
