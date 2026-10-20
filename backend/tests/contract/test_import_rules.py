@@ -1,0 +1,79 @@
+"""One-way imports (design section 2.3):
+domain <- stats <- state <- engine <- agents <- llm <- orchestration <- api <- cli.
+
+Agents never import Microsoft Agent Framework, FastAPI or HTTP clients (principle L6); MAF lives
+in orchestration and llm.maf_backend only; FastAPI in api only.
+"""
+
+import ast
+from pathlib import Path
+
+import pundit
+
+LAYERS = ["domain", "stats", "state", "engine", "agents", "llm", "orchestration", "api", "cli"]
+PACKAGE = Path(pundit.__file__).parent
+EXTERNAL = {
+    "agent_framework": {"orchestration", "llm.maf_backend"},
+    "openai": {"llm.maf_backend"},
+    "httpx": {"llm.maf_backend"},
+    "fastapi": {"api"},
+    "starlette": {"api"},
+    "uvicorn": {"cli"},
+}
+
+
+def modules() -> list[tuple[str, Path]]:
+    found = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        relative = path.relative_to(PACKAGE).with_suffix("")
+        found.append((".".join(relative.parts), path))
+    return found
+
+
+def imports(path: Path) -> set[str]:
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            names.add(node.module)
+    return names
+
+
+def layer_of(module: str) -> str | None:
+    head = module.split(".")[0]
+    return head if head in LAYERS else None
+
+
+def test_layers_only_import_downwards() -> None:
+    problems = []
+    for module, path in modules():
+        layer = layer_of(module)
+        if layer is None:
+            continue
+        rank = LAYERS.index(layer)
+        for name in imports(path):
+            if not name.startswith("pundit."):
+                continue
+            target = layer_of(name.removeprefix("pundit."))
+            if target is not None and LAYERS.index(target) > rank:
+                problems.append(f"{module} imports {name}")
+    assert problems == []
+
+
+def test_frameworks_stay_in_their_layer() -> None:
+    problems = []
+    for module, path in modules():
+        for name in imports(path):
+            root = name.split(".")[0]
+            allowed = EXTERNAL.get(root)
+            if allowed is None:
+                continue
+            if not any(module == a or module.startswith(a + ".") for a in allowed):
+                problems.append(f"{module} imports {name}")
+    assert problems == []
+
+
+def test_every_module_is_in_a_layer() -> None:
+    unknown = [m for m, _ in modules() if layer_of(m) is None and m not in ("__init__", "__main__")]
+    assert unknown == []
