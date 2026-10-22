@@ -27,3 +27,41 @@ jobs:
         run: uv run pytest -m "not slow and not perf and not live" --cov=pundit --cov-fail-under=85
       - name: time budgets (no coverage)
         run: uv run pytest -m perf
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - name: contracts generated from the current schemas
+        run: npm run gen:types && git diff --exit-code -- src/lib/contracts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm run test
+      - run: npm run build
+      - name: first-load JS budget
+        run: npm run size
+      - name: backend for the E2E
+        working-directory: backend
+        run: uv sync --locked
+      - run: npx playwright install --with-deps chromium
+      - name: E2E (real backend with mock LLM, and recorded streams)
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          retention-days: 7

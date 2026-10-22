@@ -8,14 +8,15 @@
     "build": "next build",
     "gen:types": "node scripts/gen-types.mjs",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test --project=e2e",
     "e2e:mock": "playwright test --project=mock",
-    "check": "node scripts/gen-types.mjs --check && eslint . && tsc --noEmit && prettier --check ."
+    "size": "node scripts/bundle-size.mjs out",
+    "check": "node scripts/gen-types.mjs --check && eslint . && next typegen && tsc --noEmit && prettier --check ."
   },
   "dependencies": {
     "next": "16.4.2",

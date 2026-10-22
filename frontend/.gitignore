@@ -7,3 +7,4 @@ playwright-report/
 blob-report/
 *.tsbuildinfo
 .env*.local
+next-env.d.ts

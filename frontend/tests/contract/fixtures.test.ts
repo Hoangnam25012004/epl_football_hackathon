@@ -24,6 +24,27 @@ const NAMES: FixtureName[] = [
   "dominant_loser-42.llm-long.casual-vi-beginner-har",
 ];
 
+describe("recorded REST answers of the mock E2E follow their schema", () => {
+  const cases = [
+    ["scenarios.json", "scenario_info.schema.json"],
+    ["players.dominant_loser-42.json", "player_brief.schema.json"],
+  ] as const;
+  for (const [file, schemaFile] of cases) {
+    it(file, () => {
+      const ajv = new Ajv2020({ strict: false });
+      addFormats(ajv);
+      const schema = JSON.parse(readFileSync(join(schemaDir, schemaFile), "utf8"));
+      const validate = ajv.compile(schema);
+      const body = JSON.parse(
+        readFileSync(join(__dirname, "..", "fixtures", "rest", file), "utf8"),
+      );
+      expect(Array.isArray(body) && body.length > 0).toBe(true);
+      for (const item of body)
+        expect(validate(item), JSON.stringify(validate.errors?.[0])).toBe(true);
+    });
+  }
+});
+
 describe("fixtures follow the WebSocket contract", () => {
   const validators = new Map<string, ReturnType<typeof validatorFor>>();
   for (const name of NAMES) {
