@@ -51,6 +51,9 @@ UNSAFE_EN = (
 CONTENT_FILTER = "content_filter"  # detail used when the LLM provider blocked the text
 COUNT_HINTS = VI_STAT_NOUNS | EN_STAT_NOUNS
 RATIO_HINTS = frozenset({"lần", "times"})
+# xG written out after the number ("0.72 bàn thắng kỳ vọng"), or a decimal "chance" (folded)
+XG_AFTER = ("ban thang ky vong", "expected goal")
+CHANCE_AFTER = ("chance", "co hoi")
 _NEXT_WORD = re.compile(r"\s*([^\s.,;:!?()]+)")
 
 
@@ -96,6 +99,9 @@ def _hint(text: Text, number: Num) -> _Hint:
         return _Hint(frozenset({"percent"}))
     before = text.folded[: number.start].rstrip()
     if before.endswith("xg"):
+        return _Hint(frozenset({"xg"}))
+    after = text.folded[number.end :].lstrip()
+    if after.startswith(XG_AFTER) or (number.decimals and after.startswith(CHANCE_AFTER)):
         return _Hint(frozenset({"xg"}))
     following = _NEXT_WORD.match(text.lower, number.end)
     word = following.group(1) if following else ""

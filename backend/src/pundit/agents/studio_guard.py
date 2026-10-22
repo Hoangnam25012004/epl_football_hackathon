@@ -6,10 +6,13 @@ against the facts of a FactPack, then the studio rules:
 - UNVERIFIED_NUMBER also when a metric is written next to a number ("4 shots", "momentum
   0.88") and no fact of that metric has the value: a real number given the wrong name;
 - WRONG_ENTITY: every player named takes part in the moment, or owns one of its facts, and the
-  goalkeeper of a shot is never the one who shoots;
-- WRONG_OUTCOME: no "ghi bàn" for a shot that was saved, no red card words on a yellow card;
+  goalkeeper of a shot is never the one who shoots (nor blocks: a defender blocks);
+- WRONG_OUTCOME: no "ghi bàn" for a shot that was saved, no red card words on a yellow card, no
+  goal "led to" where nobody scored, and lead / level words fit the score (narrative.py);
+- WRONG_ATTRIBUTION also when a momentum shift or a dangerous spell is given to the wrong side;
 - FRAGMENT: the text stands alone;
-- and for text a model wrote: WRONG_LANGUAGE, WRONG_REGISTER (casual: at most one number and no
+- and for text a model wrote: WRONG_LANGUAGE (also English words inside a Vietnamese line),
+  WRONG_ENTITY for a misspelled team name, WRONG_REGISTER (casual: at most one number and no
   jargon; analyst: at least one number when the pack has some) and UNGROUNDED (a talking point
   cites a number in every line; elsewhere, a sentence that judges or compares cites one).
 
@@ -53,6 +56,13 @@ from pundit.agents.guardrail import (
 )
 from pundit.agents.language import Hit, Term, Text, detect_language, find_terms, vi_mode
 from pundit.agents.lexicon import lexicon
+from pundit.agents.narrative import (
+    caused_goal_spans,
+    direction_violations,
+    english_run_violations,
+    misspelled_team_violations,
+    score_state_violations,
+)
 from pundit.agents.numbers import Num, extract_numbers
 from pundit.stats.registry import REGISTRY
 
@@ -100,6 +110,13 @@ _KEEPER_SHOOTS = (
     ),
     re.compile(r"^\s+(?:cũng\s+)?(?:sút|dứt điểm|bỏ lỡ|đánh đầu|tung cú sút)(?!\w)", re.I),
 )
+# a blocked shot hit a defender: "blocked by ... M. Holub" or "M. Holub blocked it" names the
+# goalkeeper as the one who blocked
+_KEEPER_BLOCKS = (
+    re.compile(r"^\s+(?:also\s+|then\s+)?(?:blocks|blocked|block)\b", re.I),
+    re.compile(r"^\s+(?:đã\s+|cũng\s+)?(?:chặn|cản)(?!\w)", re.I),
+)
+_BLOCKED_BY = re.compile(r"\bblocked\s+by\s+(?:[\w'-]+\s+){0,4}$", re.I)
 _SCORES = (  # a player named right before these words is said to have scored
     re.compile(
         r"^\s+(?:also\s+|then\s+)?(?:scores|scored|nets|netted|finds the net|found the net|"
@@ -124,10 +141,12 @@ _ORDINAL_GOAL_VI = re.compile(
     r"(?:\s+(của|cho)\s+(anh ấy|anh|cô ấy)?)?",
     re.I,
 )
-# "một" is an article before these nouns ("một cơ hội ngon ăn" is "a big chance"), not a count
+# "một" is an article before these nouns ("một cơ hội ngon ăn" is "a big chance"), and after
+# "là" ("Đây là một cú sút xa" is "This was a long shot"), not a count
 _ARTICLE_MOT = re.compile(
     r"(?<!\w)(một)(?=\s+(?:cơ hội|tình huống|pha tấn công|pha bóng|pha phối hợp|pha ép sân|"
-    r"đợt|khoảnh khắc|trận đấu|trận cầu)(?!\w))",
+    r"đợt|khoảnh khắc|trận đấu|trận cầu)(?!\w))"
+    r"|(?<=(?<!\w)là )(một)(?=\s+[^\W\d_])",
     re.I,
 )
 
@@ -240,7 +259,8 @@ def _role_violations(
     written: Text, mentions: list[Mention], scope: StudioScope
 ) -> list[GuardrailViolation]:
     """Roles swapped: the goalkeeper named as the one who shoots or scores ("Brandvold's
-    shot"), or anyone but the scorer said to have scored the goal of this moment."""
+    shot") or blocks a blocked shot, or anyone but the scorer said to have scored the goal of
+    this moment."""
     trigger = scope.trigger
     if trigger is None:
         return []
@@ -254,7 +274,20 @@ def _role_violations(
         name = scope.match.player(mention.player).name
         shoots = any(pattern.search(after) for pattern in _KEEPER_SHOOTS)
         scores = any(pattern.search(after) for pattern in _SCORES)
-        if mention.player == keeper and (shoots or scores):
+        before = written.raw[max(0, mention.start - 60) : mention.start]
+        blocks = trigger.outcome == "blocked" and (
+            any(pattern.search(after) for pattern in _KEEPER_BLOCKS)
+            or _BLOCKED_BY.search(before) is not None
+        )
+        if mention.player == keeper and blocks:
+            found.append(
+                GuardrailViolation(
+                    code="WRONG_ENTITY",
+                    detail=f"{name} is the goalkeeper; a defender blocked this shot",
+                    span=name,
+                )
+            )
+        elif mention.player == keeper and (shoots or scores):
             did = "scored" if scores else "shot"
             found.append(
                 GuardrailViolation(
@@ -330,7 +363,7 @@ def mask_articles(text: str, language: Lang) -> str:
     replaced by "mot" (same length) in the copy the checks read."""
     if language != "vi":
         return text
-    return _ARTICLE_MOT.sub(lambda m: "mot" if m.group(1).islower() else "Mot", text)
+    return _ARTICLE_MOT.sub(lambda m: "mot" if m.group(0).islower() else "Mot", text)
 
 
 @cache
@@ -401,15 +434,19 @@ def check_studio(
     violations += _role_violations(written, mentions, scope)
     violations += _metric_violations(written, extract_numbers(written), scope.facts)
     violations += _ordinal_violations(written, scope, mentions)
+    violations += score_state_violations(written, mentions, match, scope.trigger)
+    violations += direction_violations(written, mentions, match, scope.trigger)
     outcome_words, jargon, assessment, comparative = _terms()
     trigger = scope.trigger
     if trigger is not None:
         forbidden = forbidden_categories(trigger, model_text=model_text)
-        for hit in find_terms(written, outcome_words):
-            if hit.payload in forbidden:
-                word = written.raw[hit.start : hit.end]
-                reason = REASONS.get(hit.payload)
-                if reason is None and hit.payload == "goal" and trigger.kind in SUMMARY_KINDS:
+        said = [(h.start, h.end, h.payload) for h in find_terms(written, outcome_words)]
+        said += [(start, end, "goal") for start, end in caused_goal_spans(written)]
+        for start, end, category in sorted(said):
+            if category in forbidden:
+                word = written.raw[start:end]
+                reason = REASONS.get(category)
+                if reason is None and category == "goal" and trigger.kind in SUMMARY_KINDS:
                     reason = "a summary line gives the score; the recap tells the goals"
                 violations.append(
                     GuardrailViolation(
@@ -431,6 +468,9 @@ def check_studio(
                     detail=f"the text is not in {'Vietnamese' if language == 'vi' else 'English'}",
                 )
             )
+        elif language == "vi":
+            violations += english_run_violations(written, masked)
+        violations += misspelled_team_violations(written, mentions, match)
         violations += _register_violations(numbers, jargon_hits, written, scope, mode, product)
         violations += _ungrounded_violations(written, numbers, product, assessment, comparative)
     return GuardrailReport(passed=not violations, violations=tuple(violations))

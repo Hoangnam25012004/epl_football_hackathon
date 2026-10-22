@@ -4,6 +4,8 @@ mutation tests on the templates of the four sample matches."""
 import re
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from studio_helpers import SAMPLES, first_trigger, pack, triggers
 
 from pundit.agents.commentary import render_texts
@@ -354,3 +356,196 @@ def test_a_decimal_is_never_a_count(minute: str, language: Lang, text: str) -> N
     """P6 round 2: "shot" is the nearest metric word, but 0.36 cannot be a number of shots."""
     built = _pack_at(minute, "big_chance")
     assert not codes(text, built, language=language, product="talking_point", mode=None)
+
+
+# --------------------------------------------------------------------------- P6 final run (Ollama)
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "language", "text", "wrong"),
+    [
+        # real drafts of the final run: a lead at a level score, a lead of the side behind
+        ("63'", "goal", "vi",
+         "Tài năng của T. Calder đã đưa Harbor Lions FC vượt lên dẫn trước với bàn thắng ở phút "
+         "63.", True),
+        ("90+3'", "dangerous_spell", "en",
+         "In the last 10 minutes, Harbor Lions FC had 9 box entries and Kestrel Athletic had "
+         "none, maintaining their lead.", True),
+        ("78'", "goal", "vi", "J. Ellery gỡ hòa cho Kestrel Athletic ở phút 78.", True),
+        ("50'", "momentum_shift", "vi",
+         "Kestrel Athletic đang bị dẫn trước, Harbor Lions FC kiểm soát bóng 56%.", True),
+        # the same words where they fit the score, or where the lead was lost
+        ("78'", "goal", "en",
+         "J. Ellery scored in the 78th minute, giving Kestrel Athletic a 2-1 lead.", False),
+        ("27'", "goal", "en", "M. Ribas scored, putting Kestrel Athletic ahead 1-0.", False),
+        ("63'", "goal", "en", "T. Calder equalises for Harbor Lions FC: 1-1.", False),
+        ("63'", "goal", "en", "T. Calder cancels out Kestrel Athletic's lead.", False),
+        ("50'", "momentum_shift", "vi",
+         "Harbor Lions FC đang bị dẫn trước nhưng kiểm soát bóng 56%.", False),
+    ],
+)  # fmt: skip
+def test_lead_and_level_words_follow_the_score(
+    minute: str, kind: str, language: Lang, text: str, wrong: bool
+) -> None:
+    found = codes(text, _pack_at(minute, kind), language=language, mode="analyst")
+    assert ("WRONG_OUTCOME" in found) is wrong, found
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "text", "wrong"),
+    [
+        ("49'", "dangerous_spell",
+         "Harbor Lions FC had 4 penalty-area entries in the last 10 minutes. This sustained "
+         "pressure has led to the goal.", True),
+        ("90+3'", "dangerous_spell",
+         "Harbor Lions FC had 9 box entries in the last 10 minutes, leading to Harbor's goal.",
+         True),
+        ("56'", "dangerous_spell",
+         "Harbor Lions FC had 8 penalty-area entries in the last 10 minutes, which led to a shot "
+         "on goal.", False),
+        ("63'", "goal", "Harbor Lions FC's pressure led to the goal: T. Calder scored for 1-1.",
+         False),
+    ],
+)  # fmt: skip
+def test_a_goal_caused_where_nobody_scored(minute: str, kind: str, text: str, wrong: bool) -> None:
+    found = codes(text, _pack_at(minute, kind), language="en", mode="analyst")
+    assert ("WRONG_OUTCOME" in found) is wrong, found
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "language", "text", "wrong"),
+    [
+        ("50'", "momentum_shift", "en",
+         "The momentum is swinging strongly in favor of Kestrel Athletic, with a possession "
+         "advantage of 56% to 44% in the last 10 minutes.", True),
+        ("56'", "dangerous_spell", "vi",
+         "Harbor Lions FC đang chịu áp lực liên tục, với 8 lần vào vòng cấm trong 10 phút gần "
+         "nhất.", True),
+        ("49'", "dangerous_spell", "en",
+         "Harbor Lions FC are under a lot of pressure, with 4 penalty-area entries.", True),
+        ("19'", "momentum_shift", "en",
+         "The momentum is swinging strongly in favor of Kestrel Athletic, with a possession "
+         "ratio of 42% to 58% in the last 10 minutes.", False),
+        ("56'", "dangerous_spell", "vi",
+         "Kestrel Athletic đang chịu áp lực: Harbor Lions FC có 8 lần vào vòng cấm trong 10 phút "
+         "gần nhất.", False),
+        ("49'", "dangerous_spell", "en",
+         "Harbor Lions FC put Kestrel Athletic under pressure with 4 penalty-area entries.",
+         False),
+    ],
+)  # fmt: skip
+def test_the_side_on_top_of_a_momentum_shift_or_a_spell(
+    minute: str, kind: str, language: Lang, text: str, wrong: bool
+) -> None:
+    found = codes(text, _pack_at(minute, kind), language=language, mode="analyst")
+    assert ("WRONG_ATTRIBUTION" in found) is wrong, found
+
+
+@pytest.mark.parametrize(
+    ("language", "text", "wrong"),
+    [
+        ("en", "O. Lindqvist had a shot that was blocked by Kestrel Athletic's goalkeeper "
+               "M. Holub.", True),
+        ("en", "O. Lindqvist shot but M. Holub blocked it.", True),
+        ("vi", "Cú sút của O. Lindqvist bị M. Holub chặn lại.", True),
+        ("en", "O. Lindqvist's shot was blocked; M. Holub was not needed.", False),
+        ("vi", "Cú sút của O. Lindqvist bị chặn lại trước khi tới chỗ M. Holub.", False),
+    ],
+)  # fmt: skip
+def test_the_goalkeeper_never_blocks_a_blocked_shot(language: Lang, text: str, wrong: bool) -> None:
+    found = codes(text, _pack_at("55'", "big_chance"), language=language, mode="casual")
+    assert ("WRONG_ENTITY" in found) is wrong, found
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "product", "text", "wrong"),
+    [
+        ("9'", "big_chance", "commentary",
+         "J. Ellery có một cơ hội ngon ăn với xG 0.35, nhưng cú sút của anh lại đi off target.",
+         True),
+        ("49'", "dangerous_spell", "talking_point",
+         "a spell of sustained pressure by Harbor Lions FC trong phút 49, tỷ số 0-1 Kestrel "
+         "Athletic", True),
+        ("90+6'", "full_time", "talking_point",
+         "Harbor Lions FC 1-2 Kestrel Athletic tại full time.", True),
+        ("9'", "big_chance", "commentary",
+         "J. Ellery có cơ hội ngon ăn với xG 0.35, nhưng sút ra ngoài.", False),
+        ("56'", "dangerous_spell", "commentary",
+         "Harbor Lions FC pressing tầm cao, 8 lần vào vòng cấm trong 10 phút gần nhất.", False),
+    ],
+)  # fmt: skip
+def test_english_words_inside_a_vietnamese_line(
+    minute: str, kind: str, product: StudioProduct, text: str, wrong: bool
+) -> None:
+    mode: Register | None = "analyst" if product == "commentary" else None
+    built = _pack_at(minute, kind)
+    found = codes(text, built, language="vi", product=product, mode=mode)
+    assert ("WRONG_LANGUAGE" in found) is wrong, found
+    template = codes(text, built, language="vi", product=product, mode=mode, model_text=False)
+    assert "WRONG_LANGUAGE" not in template  # a model rule
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "text", "wrong"),
+    [
+        ("68'", "big_chance",
+         "D. Esposti có cơ hội ngon ăn, nhưng sút ra ngoài. Haror Lions FC mất một cơ hội tốt.",
+         True),
+        ("50'", "momentum_shift", "Thế trận nghiêng hẳn về Harbour Lions FC, kiểm soát bóng 56%.",
+         True),
+        ("78'", "goal", "J. Ellery của Kestrel Athletic FC ghi bàn, nâng tỷ số lên 2-1.", False),
+    ],
+)  # fmt: skip
+def test_a_misspelled_team_name(minute: str, kind: str, text: str, wrong: bool) -> None:
+    found = codes(text, _pack_at(minute, kind), language="vi", mode="casual")
+    assert ("WRONG_ENTITY" in found) is wrong, found
+
+
+@pytest.mark.parametrize(
+    ("minute", "language", "text", "kept"),
+    [
+        # wrong rejections found in the drafts of the final run: xG written out, "là một"
+        ("68'", "vi",
+         "Bàn thắng kỳ vọng của anh ấy là 0.34, còn cả trận Kestrel Athletic có 0.72 bàn thắng "
+         "kỳ vọng.", True),
+        ("55'", "vi", "Đây là một cú sút xa từ ngoài vòng cấm, xG 0.36.", True),
+        ("9'", "en", "Kestrel Athletic had a 0.35 chance of scoring.", True),
+        # a decimal next to a count noun is still not a count
+        ("55'", "vi", "Harbor Lions FC có 0.87 cú sút trong trận.", False),
+        ("55'", "vi", "Harbor Lions FC chỉ có một cú sút trúng đích.", False),
+    ],
+)  # fmt: skip
+def test_xg_in_words_and_the_article_mot(
+    minute: str, language: Lang, text: str, kept: bool
+) -> None:
+    found = codes(text, _pack_at(minute, "big_chance"), language=language, mode="analyst")
+    assert ("UNVERIFIED_NUMBER" not in found) is kept, found
+
+
+STUDIO_VOCAB = [
+    "Harbor Lions FC", "Kestrel Athletic", "Haror", "Harbour", "M. Holub", "T. Calder", "their",
+    "lead", "the lead", "ahead", "trailing", "dẫn trước", "bị", "gỡ hòa", "hòa 1-1", "equalise",
+    "led to", "the goal", "in favor of", "nghiêng về", "under pressure", "chịu áp lực",
+    "blocked by", "chặn", "off", "target", "full time", "một", "là", "cú sút", "0.72",
+    "bàn thắng kỳ vọng", "chance", "1-2", "63'", ",", ".", ";", "xG", "VAR", "km/h", "49th",
+]  # fmt: skip
+
+
+@settings(max_examples=150, deadline=None)
+@given(
+    st.lists(st.sampled_from(STUDIO_VOCAB), max_size=14),
+    st.text(max_size=20),
+    st.sampled_from(["vi", "en"]),
+)
+def test_fuzz_the_studio_guard_never_crashes(words: list[str], noise: str, language: Lang) -> None:
+    text = " ".join(words) + " " + noise
+    for minute, kind in (("55'", "big_chance"), ("50'", "momentum_shift"), ("63'", "goal")):
+        report = check_studio(
+            text,
+            scope_of(_pack_at(minute, kind)),
+            language=language,
+            product="commentary",
+            mode="analyst",
+            model_text=True,
+        )
+        assert report.passed == (not report.violations)
