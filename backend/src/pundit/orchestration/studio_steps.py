@@ -347,7 +347,10 @@ class StudioSteps:
                     if isinstance(exc, LlmOutputError)
                     else "error"
                 )
-                span.finish({"failure": failure}, status="error", error=str(exc)[:300])
+                details = exc.errors[:3] if isinstance(exc, LlmOutputError) else []
+                span.finish(
+                    {"failure": failure, "errors": details}, status="error", error=str(exc)[:300]
+                )
                 return "failed"
             except Exception as exc:  # an adapter bug must not take the job down
                 run.breaker.record_failure()

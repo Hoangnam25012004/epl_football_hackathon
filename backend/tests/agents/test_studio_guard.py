@@ -341,3 +341,16 @@ def test_mot_counts_before_a_statistic() -> None:
         "Harbor Lions FC chỉ có một cú sút trúng đích.", chance, language="vi", mode="analyst"
     )
     assert "UNVERIFIED_NUMBER" in found
+
+
+@pytest.mark.parametrize(
+    ("minute", "language", "text"),
+    [
+        ("55'", "en", "The xG for the shot was 0.36."),
+        ("68'", "vi", "xG của cú sút là 0.34."),
+    ],
+)
+def test_a_decimal_is_never_a_count(minute: str, language: Lang, text: str) -> None:
+    """P6 round 2: "shot" is the nearest metric word, but 0.36 cannot be a number of shots."""
+    built = _pack_at(minute, "big_chance")
+    assert not codes(text, built, language=language, product="talking_point", mode=None)

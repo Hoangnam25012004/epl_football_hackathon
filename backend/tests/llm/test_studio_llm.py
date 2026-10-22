@@ -246,3 +246,11 @@ def test_offline_calls_get_their_whole_budget(monkeypatch: pytest.MonkeyPatch) -
     assert seen == [offline.budgets.llm_timeout_s, live.budgets.llm_timeout_s]
     assert offline.budgets.llm_timeout_s == 4 * settings.llm_timeout_s
     assert live.budgets.llm_timeout_s <= settings.studio_job_budget_s
+
+
+def test_a_recap_keeps_its_first_five_paragraphs() -> None:
+    """P6: a small model wrote one paragraph per sentence; the first five are kept."""
+    many = LlmRecap(title="T", paragraphs=[f"p{i}." for i in range(8)])
+    assert to_recap_draft(many).paragraphs == ("p0.", "p1.", "p2.", "p3.", "p4.")
+    with pytest.raises(LlmOutputError):
+        to_recap_draft(LlmRecap(title="T", paragraphs=["", " "]))

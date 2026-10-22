@@ -30,7 +30,13 @@ from pundit.agents.studio_text import score_line
 from pundit.agents.trace import SpanHandle, TraceRecorder
 from pundit.llm.faults import FaultPlan
 from pundit.llm.mock import MockRecapWriter
-from pundit.llm.ports import ContentFiltered, LlmError, LlmTimeout, RecapWriterPort
+from pundit.llm.ports import (
+    ContentFiltered,
+    LlmError,
+    LlmOutputError,
+    LlmTimeout,
+    RecapWriterPort,
+)
 from pundit.llm.settings import Settings
 from pundit.llm.studio_prompts import RECAP_PROMPT_VERSION
 from pundit.orchestration.resilience import Budget, CircuitBreaker, Clock, with_timeout
@@ -223,7 +229,10 @@ class RecapService:
             except LlmError as exc:
                 self.breaker.record_failure()
                 failure = "timeout" if isinstance(exc, LlmTimeout) else "error"
-                span.finish({"failure": failure}, status="error", error=str(exc)[:300])
+                details = exc.errors[:3] if isinstance(exc, LlmOutputError) else []
+                span.finish(
+                    {"failure": failure, "errors": details}, status="error", error=str(exc)[:300]
+                )
                 return "failed"
             except Exception as exc:  # an adapter bug must not lose the recap
                 self.breaker.record_failure()

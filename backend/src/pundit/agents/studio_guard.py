@@ -54,6 +54,7 @@ from pundit.agents.guardrail import (
 from pundit.agents.language import Hit, Term, Text, detect_language, find_terms, vi_mode
 from pundit.agents.lexicon import lexicon
 from pundit.agents.numbers import Num, extract_numbers
+from pundit.stats.registry import REGISTRY
 
 StudioProduct = Literal["talking_point", "commentary", "recap", "graphic"]
 MAX_CHARS: dict[tuple[StudioProduct, str], int] = {
@@ -83,6 +84,11 @@ METRIC_FAMILY: dict[str, frozenset[str]] = {
     "cards": frozenset({"cards", "yellow_cards", "red_cards"}),
     "possession": frozenset({"possession", "possession_time"}),
 }
+# counts are whole numbers: "the xG for the shot was 0.36" does not name 0.36 a shot count
+COUNT_METRICS = frozenset(
+    {name for name, spec in REGISTRY.items() if spec.unit == "count"}
+    | {"cards", "var_overturns", "score"}
+)
 MAX_GAP_WORDS = 3  # "possession ratio of 42%", "kiểm soát bóng HAR 57%"
 _GAP_STOP = re.compile(r"[\d,.;:!?()]")
 _KEEPER_SHOOTS = (
@@ -184,6 +190,8 @@ def named_metric(written: Text, number: Num, mentions: list[Hit[str]]) -> str | 
     raw = written.raw
     best: tuple[float, str] | None = None
     for hit in mentions:
+        if number.decimals and hit.payload in COUNT_METRICS:
+            continue
         if hit.start >= number.end:
             gap, rank_bonus = raw[number.end : hit.start], 0.0
         elif hit.end <= number.start:

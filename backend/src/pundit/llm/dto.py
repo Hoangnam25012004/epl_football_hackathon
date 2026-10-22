@@ -193,6 +193,7 @@ def dto_to_spec(dto: LlmClaimSpec, ctx: ClaimContext) -> ClaimSpec:
 # --------------------------------------------------------------------------- studio (Day 3)
 
 MAX_RAW_CHARS = 600  # what is kept of one model text; the Guardrail enforces the product limits
+MAX_RECAP_PARAGRAPHS = 5
 _QUOTES = (('"', '"'), ("“", "”"), ("'", "'"), ("«", "»"))
 _BULLETS = ("- ", "* ", "• ")
 
@@ -263,12 +264,14 @@ def to_graphics_choice(dto: LlmGraphicsChoice) -> GraphicsChoice:
 
 def to_recap_draft(dto: LlmRecap) -> RecapDraft:
     title = clean_text(dto.title, 120)
+    # a small model writes one paragraph per sentence: the first five are kept (P6)
     paragraphs = tuple(p for p in (clean_text(item) for item in dto.paragraphs) if p)
+    paragraphs = paragraphs[:MAX_RECAP_PARAGRAPHS]
     errors: list[str] = []
     if not title:
         errors.append("the title is empty")
-    if not 1 <= len(paragraphs) <= 6:
-        errors.append(f"write 3 to 5 paragraphs, got {len(paragraphs)}")
+    if not paragraphs:
+        errors.append("write 3 to 5 paragraphs, got none")
     if errors:
         raise LlmOutputError("the recap is incomplete", errors=errors, raw=str(dto))
     return RecapDraft(title=title, paragraphs=paragraphs)
