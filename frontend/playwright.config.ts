@@ -9,6 +9,7 @@ export const E2E_SERVER_ENV = {
   TTS_PROVIDER: "mock",
   MOCK_TTS_TIME_SCALE: "0.1",
   MOCK_TTS_LATENCY_MS: "100",
+  STT_PROVIDER: "mock",
 };
 const PORT = Number(process.env.E2E_PORT ?? 8765);
 const MOCK_PORT = Number(process.env.E2E_MOCK_PORT ?? 8766);
@@ -38,6 +39,10 @@ export default defineConfig({
         baseURL: `http://127.0.0.1:${PORT}`,
         ...(channel ? { channel } : {}),
         viewport: { width: 1600, height: 950 },
+        // Day 5 A10: a fake microphone (a tone), allowed without a prompt
+        launchOptions: {
+          args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+        },
       },
     },
     {

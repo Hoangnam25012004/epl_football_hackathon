@@ -12,6 +12,7 @@ import type {
   OnAirState,
   PlayerBrief,
   RecapView,
+  RecognitionResult,
   ScenarioInfo,
   SpeechCue,
   SpeechVoice,
@@ -29,6 +30,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
 export const DEFAULT_TIMEOUT_MS = 8_000;
 export const CLAIM_TIMEOUT_MS = 20_000; // a claim may wait for its LLM budget
+export const STT_TIMEOUT_MS = 20_000; // a recording may wait its turn (one at a time)
 
 /** Empty in the static build (same origin as the API); set by `npm run dev`. */
 export function apiBase(): string {
@@ -63,20 +65,30 @@ export function detailOf(body: unknown): string | null {
   return null;
 }
 
-type RequestOptions = { body?: unknown; timeoutMs?: number; fetchImpl?: typeof fetch };
+type RequestOptions = {
+  body?: unknown; // sent as JSON
+  blob?: Blob; // sent as is, with its type (Day 5: the WAV of a spoken claim)
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+};
 
 export async function request<T>(
   method: "GET" | "POST",
   path: string,
-  { body, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch }: RequestOptions = {},
+  { body, blob, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch }: RequestOptions = {},
 ): Promise<Result<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const headers = blob
+    ? { "Content-Type": blob.type }
+    : body === undefined
+      ? undefined
+      : { "Content-Type": "application/json" };
   try {
     const response = await fetchImpl(apiBase() + path, {
       method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers,
+      body: blob ?? (body === undefined ? undefined : JSON.stringify(body)),
       signal: controller.signal,
       cache: "no-store",
     });
@@ -167,6 +179,12 @@ export const api = {
   voices: () => request<SpeechVoice[]>("GET", "/speech/voices"),
   greeting: (lang: "vi" | "en", voice: "female" | "male") =>
     request<SpeechCue>("GET", `/speech/greeting?lang=${lang}&voice=${voice}`),
+  // P2: a spoken claim as text, for the claim box only (docs/day5-design.md section 11)
+  recognize: (wav: Blob, lang: "vi" | "en") =>
+    request<RecognitionResult>("POST", `/speech/recognize?lang=${lang}`, {
+      blob: wav,
+      timeoutMs: STT_TIMEOUT_MS,
+    }),
 };
 
 /** "dominant_loser-42" → {scenario, seed}; null for anything else. */

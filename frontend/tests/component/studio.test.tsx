@@ -92,7 +92,8 @@ describe("ClaimBox", () => {
     fireEvent.click(screen.getByTestId("claim-submit"));
     expect(await screen.findByRole("alert")).toHaveTextContent("text too short");
     expect(screen.getByTestId("claim-input")).toHaveValue("Đội nhà áp đảo hiệp 2");
-    const body = JSON.parse(String(fetch.calls[0]?.init?.body));
+    const verify = fetch.calls.find((call) => call.url.includes("/claims/verify"));
+    const body = JSON.parse(String(verify?.init?.body));
     expect(body).toEqual({
       match_id: "dominant_loser-42",
       text: "Đội nhà áp đảo hiệp 2",

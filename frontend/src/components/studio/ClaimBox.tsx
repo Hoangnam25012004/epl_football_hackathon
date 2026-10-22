@@ -2,9 +2,10 @@
 
 // Check a claim and show the verdict with its numbers (docs/day4-design.md section 5.4). Every
 // number is a fact's `display`; the verdict has a colour, an icon and words (section 4.9).
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useToast } from "@/components/common/Toast";
 import { Chip, EmptyState } from "@/components/common/ui";
+import { MicButton } from "@/components/studio/MicButton";
 import { api } from "@/lib/api";
 import type { ClaimResult, Fact } from "@/lib/contracts";
 import { useT, type Key } from "@/lib/i18n";
@@ -104,8 +105,9 @@ export function ClaimBox({
   history: ClaimResult[];
   onDetails: (claimId: string) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +135,7 @@ export function ClaimBox({
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input
+            ref={input}
             data-testid="claim-input"
             value={text}
             maxLength={MAX_CHARS}
@@ -140,6 +143,15 @@ export function ClaimBox({
             placeholder={t("studio.claimPlaceholder")}
             aria-label={t("studio.claim")}
             className="min-w-0 flex-1 rounded border border-line bg-bg px-3 py-2 text-sm"
+          />
+          <MicButton
+            language={lang}
+            onText={(spoken) => {
+              // filled, never sent: the commentator checks it and presses Enter
+              setText(spoken.slice(0, MAX_CHARS));
+              setError(null);
+              input.current?.focus();
+            }}
           />
           <button
             type="submit"

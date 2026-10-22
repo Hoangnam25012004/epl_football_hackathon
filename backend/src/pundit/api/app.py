@@ -22,6 +22,7 @@ from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.service import ClaimService
 from pundit.orchestration.studio_service import StudioService
 from pundit.speech.narrator import Narrator, build_narrator
+from pundit.speech.transcriber import Transcriber, build_transcriber
 
 log = logging.getLogger("pundit.api")
 IMMUTABLE = "public, max-age=31536000, immutable"
@@ -66,6 +67,7 @@ def create_app(
     clock_factory: Callable[[], Clock] = RealClock,
     queue_size: int = DEFAULT_QUEUE_SIZE,
     narrator: Narrator | None = None,
+    transcriber: Transcriber | None = None,
 ) -> FastAPI:
     """Build the app. Tests inject services (fault plans, fake clocks) and a replay clock.
     The studio runs unless STUDIO_ENABLED=false (then the app is exactly the Day 2 one); the
@@ -78,6 +80,8 @@ def create_app(
         narrator = None
     elif narrator is None:
         narrator = build_narrator(settings)
+    if transcriber is None:
+        transcriber = build_transcriber(settings)  # P2: None unless STT_PROVIDER is set
     sessions = SessionManager(
         service,
         clock_factory=clock_factory,
@@ -93,6 +97,8 @@ def create_app(
         await sessions.shutdown()
         if narrator is not None:
             await narrator.aclose()
+        if transcriber is not None:
+            await transcriber.aclose()
 
     app = FastAPI(
         title="Pundit Copilot API",
@@ -106,6 +112,7 @@ def create_app(
     app.state.manager = sessions
     app.state.settings = settings
     app.state.narrator = narrator
+    app.state.transcriber = transcriber
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -116,6 +123,8 @@ def create_app(
     app.include_router(ws.router)
     if narrator is not None:  # mounted only with the voice: TTS_PROVIDER=off is the Day 4 app
         app.include_router(audio.router)
+    if transcriber is not None:  # speech to text (P2), off by default
+        app.include_router(audio.stt_router)
     ui = ui_directory(settings)
     if ui is not None:  # mounted last: every API route and /docs match first
         app.mount("/", UIFiles(directory=ui, html=True), name="ui")

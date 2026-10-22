@@ -287,3 +287,45 @@ test("A11 axe on the fan player with the voice on and the recap player open", as
   expect(await seriousA11y(page)).toEqual([]);
   await stopMatch(request, matchId);
 });
+
+test.describe("speech to text (P2)", () => {
+  test.use({ permissions: ["microphone"] });
+
+  test("A10 speak a claim: the box gets the text, nothing is sent; Enter verifies it", async ({
+    page,
+    request,
+  }) => {
+    const errors = watchErrors(page);
+    const matchId = await createMatch(request, { seed: 60, speed: 20 });
+    const verified: string[] = [];
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/claims/verify") verified.push(r.url());
+    });
+    await page.goto(`/studio/?match=${matchId}`);
+    const mic = page.getByTestId("mic-button");
+    await expect(mic).toBeVisible();
+    await mic.click();
+    await expect(mic).toHaveAttribute("data-phase", "recording");
+    await page.waitForTimeout(1500); // Chromium's fake microphone plays a tone
+    const recognized = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === "/speech/recognize",
+    );
+    await mic.click();
+    const response = await recognized;
+    expect(response.status(), await response.text()).toBe(200);
+    expect(response.request().headers()["content-type"]).toBe("audio/wav");
+    // the studio speaks English by default: the mock's English claim, not sent
+    await expect(page.getByTestId("claim-input")).toHaveValue(
+      "The home side dominated the second half",
+    );
+    await expect(page.getByTestId("claim-input")).toBeFocused();
+    expect(verified).toEqual([]);
+    // the commentator reads it and presses Enter: the Day 4 path
+    const verdict = page.waitForResponse((r) => new URL(r.url()).pathname === "/claims/verify");
+    await page.getByTestId("claim-input").press("Enter");
+    expect((await verdict).ok()).toBeTruthy();
+    await expect(page.getByTestId("verdict-card").first()).toBeVisible();
+    expect(errors).toEqual([]);
+    await stopMatch(request, matchId);
+  });
+});
