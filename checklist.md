@@ -96,8 +96,10 @@
 
 ## Ngày 3 — 23/10: Talking-Point + Graphics + Vietnamese Commentator
 
+> Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day3-design.md](docs/day3-design.md). **Template trước, LLM trong ngân sách** (chưa gắn Foundry: mock cho dev/CI, Ollama chạy offline).
+
 **Talking-Point Agent**
-- [ ] **P0** Khi có moment, sinh 2–3 câu bình luận ngắn (tiếng Anh) kèm số liệu đã kiểm chứng
+- [ ] **P0** Khi có moment, sinh 2–3 câu bình luận ngắn (tiếng Anh + tiếng Việt) kèm số liệu đã kiểm chứng
 - [ ] **P0** Đi qua Guardrail trước khi đẩy ra UI
 
 **Graphics Agent**
@@ -118,7 +120,7 @@
 - [ ] **P2** Chế độ "một chỉ số duy nhất" (người xem chọn chỉ số muốn theo dõi)
 
 **API**
-- [ ] **P0** WebSocket đẩy thêm `talking_point`, `lower_third`, `vn_commentary`
+- [ ] **P0** WebSocket đẩy thêm `talking_point`, `lower_third`, `commentary` (bình luận VI/EN theo hồ sơ; thay cho tên dự kiến `vn_commentary`), `recap`
 - [ ] **P0** `GET /matches/{id}/recap?lang=vi`
 
 **Hoàn thành khi:** replay trận mẫu thì có talking points, JSON lower-third và bình luận tiếng Việt chạy ra liên tục, không có số liệu bịa.
