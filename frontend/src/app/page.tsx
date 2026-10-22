@@ -98,11 +98,21 @@ function Landing() {
               <span className="text-muted">
                 {session.events_applied}/{session.events_total}
               </span>
+              {/* no prefetch: the static export writes the pages' segment files where the
+                  client does not look for them (404 in the console); the pages are small */}
               <span className="ml-auto flex gap-2">
-                <Link className="text-accent underline" href={`/studio/?match=${session.match_id}`}>
+                <Link
+                  prefetch={false}
+                  className="text-accent underline"
+                  href={`/studio/?match=${session.match_id}`}
+                >
                   {t("landing.studio")}
                 </Link>
-                <Link className="text-accent underline" href={`/fan/?match=${session.match_id}`}>
+                <Link
+                  prefetch={false}
+                  className="text-accent underline"
+                  href={`/fan/?match=${session.match_id}`}
+                >
                   {t("landing.fan")}
                 </Link>
               </span>

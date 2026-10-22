@@ -31,6 +31,21 @@ test("E1 landing → studio: scoreboard, controls, synthetic label, no console e
   expect(errors).toEqual([]);
 });
 
+test("E1b the landing page lists running matches without a console error (no 404 prefetch)", async ({
+  page,
+  request,
+}) => {
+  const matchId = await createMatch(request, { seed: 59, speed: 20 });
+  const errors = watchErrors(page);
+  await page.goto("/");
+  const row = page.getByText(matchId, { exact: true });
+  await expect(row).toBeVisible();
+  await row.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500); // a prefetch would have happened by now
+  expect(errors).toEqual([]);
+  await stopMatch(request, matchId);
+});
+
 test("E2 play 20x, pause stops events, resume, 5x; n continuous, no duplicate event", async ({
   page,
   request,
