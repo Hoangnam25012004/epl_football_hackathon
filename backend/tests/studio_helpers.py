@@ -16,13 +16,14 @@ from pundit.orchestration.studio_steps import StudioBudgets
 
 SAMPLES = (("dominant_loser", 42), ("comeback_var", 7), ("red_card_swing", 7), ("balanced", 3))
 MATRIX = tuple((s, n) for s, _ in SAMPLES for n in (3, 7, 42))  # 4 scenarios x 3 seeds
-# small real-time budgets: an injected hang ends in a fraction of a second
+# small real-time budgets: an injected hang ends in half a second, yet a busy machine (a slow
+# event loop) never turns an instant mock answer into a timeout
 FAST = StudioBudgets(
-    talking_point_s=0.3,
-    commentary_s=0.3,
-    graphics_s=0.2,
-    job_s=0.5,
-    llm_timeout_s=0.2,
+    talking_point_s=0.8,
+    commentary_s=0.8,
+    graphics_s=0.6,
+    job_s=1.2,
+    llm_timeout_s=0.5,
     min_llm_s=0.01,
 )
 
