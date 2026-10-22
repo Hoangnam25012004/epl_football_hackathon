@@ -40,6 +40,8 @@ Degraded = Literal[
     "explainer_fallback",  # the published explanation is the deterministic template
     "circuit_open",  # LLM calls skipped because the circuit breaker is open
     "orchestrator_fallback",  # the workflow failed; the deterministic pipeline answered
+    "writer_fallback",  # studio: a model text failed or was rejected; the template was used
+    "llm_skipped",  # studio: no model call (no time left in the budget)
 ]
 Op = Literal[">", ">=", "<", "<=", "==", "~"]
 AssertionKind = Literal["dominance", "compare", "value"]
@@ -55,6 +57,10 @@ ViolationCode = Literal[
     "WRONG_ATTRIBUTION",  # a true number given to the wrong team or player
     "FRAGMENT",  # an explanation that does not stand alone ("... và KES chỉ có 1 cú sút")
     "UNGROUNDED",  # a model's sentence about the match without any number from the facts
+    "WRONG_ENTITY",  # studio: a player who is not part of the moment
+    "WRONG_OUTCOME",  # studio: "ghi bàn" for a shot that was saved, the wrong card colour
+    "WRONG_LANGUAGE",  # studio: an English text where Vietnamese was asked, or the reverse
+    "WRONG_REGISTER",  # studio: casual text with jargon or several numbers, analyst without any
 ]
 MomentKind = Literal[
     "goal",
@@ -72,7 +78,38 @@ MomentKind = Literal[
 ]
 SpanKind = Literal["agent", "tool", "llm", "guardrail", "fallback"]
 SpanStatus = Literal["ok", "error", "retry", "fallback", "rejected"]
-WsType = Literal["hello", "event", "snapshot", "moment", "claim", "status", "resync"]
+WsType = Literal[
+    "hello",
+    "event",
+    "snapshot",
+    "moment",
+    "claim",
+    "status",
+    "resync",
+    "talking_point",  # Day 3: clients must ignore types they do not know
+    "lower_third",
+    "commentary",
+    "recap",
+    "talking_point_status",
+]
+# Day 3 studio (docs/day3-design.md section 3)
+CueKind = Literal["shot", "corner", "offside", "var_review", "added_time", "stat_tick", "lull"]
+RuleId = Literal[
+    "offside", "var", "penalty", "second_yellow", "red_card", "yellow_card", "corner",
+    "substitution", "added_time",  # football rules
+    "xg", "possession", "momentum", "ppda", "chaos", "tempo",  # statistics
+]  # fmt: skip
+EventOutcome = Literal[
+    "goal", "saved", "blocked", "off_target", "post", "yellow", "second_yellow", "red",
+    "offside", "overturned", "stands",
+]  # fmt: skip
+Register = Literal["analyst", "casual"]
+ItemSource = Literal["llm", "template"]
+StudioBranch = Literal["talking_point", "lower_third", "commentary"]
+TalkingAngle = Literal["headline", "stat", "story"]
+TalkingPointStatus = Literal["new", "approved", "dismissed", "pinned"]
+LowerThirdTemplate = Literal["score_update", "team_compare", "player_card", "momentum"]
+RecapScope = Literal["H1", "FULL"]
 
 
 class Contract(BaseModel):
@@ -496,3 +533,366 @@ class WsMessage(Contract):
     n: int = Field(ge=0)  # increases by one per message within a session
     match_id: str
     payload: dict[str, Any]
+
+
+# --------------------------------------------------------------------------- studio (Day 3)
+
+
+class Cue(Contract):
+    """A commentary-worthy event that is not a moment (docs/day3-design.md section 4)."""
+
+    id: str  # f"{match_id}-q{n:04d}", numbered in detection order
+    match_id: str
+    kind: CueKind
+    team: TeamId | None
+    player: PlayerId | None
+    period: int
+    clock_ms: int
+    display_minute: str
+    seq: int
+    trigger_event_ids: tuple[str, ...]
+    facts: tuple[Fact, ...]
+
+
+class Trigger(Contract):
+    """A moment or a cue, as the studio crew sees it."""
+
+    id: str  # = moment.id or cue.id
+    match_id: str
+    source: Literal["moment", "cue"]
+    kind: str  # MomentKind | CueKind
+    importance: Literal[1, 2, 3]
+    team: TeamId | None
+    player: PlayerId | None
+    period: int
+    clock_ms: int
+    match_ms: int
+    display_minute: str
+    seq: int
+    trigger_event_ids: tuple[str, ...]
+    facts: tuple[Fact, ...]
+    rules: tuple[RuleId, ...] = ()
+    outcome: EventOutcome | None = None
+    roles: dict[str, PlayerId] = Field(default_factory=dict)  # "scorer" -> player id, ...
+    details: dict[str, str] = Field(default_factory=dict)  # "situation" -> "penalty", ...
+    related_ids: tuple[str, ...] = ()  # goal_overturned -> the goal moment
+
+    @property
+    def involved_players(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.roles.values())))
+
+
+class FactPack(Contract):
+    """The verified numbers of one trigger, computed on the view pinned at its seq."""
+
+    trigger: Trigger
+    match: MatchContext  # names, score and clock at as_of_seq (= trigger.seq)
+    facts: tuple[Fact, ...]
+    headline: tuple[str, ...] = ()  # keys of the 1-3 facts to say first
+    window_numbers: tuple[float, ...] = ()  # bounds and lengths of the windows used
+    first_rules: tuple[RuleId, ...] = ()  # rules seen for the first time in the match
+
+    @property
+    def as_of_seq(self) -> int:
+        return self.match.as_of_seq
+
+
+class TalkingLine(Contract):
+    text: str
+    angle: TalkingAngle
+    fact_keys: tuple[str, ...] = ()
+
+
+class TalkingPoint(Contract):
+    id: str  # f"{trigger.id}-tp"
+    match_id: str
+    trigger_id: str
+    trigger_kind: str
+    importance: Literal[2, 3]
+    period: int
+    clock_ms: int
+    display_minute: str
+    as_of_seq: int
+    en: tuple[TalkingLine, ...] = Field(min_length=2, max_length=3)
+    vi: tuple[TalkingLine, ...] = Field(min_length=2, max_length=3)
+    source_en: ItemSource
+    source_vi: ItemSource
+    model: str
+    facts: tuple[Fact, ...]
+    evidence_event_ids: tuple[str, ...]
+    degraded: tuple[Degraded, ...] = ()
+    status: TalkingPointStatus = "new"
+    trace: tuple[TraceSpan, ...] | None = None
+
+
+class GraphicStat(Contract):
+    key: str
+    label_vi: str
+    label_en: str
+    home: str | None = None  # displays, for a two-team template
+    away: str | None = None
+    value: str | None = None  # display, for a one-side template
+    highlight: Literal["home", "away"] | None = None
+
+
+class TeamBadge(Contract):
+    id: TeamId
+    name: str
+    short_name: str
+    primary_color: str
+    secondary_color: str
+
+
+class LowerThird(Contract):
+    id: str  # f"{trigger.id}-lt"
+    match_id: str
+    trigger_id: str
+    template: LowerThirdTemplate
+    title_vi: str = Field(max_length=32)
+    title_en: str = Field(max_length=32)
+    subtitle_vi: str = Field(max_length=48)
+    subtitle_en: str = Field(max_length=48)
+    stats: tuple[GraphicStat, ...] = Field(min_length=1, max_length=4)
+    home: TeamBadge
+    away: TeamBadge
+    player: PlayerId | None = None
+    period: int
+    clock_ms: int
+    match_clock: str
+    show_at_match_ms: int
+    duration_ms: int  # display time at 1x
+    priority: Literal[1, 2, 3]
+    supersedes: tuple[str, ...] = ()
+    facts: tuple[Fact, ...]
+    evidence_event_ids: tuple[str, ...]
+    source: Literal["rule", "llm"]
+    synthetic: Literal[True] = True
+    disclaimer: str
+
+
+class CommentaryText(Contract):
+    language: Lang
+    mode: Register
+    text: str
+    source: ItemSource
+
+
+class CommentaryItem(Contract):
+    """One line of commentary in its four versions (vi / en x analyst / casual)."""
+
+    id: str  # f"{trigger.id}-c"
+    match_id: str
+    trigger_id: str
+    trigger_kind: str
+    importance: Literal[1, 2, 3]
+    period: int
+    clock_ms: int
+    display_minute: str
+    as_of_seq: int
+    team: TeamId | None
+    player: PlayerId | None
+    involved_players: tuple[PlayerId, ...] = ()
+    texts: tuple[CommentaryText, ...] = Field(min_length=4, max_length=4)
+    facts: tuple[Fact, ...]
+    evidence_event_ids: tuple[str, ...]
+    rules: tuple[RuleId, ...] = ()
+    first_rules: tuple[RuleId, ...] = ()
+    excitement: Literal[0, 1, 2, 3] = 0
+    speak: bool = False
+    degraded: tuple[Degraded, ...] = ()
+
+    def text(self, language: Lang, mode: Register) -> CommentaryText:
+        for item in self.texts:
+            if item.language == language and item.mode == mode:
+                return item
+        raise KeyError((language, mode))
+
+
+class RecapText(Contract):
+    language: Lang
+    mode: Register
+    title: str
+    paragraphs: tuple[str, ...] = Field(min_length=1, max_length=6)
+    source: ItemSource
+
+
+class Recap(Contract):
+    id: str  # f"{match_id}-recap-{scope}"
+    match_id: str
+    scope: RecapScope
+    as_of_seq: int
+    texts: tuple[RecapText, ...] = Field(min_length=4, max_length=4)
+    key_moment_ids: tuple[str, ...] = ()
+    stats: tuple[GraphicStat, ...] = ()
+    facts: tuple[Fact, ...]
+    evidence_event_ids: tuple[str, ...]
+    revision: int = Field(default=1, ge=1)
+    degraded: tuple[Degraded, ...] = ()
+
+    def text(self, language: Lang, mode: Register) -> RecapText:
+        for item in self.texts:
+            if item.language == language and item.mode == mode:
+                return item
+        raise KeyError((language, mode))
+
+
+class Profile(Contract):
+    """Who is watching (Day 3 section 11): one per WebSocket connection."""
+
+    mode: Register = "analyst"
+    language: Lang = "vi"
+    team: TeamId | None = None  # favourite club
+    player: PlayerId | None = None  # player focus
+    beginner: bool = False  # "Người mới xem"
+    metric: str | None = None  # one metric only
+
+    def key(self) -> str:
+        beginner = "1" if self.beginner else "0"
+        parts = (self.mode, self.language, self.team, self.player, beginner, self.metric)
+        return "|".join(part or "-" for part in parts)
+
+
+class FactView(Contract):
+    label: str
+    display: str
+
+
+class RuleView(Contract):
+    rule: RuleId
+    title: str
+    text: str
+    depth: Literal["full", "short"]
+
+
+class CommentaryView(Contract):
+    """Payload of the WebSocket message `commentary`: one item for one profile."""
+
+    id: str
+    trigger_id: str
+    kind: str
+    period: int
+    clock_ms: int
+    display_minute: str
+    importance: Literal[1, 2, 3]
+    language: Lang
+    mode: Register
+    text: str
+    framing: str | None = None
+    emphasis: Literal["own_team", "opponent", "neutral", "focus_player"] = "neutral"
+    relevance: Literal["high", "normal", "low"] = "normal"
+    facts: tuple[FactView, ...] = ()
+    explanation: RuleView | None = None
+    player_tracker: tuple[FactView, ...] | None = None
+    speak: bool = False
+    excitement: int = 0
+    source: ItemSource
+
+
+class GraphicStatView(Contract):
+    label: str
+    home: str | None = None
+    away: str | None = None
+    value: str | None = None
+    highlight: Literal["home", "away"] | None = None
+
+
+class LowerThirdView(Contract):
+    """Payload of `lower_third`: a lower-third in the profile's language."""
+
+    id: str
+    trigger_id: str
+    template: LowerThirdTemplate
+    language: Lang
+    title: str
+    subtitle: str
+    stats: tuple[GraphicStatView, ...]
+    home: TeamBadge
+    away: TeamBadge
+    player: PlayerId | None = None
+    period: int
+    clock_ms: int
+    match_clock: str
+    show_at_match_ms: int
+    duration_ms: int
+    priority: Literal[1, 2, 3]
+    supersedes: tuple[str, ...] = ()
+    evidence_event_ids: tuple[str, ...]
+    source: Literal["rule", "llm"]
+    synthetic: Literal[True] = True
+    disclaimer: str
+
+
+class RecapView(Contract):
+    """Payload of `recap` and of GET /matches/{id}/recap."""
+
+    id: str
+    scope: RecapScope
+    language: Lang
+    mode: Register
+    title: str
+    paragraphs: tuple[str, ...]
+    key_moment_ids: tuple[str, ...] = ()
+    stats: tuple[GraphicStatView, ...] = ()
+    revision: int
+    source: ItemSource
+    degraded: tuple[Degraded, ...] = ()
+
+
+# Model drafts: what an LLM port returns, before the Guardrail
+
+
+class TalkingDraft(Contract):
+    en: tuple[str, ...]
+    vi: tuple[str, ...]
+
+
+class CommentaryDraft(Contract):
+    analyst: str  # Vietnamese
+    casual: str
+
+
+class GraphicsOptions(Contract):
+    templates: tuple[LowerThirdTemplate, ...]
+    stat_keys: tuple[str, ...]  # candidate fact keys
+
+
+class GraphicsChoice(Contract):
+    template: LowerThirdTemplate
+    stat_keys: tuple[str, ...]
+
+
+class RecapDraft(Contract):
+    title: str
+    paragraphs: tuple[str, ...]
+
+
+# Studio workflow messages
+
+
+class StudioJob(Contract):
+    trigger: Trigger
+    first_rules: tuple[RuleId, ...] = ()  # rules met for the first time in the match
+
+
+class StudioPlan(Contract):
+    """StudioIntake -> FactPackBuilder: the job and the branches that apply to it."""
+
+    job: StudioJob
+    branches: tuple[StudioBranch, ...]
+
+
+class BranchResult(Contract):
+    branch: StudioBranch
+    talking_point: TalkingPoint | None = None
+    lower_third: LowerThird | None = None
+    commentary: CommentaryItem | None = None
+
+
+class StudioOutput(Contract):
+    trigger_id: str
+    commentary: CommentaryItem
+    talking_point: TalkingPoint | None = None
+    lower_third: LowerThird | None = None
+    degraded: tuple[Degraded, ...] = ()
+    timings_ms: dict[str, float] = Field(default_factory=dict)
+    trace: tuple[TraceSpan, ...] | None = None

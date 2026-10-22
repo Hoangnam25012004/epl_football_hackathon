@@ -631,7 +631,8 @@ def check(
             )
         )
     claim = Text.of(text)
-    for label in _found(claim, VERDICT_TERMS):
+    # verdict words only matter under a verdict: commentary may say "sai lầm" or "đúng lúc"
+    for label in _found(claim, VERDICT_TERMS) if context.verdict is not None else ():
         violations.append(
             GuardrailViolation(
                 code="VERDICT_MISMATCH",
