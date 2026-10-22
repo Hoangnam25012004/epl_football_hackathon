@@ -134,27 +134,40 @@
 > Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day4-design.md](docs/day4-design.md). Next.js static export do FastAPI phục vụ (một origin); overlay tự động + biên tập viên Take / Clear / Hold; UI song ngữ; phạm vi P0 + P1 + màn so sánh Analyst / Casual.
 
 **Studio Dashboard**
-- [ ] **P0** Scoreboard + đồng hồ trận + nút điều khiển replay (play / pause / tốc độ)
-- [ ] **P0** Feed sự kiện real-time
-- [ ] **P0** Ô nhập claim + hiển thị verdict (màu theo kết quả) + số liệu
-- [ ] **P0** Hàng đợi talking points: duyệt / bỏ / ghim
-- [ ] **P0** Drawer **Why / Evidence / Agent Trace**
-- [ ] **P1** Timeline momentum (biểu đồ)
-- [ ] **P1** Sơ đồ sân hiển thị vị trí các event làm bằng chứng
+- [x] **P0** Scoreboard + đồng hồ trận + nút điều khiển replay (play / pause / tốc độ)
+- [x] **P0** Feed sự kiện real-time
+- [x] **P0** Ô nhập claim + hiển thị verdict (màu theo kết quả) + số liệu
+- [x] **P0** Hàng đợi talking points: duyệt / bỏ / ghim
+- [x] **P0** Drawer **Why / Evidence / Agent Trace**
+- [x] **P1** Timeline momentum (biểu đồ)
+- [x] **P1** Sơ đồ sân hiển thị vị trí các event làm bằng chứng
 
 **Overlay lower-third**
-- [ ] **P0** Trang `/overlay` nền trong suốt, nhận JSON qua WebSocket, có animation vào / ra
-- [ ] **P0** JSON overlay có timestamp trận đấu (`match_clock`, `show_at`, `duration`) để đồng bộ với video, theo yêu cầu "timed and machine-readable" của Rules
-- [ ] **P1** Thử đưa vào OBS (Browser Source) để quay demo
+- [x] **P0** Trang `/overlay` nền trong suốt, nhận JSON qua WebSocket, có animation vào / ra
+- [x] **P0** JSON overlay có timestamp trận đấu (`match_clock`, `show_at`, `duration`) để đồng bộ với video, theo yêu cầu "timed and machine-readable" của Rules
+- [x] **P1** Thử đưa vào OBS (Browser Source) để quay demo
 
 **Fan VN Player**
-- [ ] **P0** Chọn trận, hiển thị bình luận tiếng Việt dạng text theo thời gian thực
-- [ ] **P0** Công tắc chế độ "Người mới xem"
-- [ ] **P0** Màn hình chọn hồ sơ: Analyst / Casual, ngôn ngữ, CLB yêu thích
-- [ ] **P1** Màn hình Player focus
-- [ ] **P0** Nhãn **"Synthetic data"** trên mọi màn hình
+- [x] **P0** Chọn trận, hiển thị bình luận tiếng Việt dạng text theo thời gian thực
+- [x] **P0** Công tắc chế độ "Người mới xem"
+- [x] **P0** Màn hình chọn hồ sơ: Analyst / Casual, ngôn ngữ, CLB yêu thích
+- [x] **P1** Màn hình Player focus
+- [x] **P0** Nhãn **"Synthetic data"** trên mọi màn hình
 
 **Hoàn thành khi:** chạy local thấy được đủ một luồng: claim, verdict, talking point, lower-third và bình luận tiếng Việt.
+
+**Kết quả (22/10):** đạt.
+
+- **Đã xây:** Next.js 16 static export do `pundit serve --ui` phục vụ, gồm trang chọn trận, Studio, Overlay, Fan và màn So sánh Analyst / Casual (thêm ngoài checklist).
+- **Kiểm thử:**
+  - Vitest 73 passed (unit, property, component, contract).
+  - Playwright 23/23: E1–E12 trên backend thật, cùng các ca mất kết nối và mã 4404 / 4422 / 4429 ở project mock.
+  - axe 0 lỗi serious / critical trên 5 trang.
+  - Cả trận 1000x khi mở 3 trang: long task lâu nhất 115 ms, heap tăng ≤ 2,3 MB; độ trễ p95 11 ms ở 20x.
+  - Backend: `pytest -m "not live"` 1789 passed; ruff và mypy sạch.
+- **OBS 32.2.2 (M3):** Browser Source không có CSS mặc định vẫn trong suốt trên nền chroma, lower-third tự lên rồi tự xuống sóng.
+- **Lỗi tìm thấy và đã sửa (12):** biến thể `dark:` không theo theme Studio, tương phản màu, trang thiếu `?match=` mất nhãn Synthetic, Fan bị từ chối hồ sơ mà không biết lý do, vùng cuộn không dùng được bàn phím…
+- Chi tiết: [docs/day4-design.md](docs/day4-design.md) §18.
 
 ---
 

@@ -875,3 +875,88 @@ Job backend giữ nguyên.
 | 7 | Thư viện | ✅ Không dùng thư viện biểu đồ / animation; dùng SVG + CSS |
 | 8 | Restart | ✅ Phiên cũ phát `status.restarted` sau khi phiên mới đã đăng ký; mọi client tự kết nối lại |
 | 9 | Overlay khi trận chưa tồn tại | ✅ Chờ và thử lại mỗi 5 s (Studio / Fan thì hiện nút "Tạo trận này") |
+
+---
+
+## 18. As-built (22/10/2026)
+
+### 18.1. Đã xây
+
+- **Backend (G1, chỉ thêm):** pause / resume / tốc độ không huỷ job studio; `OnAirState` + message `on_air` + `GET/POST /matches/{id}/on-air`; `/timeline`, `/stats`, `/events` (`ids=` / `last=`, không lộ event tương lai), `/scenarios` (kèm câu claim mẫu), `GET /matches`, `/matches/{id}/players`; restart báo `status.restarted` sau khi phiên mới đã đăng ký; `pundit serve --ui PATH` phục vụ bản build (HTML `no-cache`, `_next/static/` `immutable`); 13 schema mới trong `packages/schemas`.
+- **Frontend (`frontend/`):** Next.js 16.4 static export, React 19.3, Tailwind 4.3, zustand 5; 53 file nguồn (khoảng 6.000 dòng, chưa tính type sinh từ schema).
+  - Trang chọn trận, Studio, Overlay, Fan, So sánh.
+  - `lib/` thuần: socket (kiểm `n`, backoff, 4404 / 4422 / 4429, watchdog), store (gom theo khung hình), overlay-scheduler, profile, clock, pitch, compare, i18n EN / VI.
+- **Fixture:** A (luồng WS thật, 3 hồ sơ + hello giữa trận) và B (câu LLM dài từ P6 Ngày 3). Thêm `tests/fixtures/rest/` (`GET /scenarios`, `GET /matches/dominant_loser-42/players`) cho E2E mock, có contract test.
+- **CI:** job `frontend` trong `.github/workflows/ci.yml` gồm:
+  - `npm ci`;
+  - `gen:types` + `git diff --exit-code`;
+  - lint, typecheck, prettier;
+  - Vitest, build, `npm run size`;
+  - backend `uv sync`, Playwright Chromium, cả hai project E2E;
+  - upload `test-results`.
+
+### 18.2. Khác biệt so với thiết kế và lý do
+
+| # | Chỗ | Thiết kế | As-built | Lý do |
+|---|---|---|---|---|
+| 1 | Ngân sách JS tải lần đầu (F7) | Overlay < 120 KB gzip | Overlay ≤ 160 KB; đo được **147,5 KB**. Studio 163,2 KB (ngân sách 300 KB) | Riêng React DOM + runtime Next.js đã khoảng 130 KB gzip. Bộ đo bỏ qua script `noModule` (polyfill trình duyệt hiện đại không tải) |
+| 2 | Test thời gian F7 trên CI | Chạy trong E2E | `perf.spec.ts` bỏ qua khi `CI` có giá trị; chạy trên máy dev | Runner dùng chung của GitHub quá nhiễu cho ngưỡng thời gian. E2E chức năng vẫn chạy trên CI |
+| 3 | E11 | Dừng backend thật 5 s | Project `mock`: `routeWebSocket` đóng socket, từ chối mọi lần nối lại trong 5 s, rồi trả hello giữa trận | Dừng server dùng chung giữa các test làm hỏng test khác. Cùng hành vi phía client, chạy tất định |
+| 4 | Ảnh tham chiếu F6 | Duyệt bằng mắt một lần rồi làm tham chiếu | Test ghi 4 ảnh (Studio, Overlay `debug` 1920×1080; Fan 390×844; So sánh) vào `test-results/`. Đã duyệt bằng mắt; không so pixel | Font và khử răng cưa khác nhau giữa Windows và Linux CI. Phần đo được (tràn ngang, vùng an toàn, alpha) có assert riêng |
+| 5 | E3 | Thẻ verdict có `61%`, `15–1`, `2.24–0.24` | Thẻ hiện headline của server (61%, 15, 2.24, 0.91), đúng §5.4. Số hai đội (39%, 1, 0.24) nằm ở tab Why, theo từng assertion | §5.4 định nghĩa thẻ chỉ có headline. E3 kiểm cả thẻ (U1: đúng `display`, đúng thứ tự) và tab Why |
+| 6 | Fixture B trong E2E mock | — | Đặt hello lúc giao bóng của fixture A trước fixture B | Fixture B bắt đầu từ `n = 1`, không có hello; socket bỏ qua mọi message trước hello (U3) |
+| 7 | `lang` cho nội dung | — | Chữ của server (bình luận, câu mở đầu, facts, giải thích luật) mang `lang` theo `item.language` | Ngôn ngữ UI tách khỏi ngôn ngữ nội dung (U8); trình đọc màn hình đọc đúng giọng (WCAG 3.1.2). E8 / E9 / E10 dựa vào thuộc tính này, vì tên cầu thủ Việt có dấu xuất hiện cả trong câu tiếng Anh |
+| 8 | Màu | Một token `--accent` | `--accent` cho chữ và viền; `--accent-fill` cho nút nền màu chữ trắng. Thêm `--true-fill`… cho nhãn verdict | Đạt 4,5:1 ở mọi theme (chi tiết ở 18.4) |
+| 9 | Kiểm tra OBS (M3) | Thủ công | Tự động một lần bằng obs-websocket (script trong scratchpad, không đưa vào repo vì ghi cấu hình OBS trong `%APPDATA%`) | Kết quả ở 18.3. Cấu hình OBS để lại cho buổi quay: profile `Pundit` 1920×1080; websocket đã tắt sau khi chạy |
+
+### 18.3. Kết quả kiểm thử theo §12
+
+| Pha | Kết quả |
+|---|---|
+| **F1. Gate tĩnh** | Backend: `ruff check .`, `ruff format --check .` (183 file), `mypy` (104 file): **sạch**. Frontend: `npm run check` (gen:types không lệch, eslint, typecheck, prettier): **sạch** |
+| **F2. Hồi quy backend** | `pytest -m "not live"` (mặc định + slow + perf): **1789 passed**, 6 deselected (live), trong 13 phút 8 giây. Gồm 1764 test của Ngày 1–3 và test mới của §3.9 |
+| **F3. Unit / component / property FE** | Vitest: **73 passed** (8 file: socket, store, scheduler, lib, compare / audio, component Studio, component màn hình khác, contract). Property (fast-check) tìm ra lỗi: món đã Take vẫn nằm trong hàng đợi nên lên sóng lần hai; đã sửa |
+| **F4. Hợp đồng** | Mọi message của 5 fixture WS hợp lệ với `ws_payloads.schema.json`; 2 fixture REST hợp lệ với schema của chúng; type sinh từ schema không lệch |
+| **F5. E2E backend thật** | **13/13**: E1–E10, E12 (11 test, E6 + E7 và E8 + E9 gộp), cộng F6 × 2. E11 ở project `mock` |
+| **E2E mock** | **10/10**: E11 (mất kết nối 5 s → banner "Reconnecting in Ns" → bắt kịp trạng thái 58', 0–1); 4404 Studio (nút "Create this match" → tải lại → live); 4404 overlay (chờ, không hiện gì, rồi lên sóng); 4422 Fan (hiện lý do, chọn lại hồ sơ, không thử lại hồ sơ bị từ chối); 4429 (báo quá tải, không thử lại trước 10 s); mọi trang khi chưa chọn trận và khi backend tắt; 4 bài bố cục với fixture B |
+| **F6. A11y, hình ảnh, trong suốt** | axe WCAG 2 A/AA trên 5 trang: **0 serious / critical** (sau các sửa ở 18.4). Overlay: alpha = 0 ở mọi điểm mẫu ngoài lower-third, > 200 bên trong. Ảnh tham chiếu đã duyệt: chữ VI đủ dấu, không tràn ngang ở 390 px, lower-third nằm trong vùng an toàn 5 % |
+| **F7. Hiệu năng** | Cả trận 1000x khi Studio + Fan + Overlay cùng mở: long task lâu nhất **115 ms** (Studio; ngưỡng 200), heap tăng **≤ 2,3 MB** mỗi tab (ngưỡng 50), 0 hở `n`, 0 trùng. Message → store ở 20x: **p95 11,0 ms** trên 150 message (ngưỡng 100). JS tải lần đầu: mục 18.2 dòng 1 |
+| **F8. Nghiệm thu thủ công** | M1, M2, M4, M5, M7, M8: làm qua Playwright MCP và E2E ở trên. **M3 (OBS 32.2.2):** Browser Source 1920×1080 trỏ tới `/overlay/?match=dominant_loser-42&lang=en`, **xoá CSS mặc định của OBS**, đặt trên nền màu chroma `#00B140`. Bốn góc và giữa khung giữ đúng `#00B140`, nghĩa là chính trang overlay trong suốt. Lower-third "GOAL! 27' · HAR 0–1 KES" hiện trong vùng an toàn rồi tự rời sóng. M6 (diễn tập video): để Ngày 7 |
+| **F9. Ghi kết quả** | Mục này; `checklist.md`; `claude.md`; commit local (chưa push) |
+
+### 18.4. Lỗi tìm thấy khi kiểm thử và cách sửa
+
+| # | Lỗi | Tìm bằng | Sửa |
+|---|---|---|---|
+| 1 | Món đã Take vẫn nằm trong hàng đợi, lên sóng lần hai | Property test scheduler | Take gỡ món khỏi hàng đợi |
+| 2 | Bảng chỉ số / timeline không cập nhật khi replay nhanh (debounce bị dồn mãi) | Chạy thử 1000x | `useThrottled` thay debounce |
+| 3 | Nền ô cờ của chế độ `debug` không hiện (CSS `backgroundImage` sai) | Xem ảnh | Dùng thuộc tính `background` |
+| 4 | Tiêu đề lower-third bị cắt | Xem ảnh với fixture B | Hộp rộng 1040 px; tiêu đề `truncate` |
+| 5 | Nhãn bằng chứng luôn tiếng Anh; nhãn thô "stat tick" | Đọc lại UI VI | Theo ngôn ngữ UI; thêm khoá `cue.*` |
+| 6 | Đếm ngược kết nối lại lệch 1 s | Component test | Lấy `retryInMs` cho lần hiển thị đầu |
+| 7 | Trang Studio / Fan / So sánh mở thiếu `?match=` không có nhãn "Synthetic data" (vi phạm U5) | E2E mock | Component `NoMatch` dùng chung, có nhãn |
+| 8 | Fan nhận 4422 thì mở lại màn chọn hồ sơ mà không nói lý do | Viết E2E 4422 | Hiện banner lý do phía trên màn chọn |
+| 9 | Biến thể `dark:` của Tailwind chỉ theo `prefers-color-scheme`, không theo theme tối của Studio (`.theme-studio`): chữ amber / sky đậm nằm trên nền tối | axe | `@custom-variant dark` bật cả trong `.theme-studio` |
+| 10 | Tương phản dưới 4,5:1 | axe | Nhãn "Synthetic data" và chip cảnh báo: `amber-600` → `amber-800` ở nền sáng. Accent nền sáng `#1f6feb` → `#0969da`. Nút chữ trắng dùng `--accent-fill` (`#1f6feb` ở theme tối). Nhãn verdict dùng `--*-fill` đậm (chữ trắng trên `#3fb950` chỉ đạt 2,5:1). Thẻ bình luận "ít quan trọng" dùng viền nét đứt thay cho `opacity` |
+| 11 | Vùng cuộn không vào được bằng bàn phím (feed sự kiện, feed bình luận, panel, JSON trace, danh sách bằng chứng) | axe | `tabIndex={0}` + nhãn; thân `Panel` là `region` có `aria-labelledby` |
+| 12 | axe đo lúc thẻ còn đang fade-in nên báo sai tương phản | Gỡ lỗi test | Helper chờ mọi animation kết thúc rồi mới chạy axe |
+
+### 18.5. Cách chạy
+
+```bash
+cd frontend && npm ci && npm run build          # ra frontend/out
+cd ../backend && uv run pundit serve --ui ../frontend/out   # http://localhost:8000
+cd ../frontend && npm run test                   # Vitest
+npx playwright test                              # e2e (tự bật backend ở cổng 8765) + mock (cổng 8766)
+npm run size                                     # ngân sách JS tải lần đầu
+```
+
+- Máy có Windows Application Control chặn `.venv/Scripts/python.exe`: đặt `E2E_SERVER` thành lệnh chạy `pundit serve --ui out --port 8765` bằng Python gốc của uv.
+- Playwright dùng Edge có sẵn (`PW_CHANNEL=chrome` để đổi); CI dùng Chromium.
+- OBS: Browser Source `http://localhost:8000/overlay/?match=<id>&lang=en|vi`, 1920×1080, có thể để trống ô Custom CSS.
+
+### 18.6. Việc còn lại cho Ngày 5+
+
+- Ngày 5: `audio_url` cho `CommentaryView` / `RecapView` (chỗ đã chừa ở `AudioQueue`), Dockerfile một image (stage Node build `out/`, image Python phục vụ qua `UI_DIR`).
+- Bản public: chính sách nhiều giám khảo cùng điều khiển một phiên (§15).
+- Ngày 7: M6 diễn tập kịch bản video trên bản deploy.
