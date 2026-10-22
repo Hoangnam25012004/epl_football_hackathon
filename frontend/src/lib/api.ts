@@ -13,6 +13,8 @@ import type {
   PlayerBrief,
   RecapView,
   ScenarioInfo,
+  SpeechCue,
+  SpeechVoice,
   StatsPanel,
   StudioItemDetail,
   TalkingPoint,
@@ -149,8 +151,22 @@ export const api = {
     request<EventsPage>("GET", `/matches/${enc(id)}/events?ids=${enc(ids.join(","))}`),
   lastEvents: (id: string, last: number) =>
     request<EventsPage>("GET", `/matches/${enc(id)}/events?last=${last}`),
-  recap: (id: string, scope: RecapView["scope"], lang: "vi" | "en", mode: "analyst" | "casual") =>
-    request<RecapView>("GET", `/matches/${enc(id)}/recap?scope=${scope}&lang=${lang}&mode=${mode}`),
+  recap: (
+    id: string,
+    scope: RecapView["scope"],
+    lang: "vi" | "en",
+    mode: "analyst" | "casual",
+    voice: "female" | "male" | null = null,
+  ) =>
+    request<RecapView>(
+      "GET",
+      `/matches/${enc(id)}/recap?scope=${scope}&lang=${lang}&mode=${mode}` +
+        (voice ? `&voice=${voice}` : ""),
+    ),
+  // Day 5: the voice (docs/day5-design.md section 3.5)
+  voices: () => request<SpeechVoice[]>("GET", "/speech/voices"),
+  greeting: (lang: "vi" | "en", voice: "female" | "male") =>
+    request<SpeechCue>("GET", `/speech/greeting?lang=${lang}&voice=${voice}`),
 };
 
 /** "dominant_loser-42" → {scenario, seed}; null for anything else. */

@@ -174,6 +174,7 @@ describe("fan player", () => {
     fireEvent.click(screen.getByText("English"));
     fireEvent.click(screen.getByTestId("club-kestrel_athletic"));
     fireEvent.click(screen.getByTestId("beginner-setup"));
+    fireEvent.change(screen.getByTestId("voice-select"), { target: { value: "male" } });
     fireEvent.click(screen.getByTestId("profile-start"));
     expect(done).toHaveBeenCalledWith({
       mode: "analyst",
@@ -182,6 +183,7 @@ describe("fan player", () => {
       player: null,
       beginner: true,
       metric: null,
+      voice: "male",
     });
     expect(await screen.findAllByText(/^Ví dụ:/)).not.toHaveLength(0);
   });

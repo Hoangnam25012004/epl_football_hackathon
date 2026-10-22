@@ -8,6 +8,7 @@ const DIR = join(__dirname, "fixtures");
 export type FixtureName =
   | "dominant_loser-42.analyst-en"
   | "dominant_loser-42.casual-vi-beginner-har"
+  | "dominant_loser-42.casual-vi-beginner-har-female" // Day 5: with a voice (speech)
   | "dominant_loser-42.late-hello.analyst-en"
   | "dominant_loser-42.llm-long.analyst-en"
   | "dominant_loser-42.llm-long.casual-vi-beginner-har";

@@ -27,6 +27,30 @@ const info = hello.payload.match;
 const REST = join(__dirname, "..", "fixtures", "rest");
 const read = (name: string): unknown => JSON.parse(readFileSync(join(REST, name), "utf8"));
 
+/** A silent WAV (8 kHz, 16-bit, mono) of `ms` milliseconds: a clip of the mock voice. */
+export function wav(ms: number): Buffer {
+  const rate = 8000;
+  const samples = Math.max(1, Math.round((rate * ms) / 1000));
+  const buffer = Buffer.alloc(44 + samples * 2);
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(36 + samples * 2, 4);
+  buffer.write("WAVEfmt ", 8, "ascii");
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(rate, 24);
+  buffer.writeUInt32LE(rate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36, "ascii");
+  buffer.writeUInt32LE(samples * 2, 40);
+  return buffer;
+}
+
+/** Day 5: how long each clip lasts (by its URL); any other clip lasts 400 ms. */
+export const clipMs = new Map<string, number>();
+export const GREETING_URL = `/audio/${"9".repeat(32)}.wav`;
+
 /** Answers every REST call of the pages; returns the calls made. */
 export async function mockRest(
   page: Page,
@@ -36,14 +60,41 @@ export async function mockRest(
   const home = info.home.id;
   const away = info.away.id;
   await page.route(
-    (url) => /^\/(healthz|scenarios|matches|claims)(\/|$)/.test(url.pathname),
+    (url) => /^\/(healthz|scenarios|matches|claims|speech|audio)(\/|$)/.test(url.pathname),
     async (route) => {
       const request = route.request();
       const url = new URL(request.url());
       const path = url.pathname;
       calls.push(`${request.method()} ${path}${url.search}`);
       const reply = (body: unknown, status = 200) => route.fulfill({ status, json: body });
-      if (path === "/healthz") return reply({ status: "ok", synthetic: true });
+      if (path === "/healthz") {
+        return reply({ status: "ok", synthetic: true, speech: { provider: "mock" } });
+      }
+      if (path.startsWith("/audio/")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "audio/wav",
+          headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+          body: wav(clipMs.get(path) ?? 400),
+        });
+      }
+      if (path === "/speech/greeting") {
+        return reply({
+          lang: "vi-VN",
+          voice: "vi-VN-HoaiMyNeural",
+          gender: "female",
+          preset: "greeting",
+          segments: [{ text: "Xin chào!", preset: "greeting", rate: 1, pitch: 1, volume: 1 }],
+          audio: {
+            clip_id: "9".repeat(32),
+            url: GREETING_URL,
+            media_type: "audio/wav",
+            duration_ms: 400,
+            exact: true,
+          },
+          note: null,
+        });
+      }
       if (path === "/scenarios") return reply(read("scenarios.json"));
       if (path === "/matches") {
         if (request.method() !== "POST") return reply([info]);

@@ -50,12 +50,14 @@ export function CommentaryCard({
   item,
   scenario,
   ownTeam,
+  speaking = false,
 }: {
   item: CommentaryView;
   scenario: ScenarioInfo | null;
   ownTeam: string | null;
+  speaking?: boolean; // Day 5: the line the voice is reading (its caption)
 }) {
-  const { lang } = useT();
+  const { lang, t } = useT();
   const emphasis = item.emphasis ?? "neutral";
   const own =
     scenario && ownTeam ? (scenario.home.id === ownTeam ? scenario.home : scenario.away) : null;
@@ -76,7 +78,10 @@ export function CommentaryCard({
       data-testid="commentary-card"
       data-id={item.id}
       data-emphasis={emphasis}
-      className={`item-enter rounded-lg border border-line bg-panel p-3 ${low ? "border-dashed" : ""}`}
+      data-speaking={speaking ? "true" : undefined}
+      className={`item-enter rounded-lg border bg-panel p-3 ${low ? "border-dashed" : ""} ${
+        speaking ? "border-accent ring-2 ring-accent/40" : "border-line"
+      }`}
       style={{ borderLeft: `4px solid ${edge}` }}
     >
       <div className="mb-1 flex items-center gap-2 text-xs text-muted">
@@ -84,6 +89,11 @@ export function CommentaryCard({
           {item.display_minute}
         </span>
         <span>{kindLabel(lang, item.kind)}</span>
+        {speaking ? (
+          <span className="ml-auto font-semibold text-accent" aria-hidden="true">
+            <span className="speaking-wave">🔊</span> {t("fan.voiceSpeaking")}
+          </span>
+        ) : null}
       </div>
       {item.framing ? (
         <p

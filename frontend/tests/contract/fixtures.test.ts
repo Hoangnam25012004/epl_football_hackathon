@@ -19,6 +19,7 @@ function validatorFor(type: string) {
 const NAMES: FixtureName[] = [
   "dominant_loser-42.analyst-en",
   "dominant_loser-42.casual-vi-beginner-har",
+  "dominant_loser-42.casual-vi-beginner-har-female",
   "dominant_loser-42.late-hello.analyst-en",
   "dominant_loser-42.llm-long.analyst-en",
   "dominant_loser-42.llm-long.casual-vi-beginner-har",
@@ -65,4 +66,45 @@ describe("fixtures follow the WebSocket contract", () => {
       }
     });
   }
+});
+
+describe("Day 5: the voice fixture", () => {
+  it("speaks the lines marked `speak`, only those, with a clip of the server", () => {
+    const messages = fixture("dominant_loser-42.casual-vi-beginner-har-female");
+    const commentary = messages.flatMap((m) => (m.type === "commentary" ? [m.payload] : []));
+    const spoken = commentary.filter((view) => view.speech);
+    expect(spoken.length).toBeGreaterThan(10);
+    for (const view of commentary) expect(Boolean(view.speech), view.id).toBe(Boolean(view.speak));
+    for (const view of spoken) {
+      expect(view.speech?.audio?.url).toMatch(/^\/audio\/[0-9a-f]{32}\.wav$/);
+      expect(view.speech?.voice).toBe("vi-VN-HoaiMyNeural");
+      // no digit is ever read as a digit (docs/day5-design.md section 5)
+      for (const segment of view.speech?.segments ?? []) expect(segment.text).not.toMatch(/\d/);
+    }
+    const hello = messages[0];
+    expect(hello?.type).toBe("hello");
+    if (hello?.type === "hello") {
+      const shown = hello.payload.commentary ?? [];
+      expect(shown.every((view) => !view.speech)).toBe(true); // hello is silent
+    }
+    const recaps = messages.flatMap((m) => (m.type === "recap" ? [m.payload] : []));
+    expect(new Set(recaps.map((r) => r.scope))).toEqual(new Set(["H1", "FULL"]));
+    for (const recap of recaps) {
+      expect(recap.speech?.audio?.duration_ms).toBeGreaterThan(30_000);
+      expect(recap.speech?.audio?.duration_ms).toBeLessThanOrEqual(120_000);
+    }
+  });
+
+  it("profiles without a voice never receive speech", () => {
+    for (const name of [
+      "dominant_loser-42.analyst-en",
+      "dominant_loser-42.casual-vi-beginner-har",
+    ] as const) {
+      for (const message of fixture(name)) {
+        if (message.type === "commentary" || message.type === "recap") {
+          expect(message.payload.speech ?? null).toBeNull();
+        }
+      }
+    }
+  });
 });

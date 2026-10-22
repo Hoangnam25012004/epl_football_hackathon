@@ -8,7 +8,13 @@ import { Segmented, TeamChip } from "@/components/common/ui";
 import { api } from "@/lib/api";
 import type { PlayerBrief, ScenarioInfo, StatsRow } from "@/lib/contracts";
 import { useT } from "@/lib/i18n";
-import { profileQuery, type Lang, type Mode, type ViewerProfile } from "@/lib/profile";
+import {
+  profileQuery,
+  type Lang,
+  type Mode,
+  type ViewerProfile,
+  type VoiceGender,
+} from "@/lib/profile";
 
 function useExample(matchId: string, mode: Mode, language: Lang): string | null {
   const [example, setExample] = useState<string | null>(null);
@@ -21,6 +27,7 @@ function useExample(matchId: string, mode: Mode, language: Lang): string | null 
       player: null,
       beginner: false,
       metric: null,
+      voice: null,
     });
     void api.commentary(matchId, query).then((result) => {
       if (!alive || !result.ok) return;
@@ -200,6 +207,22 @@ export function ProfileSetup({
                 </option>
               ))}
             </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            {t("fan.voice")}
+            <select
+              data-testid="voice-select"
+              value={profile.voice ?? ""}
+              onChange={(event) =>
+                set("voice", event.target.value === "" ? null : (event.target.value as VoiceGender))
+              }
+              className="rounded border border-line bg-bg px-2 py-1"
+            >
+              <option value="">{t("fan.voiceNone")}</option>
+              <option value="female">{t("fan.voiceFemale")}</option>
+              <option value="male">{t("fan.voiceMale")}</option>
+            </select>
+            <span className="text-xs text-muted">{t("fan.voiceSetupHint")}</span>
           </label>
         </div>
       </details>

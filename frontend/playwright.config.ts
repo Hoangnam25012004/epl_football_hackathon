@@ -3,6 +3,13 @@ import { defineConfig, devices } from "@playwright/test";
 // E2E (docs/day4-design.md section 12, F5/F6): `e2e` runs against the real backend (mock LLM)
 // serving the static build; `mock` replays recorded WebSocket streams with no backend at all.
 // Local runs use the installed Edge (PW_CHANNEL=chrome for Chrome); CI installs Chromium.
+// Day 5: the backend reads with the mock voice, ten times shorter than the real one
+// (docs/day5-design.md section 12.6); a server started by hand needs the same variables.
+export const E2E_SERVER_ENV = {
+  TTS_PROVIDER: "mock",
+  MOCK_TTS_TIME_SCALE: "0.1",
+  MOCK_TTS_LATENCY_MS: "100",
+};
 const PORT = Number(process.env.E2E_PORT ?? 8765);
 const MOCK_PORT = Number(process.env.E2E_MOCK_PORT ?? 8766);
 const channel = process.env.CI ? undefined : (process.env.PW_CHANNEL ?? "msedge");
@@ -47,6 +54,7 @@ export default defineConfig({
   webServer: [
     {
       command: server,
+      env: E2E_SERVER_ENV,
       url: `http://127.0.0.1:${PORT}/healthz`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

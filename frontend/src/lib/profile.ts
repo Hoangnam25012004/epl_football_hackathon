@@ -2,6 +2,7 @@
 // `parse_profile` reads, kept in localStorage when the browser allows it.
 export type Mode = "analyst" | "casual";
 export type Lang = "vi" | "en";
+export type VoiceGender = "female" | "male";
 
 export type ViewerProfile = {
   mode: Mode;
@@ -10,6 +11,7 @@ export type ViewerProfile = {
   player: string | null; // player focus (player id)
   beginner: boolean; // "Người mới xem"
   metric: string | null; // one metric only
+  voice: VoiceGender | null; // Day 5: the voice chosen (it is heard only once turned on)
 };
 
 export const DEFAULT_PROFILE: ViewerProfile = {
@@ -19,11 +21,14 @@ export const DEFAULT_PROFILE: ViewerProfile = {
   player: null,
   beginner: false,
   metric: null,
+  voice: null,
 };
 
 const STORAGE_KEY = "pundit.profile";
+const VOICE_ON_KEY = "pundit.voice-on";
 const ID = /^[a-z0-9_-]{1,64}$/;
 
+/** The WebSocket query; `voice` only while the voice is on (the server then reads aloud). */
 export function profileQuery(profile: ViewerProfile): string {
   const params = new URLSearchParams();
   params.set("mode", profile.mode);
@@ -32,7 +37,25 @@ export function profileQuery(profile: ViewerProfile): string {
   if (profile.player) params.set("player", profile.player);
   if (profile.beginner) params.set("beginner", "1");
   if (profile.metric) params.set("metric", profile.metric);
+  if (profile.voice) params.set("voice", profile.voice);
   return params.toString();
+}
+
+/** Was the voice on when the page was left? (A tap is still needed to hear it again.) */
+export function loadVoiceOn(storage: Pick<Storage, "getItem"> | null = safeStorage()): boolean {
+  try {
+    return storage?.getItem(VOICE_ON_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveVoiceOn(on: boolean, storage: Pick<Storage, "setItem"> | null = safeStorage()) {
+  try {
+    storage?.setItem(VOICE_ON_KEY, on ? "1" : "0");
+  } catch {
+    /* storage blocked: the choice lives for this page only */
+  }
 }
 
 /** Anything that is not a well-formed profile becomes the default, field by field. */
@@ -49,6 +72,7 @@ export function coerceProfile(value: unknown): ViewerProfile {
     player: pick("player"),
     beginner: source.beginner === true,
     metric: pick("metric"),
+    voice: source.voice === "female" || source.voice === "male" ? source.voice : null,
   };
 }
 

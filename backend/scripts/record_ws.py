@@ -11,7 +11,9 @@ tested with the long texts of a real model.
     uv run python scripts/record_ws.py --out ../frontend/tests/fixtures
     uv run python scripts/record_ws.py --offline out.jsonl --out ../frontend/tests/fixtures
 
-Every line is a WsMessage exactly as the server sends it.
+Every line is a WsMessage exactly as the server sends it. Day 5: the profile with a voice
+(`...-female`) is read by the mock narrator (temporary stores, no speed limit), so its
+commentary and recaps carry `speech` (docs/day5-design.md section 12.5).
 """
 
 import argparse
@@ -19,6 +21,7 @@ import asyncio
 import io
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -42,11 +45,15 @@ from pundit.engine.generator import generate
 from pundit.engine.replay import SteppingClock
 from pundit.llm.settings import Settings
 from pundit.orchestration.service import ClaimService
+from pundit.speech.narrator import Narrator, build_narrator
 
 PROFILES: dict[str, Profile] = {
     "analyst-en": Profile(mode="analyst", language="en"),
     "casual-vi-beginner-har": Profile(
         mode="casual", language="vi", team="harbor_lions", beginner=True
+    ),
+    "casual-vi-beginner-har-female": Profile(
+        mode="casual", language="vi", team="harbor_lions", beginner=True, voice="female"
     ),
 }
 JOIN_AT = 0.6  # a client that joins at 60 % of the events (its hello), in the second half
@@ -66,13 +73,31 @@ def _drain(client: Client) -> list[WsMessage]:
 
 
 async def _record_live(scenario: str, seed: int, out: Path) -> None:
-    settings = Settings()
+    with tempfile.TemporaryDirectory() as cache, tempfile.TemporaryDirectory() as store:
+        settings = Settings(
+            tts_provider="mock",
+            tts_max_speed=1_000_000.0,  # the replay is as fast as possible: still read
+            audio_cache_dir=cache,
+            audio_store_dir=store,
+        )
+        narrator = build_narrator(settings)
+        try:
+            await _record_session(settings, narrator, scenario, seed, out)
+        finally:
+            if narrator is not None:
+                await narrator.aclose()
+
+
+async def _record_session(
+    settings: Settings, narrator: Narrator | None, scenario: str, seed: int, out: Path
+) -> None:
     live = MatchSession(
         generate(scenario, seed),
         service=ClaimService(settings),
         speed=1000.0,
         clock=SteppingClock(),
         studio=default_crew(settings),
+        narrator=narrator,
     )
     clients = {name: live.hub.subscribe(1_000_000, profile) for name, profile in PROFILES.items()}
     hellos = {name: live.hub.state_message("hello", c) for name, c in clients.items()}
@@ -102,6 +127,8 @@ def _record_offline(path: Path, scenario: str, seed: int, out: Path) -> None:
     context = build_match_context(LogView.from_events(match.meta, match.events[:1]))
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     for name, profile in PROFILES.items():
+        if profile.voice is not None:
+            continue  # speech is the live session's: fixture B is about long texts
         seen: set[RuleId] = set()
         payloads: list[tuple[str, dict[str, Any]]] = []
         for row in rows:

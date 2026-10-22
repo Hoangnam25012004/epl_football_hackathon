@@ -57,8 +57,9 @@ export async function storeProfile(page: Page, profile: Partial<ViewerProfile>):
     player: null,
     beginner: false,
     metric: null,
+    voice: null,
     ...profile,
-  };
+  } as ViewerProfile;
   await page.addInitScript((value) => {
     window.localStorage.setItem("pundit.profile", value);
   }, JSON.stringify(full));

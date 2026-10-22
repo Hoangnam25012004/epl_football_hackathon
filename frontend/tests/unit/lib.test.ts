@@ -70,6 +70,7 @@ describe("profile", () => {
       player: "harbor_lions-09",
       beginner: true,
       metric: "xg",
+      voice: "male",
     });
     expect(Object.fromEntries(new URLSearchParams(query))).toEqual({
       mode: "casual",
@@ -78,6 +79,7 @@ describe("profile", () => {
       player: "harbor_lions-09",
       beginner: "1",
       metric: "xg",
+      voice: "male",
     });
     expect(profileQuery(DEFAULT_PROFILE)).toBe("mode=casual&lang=vi");
   });

@@ -141,6 +141,22 @@ html.overlay-page body {
   animation: fade-in 300ms ease-out both;
 }
 
+/* Day 5: the card being read aloud (docs/day5-design.md section 10.5) */
+@keyframes speaking {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+.speaking-wave {
+  display: inline-block;
+  animation: speaking 1.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lt-enter,
   .item-enter {
@@ -148,5 +164,8 @@ html.overlay-page body {
   }
   .lt-exit {
     animation: fade-in 200ms linear reverse both;
+  }
+  .speaking-wave {
+    animation: none;
   }
 }

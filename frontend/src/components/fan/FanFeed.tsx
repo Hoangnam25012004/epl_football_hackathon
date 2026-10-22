@@ -1,11 +1,12 @@
 "use client";
 
 // The fan's commentary feed, the player-focus tab and the recaps (docs/day4-design.md 7.2–7.4).
-import { useEffect, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { EmptyState, Segmented } from "@/components/common/ui";
 import type { CommentaryView, RecapView, ScenarioInfo } from "@/lib/contracts";
 import { useT } from "@/lib/i18n";
 import { CommentaryCard } from "./CommentaryCard";
+import { RecapAudio } from "./RecapAudio";
 
 /** Newest on top; a reader who scrolled down is not moved, a "N new" button brings them back. */
 export function CommentaryFeed({
@@ -13,11 +14,15 @@ export function CommentaryFeed({
   scenario,
   ownTeam,
   waiting,
+  speakingId = null,
+  voiceOn = false,
 }: {
   items: CommentaryView[];
   scenario: ScenarioInfo | null;
   ownTeam: string | null;
   waiting: boolean;
+  speakingId?: string | null; // Day 5: the line being read aloud
+  voiceOn?: boolean; // the app reads aloud: a screen reader must not read over it
 }) {
   const { t } = useT();
   const list = useRef<HTMLDivElement>(null);
@@ -56,14 +61,20 @@ export function CommentaryFeed({
       ) : null}
       <div
         ref={list}
-        aria-live="polite"
+        aria-live={voiceOn ? "off" : "polite"}
         aria-label={t("fan.tabCommentary")}
         tabIndex={0}
         data-testid="commentary-feed"
         className="flex h-full flex-col gap-2 overflow-auto p-3"
       >
         {newest.map((item) => (
-          <CommentaryCard key={item.id} item={item} scenario={scenario} ownTeam={ownTeam} />
+          <CommentaryCard
+            key={item.id}
+            item={item}
+            scenario={scenario}
+            ownTeam={ownTeam}
+            speaking={item.id === speakingId}
+          />
         ))}
       </div>
     </div>
@@ -111,7 +122,15 @@ export function PlayerTab({
   );
 }
 
-export function RecapPanel({ recaps }: { recaps: { H1?: RecapView; FULL?: RecapView } }) {
+export type RecapAudioProps = Omit<ComponentProps<typeof RecapAudio>, "recap">;
+
+export function RecapPanel({
+  recaps,
+  audio = null,
+}: {
+  recaps: { H1?: RecapView; FULL?: RecapView };
+  audio?: RecapAudioProps | null; // Day 5: the recap read aloud
+}) {
   const { t } = useT();
   const [scope, setScope] = useState<"H1" | "FULL">(recaps.FULL ? "FULL" : "H1");
   const recap = recaps[scope];
@@ -140,8 +159,15 @@ export function RecapPanel({ recaps }: { recaps: { H1?: RecapView; FULL?: RecapV
               </span>
             ) : null}
           </h2>
+          {audio ? (
+            <RecapAudio
+              key={`${recap.scope}|${audio.language}|${audio.mode}|${audio.gender}`}
+              recap={recap}
+              {...audio}
+            />
+          ) : null}
           {recap.paragraphs.map((paragraph) => (
-            <p key={paragraph} className="leading-relaxed">
+            <p key={paragraph} className="leading-relaxed" lang={recap.language}>
               {paragraph}
             </p>
           ))}

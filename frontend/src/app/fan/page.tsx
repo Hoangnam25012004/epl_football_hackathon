@@ -16,6 +16,7 @@ import { NoMatch } from "@/components/common/NoMatch";
 import { LangToggle, Tabs } from "@/components/common/ui";
 import { CommentaryFeed, PlayerTab, RecapPanel } from "@/components/fan/FanFeed";
 import { ProfileSetup } from "@/components/fan/ProfileSetup";
+import { VoiceControl } from "@/components/fan/VoiceControl";
 import { api, parseMatchId } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import {
@@ -23,14 +24,19 @@ import {
   clearProfile,
   fitProfile,
   loadProfile,
+  loadVoiceOn,
   profileQuery,
   saveProfile,
+  saveVoiceOn,
   type ViewerProfile,
+  type VoiceGender,
 } from "@/lib/profile";
 import { items } from "@/store/match-store";
+import { useCommentaryAudio } from "@/hooks/useCommentaryAudio";
 import { useMatchConnection } from "@/hooks/useMatchConnection";
 import { usePlayers } from "@/hooks/usePlayers";
 import { scenarioOf, useScenarios } from "@/hooks/useScenarios";
+import { useSpeechHealth } from "@/hooks/useSpeechHealth";
 
 export default function FanPage() {
   return (
@@ -54,6 +60,13 @@ function Fan() {
   const [profile, setProfile] = useState<ViewerProfile | null>(stored);
   const [editing, setEditing] = useState(stored === null);
   const [tab, setTab] = useState<Tab>("commentary");
+  // Day 5: the voice. Off on every page load (browsers need a tap before sound); the voice
+  // chosen is kept in the profile, and whether it was on, for a "tap to resume" button.
+  const { controller, audio } = useCommentaryAudio();
+  const provider = useSpeechHealth().tts;
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [resume, setResume] = useState(() => loadVoiceOn());
+  const gender: VoiceGender = profile?.voice ?? "female";
 
   // a club or player of another match is dropped before connecting (a 4422 loop otherwise)
   const teams = useMemo(() => (scenario ? [scenario.home.id, scenario.away.id] : null), [scenario]);
@@ -62,8 +75,11 @@ function Fan() {
     return fitProfile(profile, teams, players.size ? [...players.keys()] : null);
   }, [profile, teams, players]);
   const live = !editing && fitted !== null;
-  const connection = useMatchConnection(live ? matchId : null, fitted ? profileQuery(fitted) : "", {
+  // the server reads aloud only for a connection that asks (`voice` in the query)
+  const query = fitted ? profileQuery({ ...fitted, voice: voiceOn ? gender : null }) : "";
+  const connection = useMatchConnection(live ? matchId : null, query, {
     name: "fan",
+    onLive: controller.onLive,
   });
   const { store, socketState } = connection;
   const match = useStore(store, (s) => s.match);
@@ -91,6 +107,46 @@ function Fan() {
     saveProfile(next);
     setProfile(next);
     toast.show(next.beginner ? t("fan.beginnerOn") : t("fan.beginnerOff"));
+  };
+
+  const greet = (voice: VoiceGender) => {
+    void api.greeting("vi", voice).then((result) => {
+      if (result.ok) controller.greet(result.data);
+    });
+  };
+
+  // runs inside the click: `enable` unlocks audio before anything awaits
+  const toggleVoice = () => {
+    if (audio.needsGesture) {
+      controller.enable();
+      return;
+    }
+    if (voiceOn) {
+      controller.disable();
+      setVoiceOn(false);
+      saveVoiceOn(false);
+      toast.show(t("fan.voiceOffToast"));
+      return;
+    }
+    controller.enable();
+    setVoiceOn(true);
+    setResume(false);
+    saveVoiceOn(true);
+    if (profile && !profile.voice) {
+      const next = { ...profile, voice: gender };
+      saveProfile(next);
+      setProfile(next);
+    }
+    toast.show(t("fan.voiceOnToast"));
+    greet(gender);
+  };
+
+  const chooseVoice = (voice: VoiceGender) => {
+    if (!profile || voice === profile.voice) return;
+    const next = { ...profile, voice };
+    saveProfile(next);
+    setProfile(next); // a new query: the next lines come in this voice
+    greet(voice);
   };
 
   const header = (
@@ -143,7 +199,7 @@ function Fan() {
           scenario={scenario}
           large
         />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm">
             <input
               type="checkbox"
@@ -163,6 +219,17 @@ function Fan() {
             {t("fan.change")}
           </button>
         </div>
+        <VoiceControl
+          on={voiceOn}
+          resume={resume}
+          gender={gender}
+          language={profile.language}
+          provider={provider}
+          audio={audio}
+          onToggle={toggleVoice}
+          onGender={chooseVoice}
+          onSkip={() => controller.dispatch({ type: "skip" })}
+        />
       </section>
       <Tabs<Tab>
         label={t("fan.title")}
@@ -183,10 +250,27 @@ function Fan() {
             scenario={scenario}
             ownTeam={fitted?.team ?? null}
             waiting={status === "created"}
+            speakingId={audio.speakingId}
+            voiceOn={audio.on}
           />
         ) : null}
         {tab === "player" ? <PlayerTab items={items(commentary)} playerName={focusName} /> : null}
-        {tab === "recap" ? <RecapPanel recaps={recaps} /> : null}
+        {tab === "recap" ? (
+          <RecapPanel
+            recaps={recaps}
+            audio={
+              provider === "off"
+                ? null
+                : {
+                    matchId,
+                    language: profile.language,
+                    mode: profile.mode,
+                    gender,
+                    controller,
+                  }
+            }
+          />
+        ) : null}
       </main>
     </div>
   );

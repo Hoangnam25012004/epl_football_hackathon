@@ -36,11 +36,20 @@ export type MatchConnection = {
 export function useMatchConnection(
   matchId: string | null,
   query: string,
-  { name = "main", unknownMatch = "fatal" as "fatal" | "wait" } = {},
+  {
+    name = "main",
+    unknownMatch = "fatal" as "fatal" | "wait",
+    onLive = undefined as ((message: AnyWsMessage) => void) | undefined,
+  } = {},
 ): MatchConnection {
   const store = useMemo(() => createMatchStore(), []);
   const [socketState, setSocketState] = useState<SocketState>({ status: "idle" });
   const socketRef = useRef<MatchSocket | null>(null);
+  // Day 5: every accepted message, in order, before frame batching (the voice queue)
+  const live = useRef(onLive);
+  useEffect(() => {
+    live.current = onLive;
+  }, [onLive]);
 
   useEffect(() => {
     if (!matchId) return;
@@ -50,7 +59,10 @@ export function useMatchConnection(
       matchId,
       query,
       unknownMatch,
-      onMessage: (message) => batcher.push(message),
+      onMessage: (message) => {
+        live.current?.(message);
+        batcher.push(message);
+      },
       onState: setSocketState,
     });
     socketRef.current = socket;
