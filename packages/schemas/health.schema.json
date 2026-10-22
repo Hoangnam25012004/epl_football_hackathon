@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "StudioHealth": {
+      "properties": {
+        "degraded": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Degraded",
+          "type": "array"
+        },
+        "dropped": {
+          "title": "Dropped",
+          "type": "integer"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "lag_ms_p95": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lag Ms P95"
+        },
+        "queued": {
+          "title": "Queued",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "queued",
+        "dropped",
+        "lag_ms_p95",
+        "degraded"
+      ],
+      "title": "StudioHealth",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "degraded": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Degraded",
+      "type": "array"
+    },
+    "llm_provider": {
+      "title": "Llm Provider",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "type": "integer"
+    },
+    "status": {
+      "const": "ok",
+      "title": "Status",
+      "type": "string"
+    },
+    "studio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StudioHealth"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "synthetic": {
+      "default": true,
+      "title": "Synthetic",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "status",
+    "llm_provider",
+    "model",
+    "degraded",
+    "sessions"
+  ],
+  "title": "Health",
+  "type": "object"
+}

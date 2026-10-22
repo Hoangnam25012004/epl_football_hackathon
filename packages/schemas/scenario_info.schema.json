@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "TeamCard": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_color": {
+          "title": "Primary Color",
+          "type": "string"
+        },
+        "secondary_color": {
+          "title": "Secondary Color",
+          "type": "string"
+        },
+        "short_name": {
+          "title": "Short Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name",
+        "primary_color",
+        "secondary_color"
+      ],
+      "title": "TeamCard",
+      "type": "object"
+    }
+  },
+  "description": "A scenario as the match picker shows it (Day 4 section 3.6).",
+  "properties": {
+    "away": {
+      "$ref": "#/$defs/TeamCard"
+    },
+    "default_seed": {
+      "title": "Default Seed",
+      "type": "integer"
+    },
+    "example_claims": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "propertyNames": {
+        "enum": [
+          "vi",
+          "en"
+        ]
+      },
+      "title": "Example Claims",
+      "type": "object"
+    },
+    "home": {
+      "$ref": "#/$defs/TeamCard"
+    },
+    "key": {
+      "title": "Key",
+      "type": "string"
+    },
+    "title_en": {
+      "title": "Title En",
+      "type": "string"
+    },
+    "title_vi": {
+      "title": "Title Vi",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "title_vi",
+    "title_en",
+    "home",
+    "away",
+    "default_seed",
+    "example_claims"
+  ],
+  "title": "ScenarioInfo",
+  "type": "object"
+}

@@ -137,6 +137,62 @@ SCENARIOS: dict[str, Scenario] = {
     s.key: s for s in (DOMINANT_LOSER, COMEBACK_VAR, RED_CARD_SWING, BALANCED)
 }
 
+# Claims to try in the studio (docs/day4-design.md section 3.6), true and false ones. Those of
+# dominant_loser are labelled cases of the Day 2 eval set (evals/claims_dominant_loser_42.json).
+EXAMPLE_CLAIMS: dict[str, dict[str, tuple[str, ...]]] = {
+    "dominant_loser": {
+        "vi": (
+            "Đội nhà áp đảo hiệp 2",
+            "HAR kiểm soát bóng 70% trong hiệp 2",
+            "HAR áp đảo hiệp 2 và thắng trận",
+            "Trọng tài thiên vị Harbor",
+        ),
+        "en": (
+            "Harbor dominated the second half",
+            "Kestrel had more corners than Harbor in the second half",
+            "Harbor had twice as many shots as Kestrel in the second half",
+            "Kestrel won despite lower xG",
+        ),
+    },
+    "comeback_var": {
+        "vi": (
+            "Ironvale áp đảo hiệp 2",
+            "SAL có nhiều cú sút hơn IRO trong hiệp 1",
+            "Saltmarsh có 1 bàn bị VAR huỷ",
+        ),
+        "en": (
+            "Ironvale dominated the second half",
+            "Saltmarsh had more shots than Ironvale in the first half",
+            "Saltmarsh had a goal overturned by VAR",
+        ),
+    },
+    "red_card_swing": {
+        "vi": (
+            "Harbor áp đảo hiệp 2",
+            "KES có nhiều cú sút hơn HAR trong hiệp 1",
+            "Kestrel nhận 1 thẻ đỏ",
+        ),
+        "en": (
+            "Harbor dominated the second half",
+            "Kestrel had more shots than Harbor in the first half",
+            "Kestrel received a red card",
+        ),
+    },
+    "balanced": {
+        "vi": (
+            "IRO kiểm soát bóng nhiều hơn SAL",
+            "SAL có nhiều phạt góc hơn IRO",
+            "Ironvale áp đảo hiệp 2",
+        ),
+        "en": (
+            "Ironvale had more possession than Saltmarsh",
+            "Saltmarsh had more corners than Ironvale",
+            "Saltmarsh dominated the first half",
+        ),
+    },
+}
+assert set(EXAMPLE_CLAIMS) == set(SCENARIOS), "every scenario has example claims"
+
 
 def get_scenario(key: str) -> Scenario:
     scenario = SCENARIOS.get(key)

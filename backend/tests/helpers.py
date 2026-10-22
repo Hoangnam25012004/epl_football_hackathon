@@ -26,7 +26,8 @@ from pundit.orchestration.service import ClaimService, StaticSource
 # which must give exactly the Day 2 behaviour (docs/day3-design.md section 16.6).
 STUDIO_ON = os.environ.get("STUDIO_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
 DAY2_HELLO_KEYS = {"match", "snapshot", "moments", "claims", "degraded"}
-STUDIO_HELLO_KEYS = {"profile", "talking_points", "lower_thirds", "commentary", "recaps"}
+# Day 4 adds `on_air` (the editors' lower-third decision) to the studio hello
+STUDIO_HELLO_KEYS = {"profile", "talking_points", "lower_thirds", "commentary", "recaps", "on_air"}
 SCENARIO_KEYS = ("dominant_loser", "comeback_var", "red_card_swing", "balanced")
 SCRIPTED_KEYS = ("dominant_loser", "comeback_var", "red_card_swing")
 SEEDS = tuple(range(8))

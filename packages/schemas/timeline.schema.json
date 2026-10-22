@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "TimelineMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "display_minute": {
+          "title": "Display Minute",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "minute": {
+          "title": "Minute",
+          "type": "number"
+        },
+        "moment_id": {
+          "title": "Moment Id",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Team"
+        }
+      },
+      "required": [
+        "moment_id",
+        "kind",
+        "minute",
+        "display_minute",
+        "team"
+      ],
+      "title": "TimelineMarker",
+      "type": "object"
+    },
+    "TimelinePoint": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "minute": {
+          "title": "Minute",
+          "type": "integer"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "minute",
+        "value",
+        "display"
+      ],
+      "title": "TimelinePoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of_seq": {
+      "title": "As Of Seq",
+      "type": "integer"
+    },
+    "away": {
+      "title": "Away",
+      "type": "string"
+    },
+    "half_time_minute": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Half Time Minute"
+    },
+    "home": {
+      "title": "Home",
+      "type": "string"
+    },
+    "markers": {
+      "items": {
+        "$ref": "#/$defs/TimelineMarker"
+      },
+      "title": "Markers",
+      "type": "array"
+    },
+    "points": {
+      "items": {
+        "$ref": "#/$defs/TimelinePoint"
+      },
+      "title": "Points",
+      "type": "array"
+    },
+    "window_minutes": {
+      "title": "Window Minutes",
+      "type": "number"
+    }
+  },
+  "required": [
+    "as_of_seq",
+    "window_minutes",
+    "home",
+    "away",
+    "half_time_minute",
+    "points",
+    "markers"
+  ],
+  "title": "TimelineView",
+  "type": "object"
+}

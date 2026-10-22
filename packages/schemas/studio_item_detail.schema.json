@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "TraceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "attempt": {
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "input": {
+          "additionalProperties": true,
+          "title": "Input",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "tool",
+            "llm",
+            "guardrail",
+            "fallback"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "additionalProperties": true,
+          "title": "Output",
+          "type": "object"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error",
+            "retry",
+            "fallback",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "parent_id",
+        "agent",
+        "kind",
+        "name",
+        "input",
+        "output",
+        "status",
+        "attempt",
+        "start_ms",
+        "duration_ms",
+        "model",
+        "error"
+      ],
+      "title": "TraceSpan",
+      "type": "object"
+    }
+  },
+  "description": "A canonical studio item with the trace of the job that made it (Agent Trace drawer).",
+  "properties": {
+    "item": {
+      "additionalProperties": true,
+      "title": "Item",
+      "type": "object"
+    },
+    "kind": {
+      "enum": [
+        "commentary",
+        "talking_point",
+        "lower_third",
+        "recap"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "trace": {
+      "items": {
+        "$ref": "#/$defs/TraceSpan"
+      },
+      "title": "Trace",
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "item",
+    "trace"
+  ],
+  "title": "StudioItemDetail",
+  "type": "object"
+}

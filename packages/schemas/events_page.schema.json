@@ -1,0 +1,3223 @@
+{
+  "$defs": {
+    "BallDeadEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "reason": {
+          "enum": [
+            "out_of_play",
+            "foul",
+            "offside",
+            "goal",
+            "period_end"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "ball_dead",
+          "default": "ball_dead",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "reason"
+      ],
+      "title": "BallDeadEvent",
+      "type": "object"
+    },
+    "BallRecoveryEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "ball_recovery",
+          "default": "ball_recovery",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "BallRecoveryEvent",
+      "type": "object"
+    },
+    "CardEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "color": {
+          "enum": [
+            "yellow",
+            "second_yellow",
+            "red"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "card",
+          "default": "card",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "color"
+      ],
+      "title": "CardEvent",
+      "type": "object"
+    },
+    "FoulEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "fouled_player": {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "title": "Fouled Player",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "foul",
+          "default": "foul",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "fouled_player"
+      ],
+      "title": "FoulEvent",
+      "type": "object"
+    },
+    "GoalEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "assist": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assist"
+        },
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "own_goal": {
+          "default": false,
+          "title": "Own Goal",
+          "type": "boolean"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "goal",
+          "default": "goal",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "GoalEvent",
+      "type": "object"
+    },
+    "InterceptionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "interception",
+          "default": "interception",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "InterceptionEvent",
+      "type": "object"
+    },
+    "MatchEndEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "match_end",
+          "default": "match_end",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "MatchEndEvent",
+      "type": "object"
+    },
+    "MatchStartEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "match_start",
+          "default": "match_start",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "MatchStartEvent",
+      "type": "object"
+    },
+    "OffsideEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "offside",
+          "default": "offside",
+          "title": "Type",
+          "type": "string"
+        },
+        "via_var": {
+          "default": false,
+          "title": "Via Var",
+          "type": "boolean"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "OffsideEvent",
+      "type": "object"
+    },
+    "PassEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "end_x": {
+          "maximum": 105.0,
+          "minimum": 0.0,
+          "title": "End X",
+          "type": "number"
+        },
+        "end_y": {
+          "maximum": 68.0,
+          "minimum": 0.0,
+          "title": "End Y",
+          "type": "number"
+        },
+        "height": {
+          "enum": [
+            "ground",
+            "low",
+            "high"
+          ],
+          "title": "Height",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "is_cross": {
+          "default": false,
+          "title": "Is Cross",
+          "type": "boolean"
+        },
+        "is_through_ball": {
+          "default": false,
+          "title": "Is Through Ball",
+          "type": "boolean"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "outcome": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "out",
+            "offside"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "play_type": {
+          "enum": [
+            "open_play",
+            "kick_off",
+            "free_kick",
+            "corner",
+            "throw_in",
+            "goal_kick"
+          ],
+          "title": "Play Type",
+          "type": "string"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "recipient": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipient"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "pass",
+          "default": "pass",
+          "title": "Type",
+          "type": "string"
+        },
+        "under_pressure": {
+          "default": false,
+          "title": "Under Pressure",
+          "type": "boolean"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "outcome",
+        "end_x",
+        "end_y",
+        "duration_ms",
+        "height",
+        "play_type"
+      ],
+      "title": "PassEvent",
+      "type": "object"
+    },
+    "PeriodEndEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "period_end",
+          "default": "period_end",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "PeriodEndEvent",
+      "type": "object"
+    },
+    "PeriodStartEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "period_start",
+          "default": "period_start",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second"
+      ],
+      "title": "PeriodStartEvent",
+      "type": "object"
+    },
+    "PlayerPhysicalEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "distance_m": {
+          "maximum": 20000.0,
+          "minimum": 0.0,
+          "title": "Distance M",
+          "type": "number"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "sprints": {
+          "maximum": 500,
+          "minimum": 0,
+          "title": "Sprints",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "top_speed_kmh": {
+          "maximum": 45.0,
+          "minimum": 0.0,
+          "title": "Top Speed Kmh",
+          "type": "number"
+        },
+        "type": {
+          "const": "player_physical",
+          "default": "player_physical",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "distance_m",
+        "top_speed_kmh",
+        "sprints"
+      ],
+      "title": "PlayerPhysicalEvent",
+      "type": "object"
+    },
+    "PressureEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "exclusiveMinimum": 0,
+          "maximum": 5000,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "target_player": {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "title": "Target Player",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "pressure",
+          "default": "pressure",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "target_player",
+        "duration_ms"
+      ],
+      "title": "PressureEvent",
+      "type": "object"
+    },
+    "ShotEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "body_part": {
+          "enum": [
+            "right_foot",
+            "left_foot",
+            "head"
+          ],
+          "title": "Body Part",
+          "type": "string"
+        },
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "goalkeeper": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goalkeeper"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "outcome": {
+          "enum": [
+            "goal",
+            "saved",
+            "off_target",
+            "blocked",
+            "post"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "situation": {
+          "enum": [
+            "open_play",
+            "counter",
+            "set_piece",
+            "corner",
+            "penalty"
+          ],
+          "title": "Situation",
+          "type": "string"
+        },
+        "speed_kmh": {
+          "maximum": 140.0,
+          "minimum": 20.0,
+          "title": "Speed Kmh",
+          "type": "number"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "shot",
+          "default": "shot",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "xg": {
+          "maximum": 0.95,
+          "minimum": 0.01,
+          "title": "Xg",
+          "type": "number"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "outcome",
+        "xg",
+        "body_part",
+        "situation",
+        "speed_kmh"
+      ],
+      "title": "ShotEvent",
+      "type": "object"
+    },
+    "SubstitutionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "player_in": {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "title": "Player In",
+          "type": "string"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "substitution",
+          "default": "substitution",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "player_in"
+      ],
+      "title": "SubstitutionEvent",
+      "type": "object"
+    },
+    "TackleEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "outcome": {
+          "enum": [
+            "won",
+            "lost"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "target_player": {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "title": "Target Player",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "tackle",
+          "default": "tackle",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "outcome",
+        "target_player"
+      ],
+      "title": "TackleEvent",
+      "type": "object"
+    },
+    "VarCheckEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "check_type": {
+          "enum": [
+            "goal",
+            "red_card",
+            "penalty"
+          ],
+          "title": "Check Type",
+          "type": "string"
+        },
+        "clock_ms": {
+          "maximum": 3600000,
+          "minimum": 0,
+          "title": "Clock Ms",
+          "type": "integer"
+        },
+        "decision": {
+          "enum": [
+            "stands",
+            "overturned"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "duration_ms": {
+          "exclusiveMinimum": 0,
+          "maximum": 600000,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+-\\d+-\\d{5}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match_id": {
+          "pattern": "^[a-z0-9_]+-\\d+$",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "match_ms": {
+          "minimum": 0,
+          "title": "Match Ms",
+          "type": "integer"
+        },
+        "minute": {
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Period",
+          "type": "integer"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Player"
+        },
+        "possession_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Id"
+        },
+        "possession_team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Possession Team"
+        },
+        "reason": {
+          "enum": [
+            "offside",
+            "foul",
+            "handball",
+            "none"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "related_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "second": {
+          "maximum": 59,
+          "minimum": 0,
+          "title": "Second",
+          "type": "integer"
+        },
+        "seq": {
+          "maximum": 99999,
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team"
+        },
+        "type": {
+          "const": "var_check",
+          "default": "var_check",
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 105.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 68.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "match_id",
+        "seq",
+        "period",
+        "clock_ms",
+        "match_ms",
+        "minute",
+        "second",
+        "check_type",
+        "decision",
+        "reason",
+        "duration_ms"
+      ],
+      "title": "VarCheckEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of_seq": {
+      "title": "As Of Seq",
+      "type": "integer"
+    },
+    "events": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "ball_dead": "#/$defs/BallDeadEvent",
+            "ball_recovery": "#/$defs/BallRecoveryEvent",
+            "card": "#/$defs/CardEvent",
+            "foul": "#/$defs/FoulEvent",
+            "goal": "#/$defs/GoalEvent",
+            "interception": "#/$defs/InterceptionEvent",
+            "match_end": "#/$defs/MatchEndEvent",
+            "match_start": "#/$defs/MatchStartEvent",
+            "offside": "#/$defs/OffsideEvent",
+            "pass": "#/$defs/PassEvent",
+            "period_end": "#/$defs/PeriodEndEvent",
+            "period_start": "#/$defs/PeriodStartEvent",
+            "player_physical": "#/$defs/PlayerPhysicalEvent",
+            "pressure": "#/$defs/PressureEvent",
+            "shot": "#/$defs/ShotEvent",
+            "substitution": "#/$defs/SubstitutionEvent",
+            "tackle": "#/$defs/TackleEvent",
+            "var_check": "#/$defs/VarCheckEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/MatchStartEvent"
+          },
+          {
+            "$ref": "#/$defs/PeriodStartEvent"
+          },
+          {
+            "$ref": "#/$defs/PeriodEndEvent"
+          },
+          {
+            "$ref": "#/$defs/MatchEndEvent"
+          },
+          {
+            "$ref": "#/$defs/PassEvent"
+          },
+          {
+            "$ref": "#/$defs/ShotEvent"
+          },
+          {
+            "$ref": "#/$defs/GoalEvent"
+          },
+          {
+            "$ref": "#/$defs/PressureEvent"
+          },
+          {
+            "$ref": "#/$defs/TackleEvent"
+          },
+          {
+            "$ref": "#/$defs/InterceptionEvent"
+          },
+          {
+            "$ref": "#/$defs/BallRecoveryEvent"
+          },
+          {
+            "$ref": "#/$defs/FoulEvent"
+          },
+          {
+            "$ref": "#/$defs/CardEvent"
+          },
+          {
+            "$ref": "#/$defs/OffsideEvent"
+          },
+          {
+            "$ref": "#/$defs/BallDeadEvent"
+          },
+          {
+            "$ref": "#/$defs/SubstitutionEvent"
+          },
+          {
+            "$ref": "#/$defs/VarCheckEvent"
+          },
+          {
+            "$ref": "#/$defs/PlayerPhysicalEvent"
+          }
+        ]
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+    }
+  },
+  "required": [
+    "as_of_seq",
+    "events",
+    "missing"
+  ],
+  "title": "EventsPage",
+  "type": "object"
+}

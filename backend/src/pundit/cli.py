@@ -15,7 +15,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from pundit.agents.context import build_match_context
 from pundit.agents.contracts import (
@@ -207,10 +207,39 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _schemas() -> dict[str, str]:
+    from pundit.api.onair import OnAirCommand, OnAirState
+    from pundit.api.panels import EventsPage, StatsPanel, TimelineView
+    from pundit.api.payloads import WsPayloads
+    from pundit.api.routes import (
+        CreateMatch,
+        Health,
+        MatchInfo,
+        MatchView,
+        ScenarioInfo,
+        StudioItemDetail,
+    )
+
     def dump(schema: object) -> str:
         return json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
 
-    return {
+    def serialized(model: type[BaseModel]) -> str:
+        return dump(model.model_json_schema(mode="serialization"))
+
+    day4 = {  # REST and WebSocket shapes the UI generates its types from (Day 4 section 3.8)
+        "create_match.schema.json": dump(CreateMatch.model_json_schema(mode="validation")),
+        "events_page.schema.json": serialized(EventsPage),
+        "health.schema.json": serialized(Health),
+        "match_info.schema.json": serialized(MatchInfo),
+        "match_view.schema.json": serialized(MatchView),
+        "on_air.schema.json": serialized(OnAirState),
+        "on_air_command.schema.json": dump(OnAirCommand.model_json_schema(mode="validation")),
+        "scenario_info.schema.json": serialized(ScenarioInfo),
+        "stats_panel.schema.json": serialized(StatsPanel),
+        "studio_item_detail.schema.json": serialized(StudioItemDetail),
+        "timeline.schema.json": serialized(TimelineView),
+        "ws_payloads.schema.json": serialized(WsPayloads),
+    }
+    return day4 | {
         "event.schema.json": dump(EVENT_ADAPTER.json_schema(mode="serialization")),
         "match_meta.schema.json": dump(MatchMeta.model_json_schema(mode="serialization")),
         "stat_result.schema.json": dump(StatResult.model_json_schema(mode="serialization")),
@@ -557,7 +586,14 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     logging.getLogger("agent_framework").setLevel(logging.WARNING)  # one line per superstep
-    uvicorn.run(create_app(load_settings(ENV_FILE)), host=args.host, port=args.port)
+    settings = load_settings(ENV_FILE)
+    if args.ui:  # Day 4: serve the static export of the frontend at "/"
+        ui = Path(args.ui).resolve()
+        if not (ui / "index.html").is_file():
+            print(f"error: {ui} has no index.html; run `npm run build` in frontend/ first")
+            return 2
+        settings = settings.model_copy(update={"ui_dir": str(ui)})
+    uvicorn.run(create_app(settings), host=args.host, port=args.port)
     return 0
 
 
@@ -704,9 +740,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--trace", action="store_true", help="print the agent trace")
     p.set_defaults(func=_cmd_recap)
 
-    p = sub.add_parser("serve", help="run the API (REST + WebSocket)")
+    p = sub.add_parser("serve", help="run the API (REST + WebSocket) and, with --ui, the UI")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--ui", help="static export of the frontend to serve at / (frontend/out)")
     p.set_defaults(func=_cmd_serve)
     return parser
 

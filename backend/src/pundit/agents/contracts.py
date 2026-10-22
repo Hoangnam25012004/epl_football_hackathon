@@ -91,6 +91,7 @@ WsType = Literal[
     "commentary",
     "recap",
     "talking_point_status",
+    "on_air",  # Day 4: an editor's decision about the lower-third on air
 ]
 # Day 3 studio (docs/day3-design.md section 3)
 CueKind = Literal["shot", "corner", "offside", "var_review", "added_time", "stat_tick", "lull"]

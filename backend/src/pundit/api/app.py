@@ -3,9 +3,13 @@
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
+from starlette.types import Scope
 
 from pundit.api import routes, ws
 from pundit.api.hub import DEFAULT_QUEUE_SIZE
@@ -19,6 +23,29 @@ from pundit.orchestration.service import ClaimService
 from pundit.orchestration.studio_service import StudioService
 
 log = logging.getLogger("pundit.api")
+IMMUTABLE = "public, max-age=31536000, immutable"
+
+
+class UIFiles(StaticFiles):
+    """The static export of the frontend (Day 4 section 3.7). HTML is always revalidated, so OBS
+    and browsers pick up a new build; `_next/static/` files have hashed names and never change."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        static = path.replace("\\", "/").startswith("_next/static/")
+        response.headers["Cache-Control"] = IMMUTABLE if static else "no-cache"
+        return response
+
+
+def ui_directory(settings: Settings) -> Path | None:
+    """The built frontend to serve, or None (no UI_DIR, or no build in it)."""
+    if not settings.ui_dir:
+        return None
+    path = Path(settings.ui_dir)
+    if not (path / "index.html").is_file():
+        log.warning("UI_DIR %s has no index.html (run `npm run build` in frontend/)", path)
+        return None
+    return path
 
 
 def default_crew(settings: Settings) -> StudioCrew:
@@ -73,4 +100,7 @@ def create_app(
     )
     app.include_router(routes.router)
     app.include_router(ws.router)
+    ui = ui_directory(settings)
+    if ui is not None:  # mounted last: every API route and /docs match first
+        app.mount("/", UIFiles(directory=ui, html=True), name="ui")
     return app

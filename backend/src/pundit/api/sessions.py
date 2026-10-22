@@ -9,6 +9,11 @@ Day 3 (docs/day3-design.md sections 11 and 14.4): the replay also detects cues a
 broadcast an event and its moments, offers their triggers to the session's StudioDirector. The
 studio items are published per viewer profile: one message number for everybody, the payload
 rendered once per profile.
+
+Day 4 (docs/day4-design.md section 3): pause / resume / speed stop only the replay task, never
+the studio jobs; the on-air decisions of the editors; read-only panels (timeline, stats, events)
+on the current view; a restart tells the clients of the old session to reconnect once the new
+session is registered.
 """
 
 import asyncio
@@ -42,6 +47,18 @@ from pundit.agents.personalize import (
 )
 from pundit.agents.triggers import TriggerFeed
 from pundit.api.hub import DEFAULT_QUEUE_SIZE, Client, Hub
+from pundit.api.onair import OnAirCommand, OnAirState, apply_command
+from pundit.api.panels import (
+    EventsPage,
+    PanelCache,
+    Period,
+    StatsPanel,
+    TimelineView,
+    events_by_id,
+    last_events,
+    stats_panel,
+    timeline,
+)
 from pundit.api.studio import StudioCrew, StudioDirector, StudioItem, StudioKind
 from pundit.domain.events import EVENT_ADAPTER, Event
 from pundit.domain.log import LogView
@@ -54,7 +71,7 @@ from pundit.state.match_state import MatchSnapshot, MatchState
 
 log = logging.getLogger("pundit.sessions")
 
-SessionStatus = Literal["created", "running", "finished", "stopped", "error"]
+SessionStatus = Literal["created", "running", "paused", "finished", "stopped", "error"]
 MAX_CLAIMS_PER_SESSION = 200
 HELLO_MOMENTS = 50
 HELLO_CLAIMS = 20
@@ -101,7 +118,10 @@ class MatchSession:
         )
         self.status: SessionStatus = "created"
         self.error: str | None = None
+        self.on_air = OnAirState()
+        self.panels = PanelCache()
         self._task: asyncio.Task[None] | None = None
+        self._swapping = False  # the replay task is being replaced (new speed): not a stop
         self._claim_count = 0
         self._last_snapshot_bucket = -1
 
@@ -185,6 +205,7 @@ class MatchSession:
             commentary.append(view)
         payload.update(
             {
+                "on_air": self.on_air.model_dump(mode="json"),
                 "profile": profile.model_dump(mode="json"),
                 "talking_points": [
                     public_talking_point(tp).model_dump(mode="json")
@@ -287,14 +308,56 @@ class MatchSession:
             self.hub.publish("talking_point_status", {"id": updated.id, "status": updated.status})
         return updated
 
+    def command_on_air(self, command: OnAirCommand) -> OnAirState:
+        """Apply an editor decision and broadcast it. LookupError: the taken lower-third does
+        not exist (or the studio is off); OnAirError: a take without an item."""
+        if command.action == "take" and (
+            self.director is None
+            or command.item_id is None
+            or command.item_id not in self.director.lower_thirds
+        ):
+            raise LookupError(command.item_id)
+        last = self.state.view().last
+        self.on_air = apply_command(self.on_air, command, last.match_ms if last else 0)
+        self.hub.publish("on_air", self.on_air.model_dump(mode="json"))
+        return self.on_air
+
+    # ------------------------------------------------------------------ panels (Day 4)
+
+    def timeline(self, window_minutes: float = 10.0) -> TimelineView:
+        view = self.state.view()
+        return self.panels.get(
+            ("timeline", window_minutes, view.last_seq),
+            lambda: timeline(view, self.moments, window_minutes),
+        )
+
+    def stats(self, period: Period) -> StatsPanel:
+        view = self.state.view()
+        return self.panels.get(("stats", period, view.last_seq), lambda: stats_panel(view, period))
+
+    def events(self, ids: list[str]) -> EventsPage:
+        return events_by_id(self.state.view(), ids)
+
+    def last_events(self, count: int) -> EventsPage:
+        return last_events(self.state.view(), count)
+
     # ------------------------------------------------------------------ replay (single writer)
+
+    def _publish_status(self, *, restarted: bool = False) -> None:
+        self.hub.publish(
+            "status",
+            {
+                "session": self.status,
+                "error": self.error,
+                "degraded": self.service.degraded_now(),
+                "speed": self.speed,
+                "restarted": restarted,
+            },
+        )
 
     def _set_status(self, status: SessionStatus) -> None:
         self.status = status
-        self.hub.publish(
-            "status",
-            {"session": status, "error": self.error, "degraded": self.service.degraded_now()},
-        )
+        self._publish_status()
 
     def _snapshot_due(self, event: Event) -> bool:
         bucket = event.match_ms // SNAPSHOT_EVERY_MS
@@ -337,7 +400,7 @@ class MatchSession:
                 self.apply(item.event, publish=not item.catching_up)
             self._set_status("finished")
         except asyncio.CancelledError:
-            if self.status == "running":
+            if self.status == "running" and not self._swapping:
                 self._set_status("stopped")
             raise
         except Exception as exc:  # a broken replay must not take the server down
@@ -354,6 +417,50 @@ class MatchSession:
         self._set_status("running")
         self._task = asyncio.create_task(self._run(), name=f"replay:{self.match_id}")
 
+    async def _cancel_replay(self) -> None:
+        """Cancel the replay task at its next sleep: `apply()` is synchronous, so an event is
+        never half applied, and the event it was waiting for is replayed by the next task."""
+        task = self._task
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    async def pause(self) -> None:
+        """Stop the replay where it is. Unlike `stop`, queued studio jobs keep running and are
+        still published."""
+        if self.status != "running":
+            return
+        self._set_status("paused")  # first: the task's cancel handler only rewrites "running"
+        await self._cancel_replay()
+
+    def resume(self) -> None:
+        """Continue (or begin) the replay from the next event."""
+        if self.status in ("created", "paused", "stopped"):
+            self.start()
+
+    async def set_speed(self, speed: float) -> None:
+        """Change the replay speed; a running replay continues at once from the next event."""
+        if speed <= 0:
+            raise ValueError("speed must be > 0")
+        running = self.status == "running" and self._task is not None and not self._task.done()
+        if running:
+            self._swapping = True
+            try:
+                await self._cancel_replay()
+            finally:
+                self._swapping = False
+            self.speed = speed
+            self._task = asyncio.create_task(self._run(), name=f"replay:{self.match_id}")
+        else:
+            self.speed = speed
+        self._publish_status()
+
+    def announce_restart(self) -> None:
+        """Tell the clients of this (replaced) session to reconnect: the match id now names a
+        new session (called once that session is registered)."""
+        self._publish_status(restarted=True)
+
     async def stop(self) -> None:
         task = self._task
         if task is not None and not task.done():
@@ -362,7 +469,8 @@ class MatchSession:
                 await task
         if self.director is not None:
             await self.director.stop()
-        if self.status == "running":  # also when the task was cancelled before it ever ran
+        # also when the task was cancelled before it ever ran, or the replay was paused
+        if self.status in ("running", "paused"):
             self._set_status("stopped")
 
     async def wait(self) -> None:
@@ -459,12 +567,18 @@ class SessionManager:
                 studio=self.studio,
             )
             self.sessions[match_id] = session
+        if existing is not None:
+            # only now: a client that reconnects at once lands on the new session
+            existing.announce_restart()
         if autostart:
             session.start()
         return session
 
     def get(self, match_id: str) -> MatchSession | None:
         return self.sessions.get(match_id)
+
+    def list(self) -> list[MatchSession]:
+        return list(self.sessions.values())
 
     def find_claim(self, claim_id: str) -> ClaimResult | None:
         for session in self.sessions.values():

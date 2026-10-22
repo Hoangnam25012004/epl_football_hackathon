@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "at_match_ms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "At Match Ms",
+      "type": "integer"
+    },
+    "hold": {
+      "default": false,
+      "title": "Hold",
+      "type": "boolean"
+    },
+    "item_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Item Id"
+    },
+    "last_action": {
+      "anyOf": [
+        {
+          "enum": [
+            "take",
+            "clear",
+            "hold",
+            "release",
+            "auto"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Action"
+    },
+    "mode": {
+      "default": "auto",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "revision": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    }
+  },
+  "title": "OnAirState",
+  "type": "object"
+}

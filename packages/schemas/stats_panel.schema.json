@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "StatCell": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "display"
+      ],
+      "title": "StatCell",
+      "type": "object"
+    },
+    "StatsRow": {
+      "additionalProperties": false,
+      "properties": {
+        "away": {
+          "$ref": "#/$defs/StatCell"
+        },
+        "evidence_count": {
+          "title": "Evidence Count",
+          "type": "integer"
+        },
+        "home": {
+          "$ref": "#/$defs/StatCell"
+        },
+        "label_en": {
+          "title": "Label En",
+          "type": "string"
+        },
+        "label_vi": {
+          "title": "Label Vi",
+          "type": "string"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "label_vi",
+        "label_en",
+        "unit",
+        "home",
+        "away",
+        "evidence_count"
+      ],
+      "title": "StatsRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of_seq": {
+      "title": "As Of Seq",
+      "type": "integer"
+    },
+    "away": {
+      "title": "Away",
+      "type": "string"
+    },
+    "home": {
+      "title": "Home",
+      "type": "string"
+    },
+    "period": {
+      "enum": [
+        "FULL",
+        "H1",
+        "H2"
+      ],
+      "title": "Period",
+      "type": "string"
+    },
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/StatsRow"
+      },
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "as_of_seq",
+    "period",
+    "home",
+    "away",
+    "rows"
+  ],
+  "title": "StatsPanel",
+  "type": "object"
+}

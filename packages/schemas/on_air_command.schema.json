@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "take",
+        "clear",
+        "hold",
+        "release",
+        "auto"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "item_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Item Id"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "OnAirCommand",
+  "type": "object"
+}

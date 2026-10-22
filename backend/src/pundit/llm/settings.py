@@ -71,6 +71,8 @@ class Settings(BaseModel):
     recap_budget_s: float = Field(default=DEFAULT_RECAP_BUDGET_S, gt=0)
     studio_queue_size: int = Field(default=512, ge=8)
     studio_drop_at: int = Field(default=256, ge=1)
+    # Day 4: the static export of the frontend, served at "/" (docs/day4-design.md section 3.7)
+    ui_dir: str | None = None
 
     @property
     def provider(self) -> Provider:
@@ -217,6 +219,7 @@ class Settings(BaseModel):
             "recap_budget_s": number("RECAP_BUDGET_S", recap_budget),
             "studio_queue_size": queue_size,
             "studio_drop_at": min(drop_at, queue_size),
+            "ui_dir": get("UI_DIR"),
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))

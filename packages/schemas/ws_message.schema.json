@@ -28,7 +28,8 @@
         "lower_third",
         "commentary",
         "recap",
-        "talking_point_status"
+        "talking_point_status",
+        "on_air"
       ],
       "title": "Type",
       "type": "string"

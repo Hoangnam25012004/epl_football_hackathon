@@ -24,9 +24,12 @@ from pundit.agents.contracts import (
     TraceSpan,
 )
 from pundit.agents.personalize import ProfileError, parse_profile, render_lower_third, render_recap
+from pundit.api.onair import OnAirCommand, OnAirError, OnAirState
+from pundit.api.panels import MAX_IDS, MAX_LAST, EventsPage, Period, StatsPanel, TimelineView
 from pundit.api.sessions import MatchSession, SessionManager, public_claim, public_talking_point
 from pundit.api.studio import StudioDirector, StudioKind
-from pundit.engine.scenarios import SCENARIOS
+from pundit.engine.rosters import roster_team
+from pundit.engine.scenarios import EXAMPLE_CLAIMS, SCENARIOS
 from pundit.state.match_state import MatchSnapshot
 
 router = APIRouter()
@@ -71,7 +74,7 @@ class MatchInfo(BaseModel):
     match_id: str
     scenario: str
     seed: int
-    status: Literal["created", "running", "finished", "stopped", "error"]
+    status: Literal["created", "running", "paused", "finished", "stopped", "error"]
     error: str | None
     speed: float
     from_minute: float
@@ -121,6 +124,32 @@ class StudioItemDetail(BaseModel):
     kind: StudioKind
     item: dict[str, Any]
     trace: list[TraceSpan]
+
+
+class TeamCard(TeamBrief):
+    primary_color: str
+    secondary_color: str
+
+
+class ScenarioInfo(BaseModel):
+    """A scenario as the match picker shows it (Day 4 section 3.6)."""
+
+    key: str
+    title_vi: str
+    title_en: str
+    home: TeamCard
+    away: TeamCard
+    default_seed: int
+    example_claims: dict[Lang, list[str]]
+
+
+class SpeedBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    speed: float = Field(gt=0, le=1000)
+
+
+DEFAULT_SEED = 42
 
 
 def manager(request: Request) -> SessionManager:
@@ -212,6 +241,107 @@ async def stop_match(match_id: str, request: Request) -> MatchInfo:
 async def get_match(match_id: str, request: Request) -> MatchView:
     session = _session(request, match_id)
     return MatchView(info=_info(session), snapshot=session.snapshot())
+
+
+# --------------------------------------------------------------------------- Day 4: UI support
+
+
+def _team_card(team_id: str) -> TeamCard:
+    team = roster_team(team_id)
+    return TeamCard(
+        id=team.id,
+        name=team.name,
+        short_name=team.short_name,
+        primary_color=team.primary_color,
+        secondary_color=team.secondary_color,
+    )
+
+
+@router.get("/scenarios", response_model=list[ScenarioInfo])
+async def list_scenarios() -> list[ScenarioInfo]:
+    return [
+        ScenarioInfo(
+            key=scenario.key,
+            title_vi=scenario.title_vi,
+            title_en=scenario.title_en,
+            home=_team_card(scenario.home),
+            away=_team_card(scenario.away),
+            default_seed=DEFAULT_SEED,
+            example_claims={
+                "vi": list(EXAMPLE_CLAIMS[scenario.key]["vi"]),
+                "en": list(EXAMPLE_CLAIMS[scenario.key]["en"]),
+            },
+        )
+        for scenario in SCENARIOS.values()
+    ]
+
+
+@router.get("/matches", response_model=list[MatchInfo], response_model_exclude_unset=True)
+async def list_matches(request: Request) -> list[MatchInfo]:
+    return [_info(session) for session in manager(request).list()]
+
+
+@router.post(
+    "/matches/{match_id}/pause", response_model=MatchInfo, response_model_exclude_unset=True
+)
+async def pause_match(match_id: str, request: Request) -> MatchInfo:
+    """Pause the replay; studio jobs already queued still finish (unlike /stop)."""
+    session = _session(request, match_id)
+    await session.pause()
+    return _info(session)
+
+
+@router.post(
+    "/matches/{match_id}/resume", response_model=MatchInfo, response_model_exclude_unset=True
+)
+async def resume_match(match_id: str, request: Request) -> MatchInfo:
+    session = _session(request, match_id)
+    session.resume()
+    return _info(session)
+
+
+@router.post(
+    "/matches/{match_id}/speed", response_model=MatchInfo, response_model_exclude_unset=True
+)
+async def set_match_speed(match_id: str, body: SpeedBody, request: Request) -> MatchInfo:
+    session = _session(request, match_id)
+    await session.set_speed(body.speed)
+    return _info(session)
+
+
+@router.get("/matches/{match_id}/timeline", response_model=TimelineView)
+async def get_timeline(
+    match_id: str,
+    request: Request,
+    window: Annotated[float, Query(gt=0, le=45, description="rolling window, minutes")] = 10.0,
+) -> TimelineView:
+    """Momentum of the home team per played minute, with markers (goals, VAR, red cards)."""
+    return _session(request, match_id).timeline(window)
+
+
+@router.get("/matches/{match_id}/stats", response_model=StatsPanel)
+async def get_stats(match_id: str, request: Request, period: Period = "FULL") -> StatsPanel:
+    return _session(request, match_id).stats(period)
+
+
+@router.get("/matches/{match_id}/events", response_model=EventsPage)
+async def get_events(
+    match_id: str,
+    request: Request,
+    ids: Annotated[str | None, Query(description="comma-separated event ids")] = None,
+    last: Annotated[int | None, Query(ge=1, le=MAX_LAST, description="the last N events")] = None,
+) -> EventsPage:
+    """Applied events only: an id the replay has not reached yet is listed as missing."""
+    session = _session(request, match_id)
+    if (ids is None) == (last is None):
+        raise HTTPException(status_code=422, detail="give either ids or last")
+    if ids is not None:
+        wanted = [part.strip() for part in ids.split(",") if part.strip()]
+        if not wanted or len(wanted) > MAX_IDS:
+            raise HTTPException(status_code=422, detail=f"give 1 to {MAX_IDS} event ids")
+        return session.events(wanted)
+    assert last is not None
+    return session.last_events(last)
 
 
 @router.get("/matches/{match_id}/moments", response_model=list[Moment])
@@ -344,3 +474,23 @@ async def set_talking_point_status(
     if updated is None:
         raise HTTPException(status_code=404, detail=f"unknown talking point {item_id!r}")
     return public_talking_point(updated)
+
+
+@router.get("/matches/{match_id}/on-air", response_model=OnAirState)
+async def get_on_air(match_id: str, request: Request) -> OnAirState:
+    session, _ = _director(request, match_id)
+    return session.on_air
+
+
+@router.post("/matches/{match_id}/on-air", response_model=OnAirState)
+async def command_on_air(match_id: str, body: OnAirCommand, request: Request) -> OnAirState:
+    """An editor's decision about the overlay: take / clear / hold / release / auto."""
+    session, _ = _director(request, match_id)
+    try:
+        return session.command_on_air(body)
+    except OnAirError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except LookupError:
+        raise HTTPException(
+            status_code=404, detail=f"unknown lower-third {body.item_id!r}"
+        ) from None

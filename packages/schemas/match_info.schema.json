@@ -1,0 +1,204 @@
+{
+  "$defs": {
+    "StudioStats": {
+      "description": "The session's studio crew (Day 3 section 14.4).",
+      "properties": {
+        "commentary": {
+          "title": "Commentary",
+          "type": "integer"
+        },
+        "degraded": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Degraded",
+          "type": "object"
+        },
+        "dropped": {
+          "title": "Dropped",
+          "type": "integer"
+        },
+        "errors": {
+          "title": "Errors",
+          "type": "integer"
+        },
+        "lag_ms_p95": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lag Ms P95"
+        },
+        "lower_thirds": {
+          "title": "Lower Thirds",
+          "type": "integer"
+        },
+        "processed": {
+          "title": "Processed",
+          "type": "integer"
+        },
+        "queued": {
+          "title": "Queued",
+          "type": "integer"
+        },
+        "recaps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recaps",
+          "type": "array"
+        },
+        "talking_points": {
+          "title": "Talking Points",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "queued",
+        "processed",
+        "dropped",
+        "errors",
+        "lag_ms_p95",
+        "degraded",
+        "commentary",
+        "talking_points",
+        "lower_thirds",
+        "recaps"
+      ],
+      "title": "StudioStats",
+      "type": "object"
+    },
+    "TeamBrief": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "short_name": {
+          "title": "Short Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name"
+      ],
+      "title": "TeamBrief",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "away": {
+      "$ref": "#/$defs/TeamBrief"
+    },
+    "claims": {
+      "title": "Claims",
+      "type": "integer"
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    },
+    "events_applied": {
+      "title": "Events Applied",
+      "type": "integer"
+    },
+    "events_total": {
+      "title": "Events Total",
+      "type": "integer"
+    },
+    "from_minute": {
+      "title": "From Minute",
+      "type": "number"
+    },
+    "home": {
+      "$ref": "#/$defs/TeamBrief"
+    },
+    "match_id": {
+      "title": "Match Id",
+      "type": "string"
+    },
+    "moments": {
+      "title": "Moments",
+      "type": "integer"
+    },
+    "scenario": {
+      "title": "Scenario",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "speed": {
+      "title": "Speed",
+      "type": "number"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "running",
+        "paused",
+        "finished",
+        "stopped",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "studio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StudioStats"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "synthetic": {
+      "title": "Synthetic",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "match_id",
+    "scenario",
+    "seed",
+    "status",
+    "error",
+    "speed",
+    "from_minute",
+    "events_total",
+    "events_applied",
+    "home",
+    "away",
+    "moments",
+    "claims",
+    "synthetic",
+    "disclaimer"
+  ],
+  "title": "MatchInfo",
+  "type": "object"
+}

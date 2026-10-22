@@ -1,0 +1,380 @@
+{
+  "$defs": {
+    "MatchInfo": {
+      "properties": {
+        "away": {
+          "$ref": "#/$defs/TeamBrief"
+        },
+        "claims": {
+          "title": "Claims",
+          "type": "integer"
+        },
+        "disclaimer": {
+          "title": "Disclaimer",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "events_applied": {
+          "title": "Events Applied",
+          "type": "integer"
+        },
+        "events_total": {
+          "title": "Events Total",
+          "type": "integer"
+        },
+        "from_minute": {
+          "title": "From Minute",
+          "type": "number"
+        },
+        "home": {
+          "$ref": "#/$defs/TeamBrief"
+        },
+        "match_id": {
+          "title": "Match Id",
+          "type": "string"
+        },
+        "moments": {
+          "title": "Moments",
+          "type": "integer"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "speed": {
+          "title": "Speed",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "running",
+            "paused",
+            "finished",
+            "stopped",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "studio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StudioStats"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "synthetic": {
+          "title": "Synthetic",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "match_id",
+        "scenario",
+        "seed",
+        "status",
+        "error",
+        "speed",
+        "from_minute",
+        "events_total",
+        "events_applied",
+        "home",
+        "away",
+        "moments",
+        "claims",
+        "synthetic",
+        "disclaimer"
+      ],
+      "title": "MatchInfo",
+      "type": "object"
+    },
+    "MatchSnapshot": {
+      "additionalProperties": false,
+      "description": "Live state for dashboards. Possession fields include the running possession.",
+      "properties": {
+        "as_of_ms": {
+          "title": "As Of Ms",
+          "type": "integer"
+        },
+        "as_of_seq": {
+          "title": "As Of Seq",
+          "type": "integer"
+        },
+        "ball_in_play": {
+          "title": "Ball In Play",
+          "type": "boolean"
+        },
+        "ball_in_play_ms": {
+          "title": "Ball In Play Ms",
+          "type": "integer"
+        },
+        "booked": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Booked",
+          "type": "array"
+        },
+        "clock_display": {
+          "title": "Clock Display",
+          "type": "string"
+        },
+        "holder_since_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Holder Since Ms"
+        },
+        "holder_team": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Holder Team"
+        },
+        "last_event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Event Id"
+        },
+        "match_id": {
+          "title": "Match Id",
+          "type": "string"
+        },
+        "on_pitch": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "On Pitch",
+          "type": "object"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "phase": {
+          "enum": [
+            "pre",
+            "pre_p1",
+            "p1",
+            "half",
+            "p2",
+            "full",
+            "post"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "possession_ms": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Possession Ms",
+          "type": "object"
+        },
+        "possession_pct": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Possession Pct",
+          "type": "object"
+        },
+        "score": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Score",
+          "type": "object"
+        },
+        "sent_off": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sent Off",
+          "type": "array"
+        }
+      },
+      "required": [
+        "match_id",
+        "phase",
+        "period",
+        "clock_display",
+        "as_of_seq",
+        "as_of_ms",
+        "score",
+        "ball_in_play",
+        "holder_team",
+        "holder_since_ms",
+        "possession_ms",
+        "ball_in_play_ms",
+        "possession_pct",
+        "on_pitch",
+        "booked",
+        "sent_off",
+        "last_event_id"
+      ],
+      "title": "MatchSnapshot",
+      "type": "object"
+    },
+    "StudioStats": {
+      "description": "The session's studio crew (Day 3 section 14.4).",
+      "properties": {
+        "commentary": {
+          "title": "Commentary",
+          "type": "integer"
+        },
+        "degraded": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Degraded",
+          "type": "object"
+        },
+        "dropped": {
+          "title": "Dropped",
+          "type": "integer"
+        },
+        "errors": {
+          "title": "Errors",
+          "type": "integer"
+        },
+        "lag_ms_p95": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lag Ms P95"
+        },
+        "lower_thirds": {
+          "title": "Lower Thirds",
+          "type": "integer"
+        },
+        "processed": {
+          "title": "Processed",
+          "type": "integer"
+        },
+        "queued": {
+          "title": "Queued",
+          "type": "integer"
+        },
+        "recaps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recaps",
+          "type": "array"
+        },
+        "talking_points": {
+          "title": "Talking Points",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "queued",
+        "processed",
+        "dropped",
+        "errors",
+        "lag_ms_p95",
+        "degraded",
+        "commentary",
+        "talking_points",
+        "lower_thirds",
+        "recaps"
+      ],
+      "title": "StudioStats",
+      "type": "object"
+    },
+    "TeamBrief": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "short_name": {
+          "title": "Short Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name"
+      ],
+      "title": "TeamBrief",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "info": {
+      "$ref": "#/$defs/MatchInfo"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/MatchSnapshot"
+    }
+  },
+  "required": [
+    "info",
+    "snapshot"
+  ],
+  "title": "MatchView",
+  "type": "object"
+}
