@@ -13,6 +13,7 @@ read by anyone.
 import asyncio
 import contextlib
 import logging
+import math
 import statistics
 import time
 from collections import Counter, OrderedDict, deque
@@ -477,7 +478,8 @@ class Narrator:
                 output=output,
                 status=status,
                 attempt=1,
-                start_ms=round(start_ms, 3),
+                # rounded up: a span never starts before the studio job it follows
+                start_ms=math.ceil(start_ms * 1000) / 1000,
                 duration_ms=round(duration_ms, 3),
                 model=self.provider,
                 error=error,

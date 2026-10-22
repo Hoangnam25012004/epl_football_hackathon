@@ -5,6 +5,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import pytest
 from helpers import match_context, run
 
 from pundit.agents.contracts import CommentaryView, SpeechCue
@@ -262,3 +263,14 @@ def test_spans_shutdown_and_unknown_clips(tmp_path: Path) -> None:
         await asyncio.sleep(0)
 
     run(scenario())
+
+
+@pytest.mark.parametrize("offset", [45.29020003974438, 12.3451, 7.0, 0.0004])
+def test_a_span_never_starts_before_the_job_it_follows(tmp_path: Path, offset: float) -> None:
+    """Rounding the start down would put a Narrator span before the studio's end on the
+    Gantt (found by the voice API test: 45.2902 rounded to 45.290)."""
+    narrator = narrator_for(tmp_path)
+    narrator._span("c-1", "narrate", "agent", offset, 1.23456, {}, {})
+    (span,) = narrator.spans_of("c-1")
+    assert offset <= span.start_ms <= offset + 0.001
+    assert span.duration_ms == 1.235
