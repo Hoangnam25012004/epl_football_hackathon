@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* `dark:` follows the system, and is always on in the studio, whose theme is dark */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    @slot;
+  }
+  &:where(.theme-studio, .theme-studio *) {
+    @slot;
+  }
+}
+
 /* Design tokens (docs/day4-design.md section 4.9). Pages pick a theme with a class on <body>. */
 :root {
   --bg: #f7f8fa;
@@ -8,11 +18,17 @@
   --border: #d9dee6;
   --text: #121821;
   --muted: #5b6676;
-  --accent: #1f6feb;
+  --accent: #0969da; /* text and borders: 4.5:1 on every light surface */
+  --accent-fill: #0969da; /* filled buttons with white text */
   --true: #1a7f37;
   --partly: #9a6700;
   --false: #cf222e;
   --unknown: #6e7781;
+  /* verdict labels: white text on these in every theme (not redefined below) */
+  --true-fill: #1a7f37;
+  --partly-fill: #9a6700;
+  --false-fill: #cf222e;
+  --unknown-fill: #6e7781;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +40,7 @@
     --text: #e6edf3;
     --muted: #9aa5b1;
     --accent: #4493f8;
+    --accent-fill: #1f6feb;
     --true: #3fb950;
     --partly: #d29922;
     --false: #f85149;
@@ -33,6 +50,7 @@
 
 /* Studio: always dark, a broadcast control room that records well */
 .theme-studio {
+  color-scheme: dark;
   --bg: #0b0f14;
   --panel: #121821;
   --panel-2: #1a222d;
@@ -40,6 +58,7 @@
   --text: #e6edf3;
   --muted: #94a3b8;
   --accent: #4493f8;
+  --accent-fill: #1f6feb;
   --true: #3fb950;
   --partly: #d29922;
   --false: #f85149;
@@ -54,6 +73,7 @@
   --color-ink: var(--text);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
   --color-verdict-true: var(--true);
   --color-verdict-partly: var(--partly);
   --color-verdict-false: var(--false);

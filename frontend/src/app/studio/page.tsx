@@ -10,7 +10,8 @@ import { PageShell } from "@/components/common/PageShell";
 import { Scoreboard } from "@/components/common/Scoreboard";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
 import { useToast } from "@/components/common/Toast";
-import { EmptyState, LangToggle, Panel } from "@/components/common/ui";
+import { NoMatch } from "@/components/common/NoMatch";
+import { LangToggle, Panel } from "@/components/common/ui";
 import { ClaimBox } from "@/components/studio/ClaimBox";
 import { CommentaryPreview } from "@/components/studio/CommentaryPreview";
 import { EventFeed } from "@/components/studio/EventFeed";
@@ -66,18 +67,7 @@ function Studio() {
     else toast.show(result.error.message, "error");
   }, [matchId, toast]);
 
-  if (!matchId) {
-    return (
-      <main className="p-6">
-        <EmptyState>
-          {t("common.noMatch")}{" "}
-          <Link className="text-accent underline" href="/">
-            {t("common.back")}
-          </Link>
-        </EmptyState>
-      </main>
-    );
-  }
+  if (!matchId) return <NoMatch />;
 
   const snapshotVersion = (snapshot?.as_of_seq ?? 0) + momentsCount;
   const examples = scenario?.example_claims[lang] ?? [];

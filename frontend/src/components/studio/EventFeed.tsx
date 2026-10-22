@@ -66,7 +66,12 @@ export function EventFeed({
         />
       </div>
       {rows.length === 0 ? <EmptyState>{t("studio.noEvents")}</EmptyState> : null}
-      <ol className="flex-1 overflow-auto text-sm" data-testid="event-feed">
+      <ol
+        className="flex-1 overflow-auto text-sm"
+        data-testid="event-feed"
+        tabIndex={0}
+        aria-label={t("studio.events")}
+      >
         {rows.map((event) => {
           const type = eventType(event);
           const corner = type === "pass" && "play_type" in event && event.play_type === "corner";
@@ -78,6 +83,7 @@ export function EventFeed({
             <li
               key={event.id}
               data-testid="event-row"
+              data-id={event.id}
               data-type={type}
               className={`flex items-center gap-2 border-b border-line/60 px-2 py-1 ${key ? "bg-panel-2 font-medium" : ""}`}
             >

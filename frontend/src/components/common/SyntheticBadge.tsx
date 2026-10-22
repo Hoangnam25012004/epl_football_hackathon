@@ -9,7 +9,7 @@ export function SyntheticBadge({ compact = false }: { compact?: boolean }) {
     <span
       data-testid="synthetic-badge"
       title={t("common.syntheticNote")}
-      className={`inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-500/15 font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300 ${
+      className={`inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-500/15 font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300 ${
         compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
       }`}
     >
@@ -25,7 +25,7 @@ export function SyntheticFallback() {
     <div className="flex min-h-dvh items-center justify-center p-6">
       <span
         data-testid="synthetic-badge"
-        className="rounded border border-amber-500/60 bg-amber-500/15 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-amber-600"
+        className="rounded border border-amber-500/60 bg-amber-500/15 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300"
       >
         ◆ Synthetic data · Dữ liệu tổng hợp
       </span>

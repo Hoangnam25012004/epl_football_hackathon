@@ -163,7 +163,12 @@ function DrawerBody({ matchId, target, homeId, scenario, players }: BodyProps) {
                 {t("drawer.missingEvents", { n: events.missing })}
               </p>
             ) : null}
-            <ol className="max-h-64 overflow-auto text-xs" data-testid="evidence-events">
+            <ol
+              className="max-h-64 overflow-auto text-xs"
+              data-testid="evidence-events"
+              tabIndex={0}
+              aria-label={t("drawer.evidence")}
+            >
               {(events?.found ?? []).map((event) => (
                 <li key={event.id} className="flex gap-2 border-b border-line/50 py-0.5">
                   <span className="tabular w-10 text-right text-muted">

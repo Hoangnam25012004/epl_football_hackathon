@@ -1,7 +1,7 @@
 "use client";
 
 // Small building blocks shared by every page.
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { textOn, safeColor } from "@/lib/color";
 import { useT, type UiLang } from "@/lib/i18n";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -20,16 +20,25 @@ export function Panel({
   testId?: string;
 }) {
   const { t } = useT();
+  const heading = useId();
   return (
     <section
       data-testid={testId}
       className={`flex min-h-0 flex-col rounded-lg border border-line bg-panel ${className}`}
     >
       <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{title}</h2>
+        <h2 id={heading} className="text-sm font-semibold uppercase tracking-wide text-muted">
+          {title}
+        </h2>
         {actions ? <div className="flex items-center gap-1">{actions}</div> : null}
       </header>
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* focusable, so a panel whose content overflows can be scrolled from the keyboard */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-labelledby={heading}
+        className="min-h-0 flex-1 overflow-auto"
+      >
         <ErrorBoundary
           name={typeof title === "string" ? title : testId}
           fallback={<p className="p-3 text-sm text-verdict-false">{t("common.panelError")}</p>}
@@ -91,7 +100,7 @@ export function Segmented<T extends string | number>({
             disabled={disabled}
             onClick={() => onChange(option.value)}
             className={`px-2.5 py-1 text-xs font-semibold first:rounded-l-md last:rounded-r-md disabled:opacity-50 ${
-              active ? "bg-accent text-white" : "text-ink hover:bg-panel-2"
+              active ? "bg-accent-fill text-white" : "text-ink hover:bg-panel-2"
             }`}
           >
             {option.label}
@@ -234,7 +243,7 @@ export function Chip({
   const tones = {
     neutral: "border-line text-muted",
     accent: "border-accent/50 text-accent",
-    warn: "border-amber-500/50 text-amber-600 dark:text-amber-300",
+    warn: "border-amber-500/50 text-amber-800 dark:text-amber-300",
   } as const;
   return (
     <span

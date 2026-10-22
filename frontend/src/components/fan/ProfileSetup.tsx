@@ -206,7 +206,7 @@ export function ProfileSetup({
       <button
         type="submit"
         data-testid="profile-start"
-        className="rounded-lg bg-accent px-4 py-3 text-base font-bold text-white"
+        className="rounded-lg bg-accent-fill px-4 py-3 text-base font-bold text-white"
       >
         {t("fan.start")}
       </button>

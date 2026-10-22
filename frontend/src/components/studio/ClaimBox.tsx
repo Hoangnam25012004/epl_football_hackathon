@@ -39,7 +39,7 @@ export function VerdictPill({ verdict }: { verdict: ClaimResult["verdict"] }) {
       data-testid="verdict"
       data-verdict={verdict}
       className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm font-bold text-white"
-      style={{ backgroundColor: style.color }}
+      style={{ backgroundColor: style.fill }}
     >
       <span aria-hidden>{style.icon}</span>
       {t(`verdict.${verdict}`)}
@@ -145,7 +145,7 @@ export function ClaimBox({
             type="submit"
             data-testid="claim-submit"
             disabled={busy || text.trim().length < 3}
-            className="rounded bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            className="rounded bg-accent-fill px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
           >
             {busy ? t("studio.claimVerifying") : t("studio.claimVerify")}
           </button>

@@ -19,7 +19,7 @@ export function matchClock(snapshot: MatchSnapshot | null, latest: MatchEvent | 
 const STATUS_TONE: Record<SessionStatus, string> = {
   created: "bg-slate-500/20 text-muted",
   running: "bg-red-600 text-white",
-  paused: "bg-amber-500/25 text-amber-700 dark:text-amber-300",
+  paused: "bg-amber-500/25 text-amber-800 dark:text-amber-300",
   finished: "bg-slate-500/25 text-ink",
   stopped: "bg-slate-500/25 text-ink",
   error: "bg-red-900 text-red-100",

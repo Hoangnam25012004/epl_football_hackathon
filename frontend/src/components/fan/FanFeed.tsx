@@ -49,7 +49,7 @@ export function CommentaryFeed({
           type="button"
           data-testid="new-items"
           onClick={() => list.current?.scrollTo({ top: 0, behavior: "smooth" })}
-          className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-xs font-bold text-white shadow"
+          className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-accent-fill px-3 py-1 text-xs font-bold text-white shadow"
         >
           ↑ {t("fan.newItems", { n: unseen })}
         </button>
@@ -57,6 +57,8 @@ export function CommentaryFeed({
       <div
         ref={list}
         aria-live="polite"
+        aria-label={t("fan.tabCommentary")}
+        tabIndex={0}
         data-testid="commentary-feed"
         className="flex h-full flex-col gap-2 overflow-auto p-3"
       >
@@ -102,7 +104,7 @@ export function PlayerTab({
       {mentions.map((item) => (
         <div key={item.id} className="rounded border border-amber-500/40 p-2 text-sm">
           <span className="tabular mr-2 font-bold">{item.display_minute}</span>
-          {item.text}
+          <span lang={item.language}>{item.text}</span>
         </div>
       ))}
     </div>
@@ -133,7 +135,7 @@ export function RecapPanel({ recaps }: { recaps: { H1?: RecapView; FULL?: RecapV
           <h2 className="text-lg font-bold">
             {recap.title}
             {recap.revision > 1 ? (
-              <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-xs font-semibold text-accent">
+              <span className="ml-2 rounded border border-accent/50 px-1.5 py-0.5 text-xs font-semibold text-accent">
                 {t("fan.recapUpdated")}
               </span>
             ) : null}

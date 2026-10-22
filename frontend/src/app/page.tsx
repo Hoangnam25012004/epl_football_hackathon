@@ -175,7 +175,9 @@ function ScenarioCard({ scenario, lang }: { scenario: ScenarioInfo; lang: "en" |
             data-testid={`open-${page}-${scenario.key}`}
             onClick={() => void open(page)}
             className={`rounded px-3 py-1.5 text-sm font-semibold disabled:opacity-50 ${
-              page === "studio" ? "bg-accent text-white" : "border border-line hover:bg-panel-2"
+              page === "studio"
+                ? "bg-accent-fill text-white"
+                : "border border-line hover:bg-panel-2"
             }`}
           >
             {t(`landing.${page}`)}

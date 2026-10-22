@@ -83,7 +83,7 @@ export function ReplayControls({
         data-testid="play-pause"
         disabled={busy || !(running || canPlay)}
         onClick={toggle}
-        className="min-w-24 rounded bg-accent px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
+        className="min-w-24 rounded bg-accent-fill px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
       >
         {running ? `⏸ ${t("studio.pause")}` : `▶ ${t("studio.play")}`}
       </button>

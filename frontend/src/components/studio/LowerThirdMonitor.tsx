@@ -121,7 +121,7 @@ export function LowerThirdMonitor({
             data-testid="lower-third-item"
             data-id={item.id}
             className={`flex items-center gap-2 rounded border border-line px-2 py-1 text-xs ${
-              superseded.includes(item.id) ? "opacity-40 line-through" : ""
+              superseded.includes(item.id) ? "text-muted line-through" : ""
             } ${schedule.current?.item.id === item.id ? "border-red-500" : ""}`}
           >
             <span className="tabular font-bold">{item.match_clock}</span>

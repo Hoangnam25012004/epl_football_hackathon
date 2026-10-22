@@ -132,7 +132,11 @@ function Json({ title, value }: { title: string; value: unknown }) {
   return (
     <div>
       <div className="mb-0.5 font-semibold text-muted">{title}</div>
-      <pre className="max-h-56 overflow-auto rounded bg-panel-2 p-2 text-[11px] leading-snug">
+      <pre
+        tabIndex={0}
+        aria-label={title}
+        className="max-h-56 overflow-auto rounded bg-panel-2 p-2 text-[11px] leading-snug"
+      >
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>

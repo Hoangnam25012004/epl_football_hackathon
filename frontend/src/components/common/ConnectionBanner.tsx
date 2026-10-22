@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import type { SocketState } from "@/lib/socket";
 
-/** Seconds until `retryAt`, ticking while there is one. */
-function useCountdown(retryAt: number | undefined): number {
-  const [now, setNow] = useState(() => Date.now());
+/** Seconds until the next attempt: exact at first (`retryInMs`), then ticking towards `retryAt`. */
+function useCountdown(retryAt: number | undefined, retryInMs: number | undefined): number {
+  const [tick, setTick] = useState<{ at: number; target?: number }>({ at: 0 });
   useEffect(() => {
     if (retryAt === undefined) return;
-    const timer = setInterval(() => setNow(Date.now()), 250);
+    const timer = setInterval(() => setTick({ at: Date.now(), target: retryAt }), 250);
     return () => clearInterval(timer);
   }, [retryAt]);
-  return retryAt === undefined ? 0 : Math.max(0, Math.ceil((retryAt - now) / 1000));
+  if (retryAt === undefined) return 0;
+  const left = tick.target === retryAt ? retryAt - tick.at : (retryInMs ?? 0);
+  return Math.max(0, Math.ceil(left / 1000));
 }
 
 /** What the connection is doing, in words; nothing when it is live. */
@@ -24,11 +26,11 @@ export function ConnectionBanner({
   onCreate?: () => void;
 }) {
   const { t } = useT();
-  const secondsLeft = useCountdown(state.retryAt);
+  const secondsLeft = useCountdown(state.retryAt, state.retryInMs);
 
   if (state.status === "open" || state.status === "idle") return null;
   let text: string;
-  let tone = "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-200";
+  let tone = "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-200";
   switch (state.status) {
     case "connecting":
       text = t("conn.connecting");
@@ -58,7 +60,7 @@ export function ConnectionBanner({
         <button
           type="button"
           onClick={onCreate}
-          className="rounded bg-accent px-3 py-1 text-sm font-semibold text-white"
+          className="rounded bg-accent-fill px-3 py-1 text-sm font-semibold text-white"
         >
           {t("conn.createMatch")}
         </button>

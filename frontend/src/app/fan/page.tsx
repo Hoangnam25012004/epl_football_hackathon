@@ -12,7 +12,8 @@ import { PageShell } from "@/components/common/PageShell";
 import { Scoreboard } from "@/components/common/Scoreboard";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
 import { useToast } from "@/components/common/Toast";
-import { EmptyState, LangToggle, Tabs } from "@/components/common/ui";
+import { NoMatch } from "@/components/common/NoMatch";
+import { LangToggle, Tabs } from "@/components/common/ui";
 import { CommentaryFeed, PlayerTab, RecapPanel } from "@/components/fan/FanFeed";
 import { ProfileSetup } from "@/components/fan/ProfileSetup";
 import { api, parseMatchId } from "@/lib/api";
@@ -75,18 +76,7 @@ function Fan() {
   // a profile the server refuses (4422) is chosen again; a refused socket never retries
   const refused = socketState.status === "fatal" && socketState.code === 4422;
 
-  if (!matchId) {
-    return (
-      <main className="p-6">
-        <EmptyState>
-          {t("common.noMatch")}{" "}
-          <Link className="text-accent underline" href="/">
-            {t("common.back")}
-          </Link>
-        </EmptyState>
-      </main>
-    );
-  }
+  if (!matchId) return <NoMatch />;
 
   const choose = (next: ViewerProfile) => {
     if (refused) clearProfile();
@@ -119,6 +109,7 @@ function Fan() {
     return (
       <div className="min-h-dvh">
         {header}
+        {refused ? <ConnectionBanner state={socketState} /> : null}
         <ProfileSetup
           matchId={matchId}
           initial={profile ?? DEFAULT_PROFILE}

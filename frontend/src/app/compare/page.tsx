@@ -10,6 +10,7 @@ import { ConnectionBanner } from "@/components/common/ConnectionBanner";
 import { PageShell } from "@/components/common/PageShell";
 import { Scoreboard } from "@/components/common/Scoreboard";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
+import { NoMatch } from "@/components/common/NoMatch";
 import { Chip, EmptyState, LangToggle, Segmented } from "@/components/common/ui";
 import { CommentaryCard } from "@/components/fan/CommentaryCard";
 import { alignByItem, formatSide, observed, parseSide } from "@/lib/compare";
@@ -49,18 +50,7 @@ function Compare() {
   const leftItems = useStore(a.store, (s) => s.commentary);
   const rightItems = useStore(b.store, (s) => s.commentary);
 
-  if (!matchId) {
-    return (
-      <main className="p-6">
-        <EmptyState>
-          {t("common.noMatch")}{" "}
-          <Link className="text-accent underline" href="/">
-            {t("common.back")}
-          </Link>
-        </EmptyState>
-      </main>
-    );
-  }
+  if (!matchId) return <NoMatch />;
 
   const rows = alignByItem(items(leftItems), items(rightItems)).slice(0, SHOWN);
   return (
