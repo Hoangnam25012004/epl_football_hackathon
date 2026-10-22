@@ -28,9 +28,28 @@ def usable(variants: Sequence[str], values: Mapping[str, str]) -> list[str]:
     return [v for v in variants if fields_of(v) <= values.keys()]
 
 
+def capitalize_sentences(text: str) -> str:
+    """Every sentence starts with a capital ("phút 63: ..." -> "Phút 63: ..."), except the
+    metric "xG", which keeps its spelling."""
+    chars = list(text)
+    start = True
+    for index, char in enumerate(chars):
+        if start and not char.isspace():
+            if char.islower() and not text.startswith("xG", index):
+                chars[index] = char.upper()
+            start = False
+        elif char in ".!?" and index + 1 < len(chars) and chars[index + 1].isspace():
+            start = True
+    return "".join(chars)
+
+
+def fill(template: str, values: Mapping[str, str]) -> str:
+    return capitalize_sentences(template.format(**values))
+
+
 def pick(variants: Sequence[str], key: str, values: Mapping[str, str]) -> str | None:
     """The variant chosen for `key` among the usable ones, filled in; None if none is usable."""
     candidates = usable(variants, values)
     if not candidates:
         return None
-    return candidates[stable_index(key, len(candidates))].format(**values)
+    return fill(candidates[stable_index(key, len(candidates))], values)

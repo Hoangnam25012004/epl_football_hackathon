@@ -7,7 +7,7 @@ score line fills in so there are always at least two lines.
 """
 
 from pundit.agents.contracts import FactPack, Lang, TalkingAngle, TalkingLine, Trigger
-from pundit.agents.phrasebank import pick
+from pundit.agents.phrasebank import fill, pick
 from pundit.agents.studio_guard import cited_keys
 from pundit.agents.studio_values import pack_values
 
@@ -333,7 +333,7 @@ def render_lines(pack: FactPack, language: Lang) -> tuple[TalkingLine, ...]:
         seen_angles.add(angle)
         lines.append(TalkingLine(text=text, angle=angle, fact_keys=cited_keys(text, pack.facts)))
     if len(lines) < 2:
-        text = SCORE_LINE[language].format(**values)
+        text = fill(SCORE_LINE[language], values)
         if all(line.text != text for line in lines):
             lines.append(
                 TalkingLine(text=text, angle="story", fact_keys=cited_keys(text, pack.facts))

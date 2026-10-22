@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from pundit.agents.contracts import CommentaryText, FactPack, Lang, Register, Trigger
-from pundit.agents.phrasebank import pick
+from pundit.agents.phrasebank import fill, pick
 from pundit.agents.studio_values import pack_values
 
 Tiers = tuple[tuple[str, ...], ...]
@@ -819,7 +819,7 @@ def render_version(pack: FactPack, language: Lang, mode: Register) -> str:
         text = pick(tier, key, values)
         if text is not None:
             return text
-    return FALLBACK[(language, mode)].format(**values)
+    return fill(FALLBACK[(language, mode)], values)
 
 
 def render_texts(pack: FactPack) -> tuple[CommentaryText, ...]:

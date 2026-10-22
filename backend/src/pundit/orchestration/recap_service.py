@@ -242,7 +242,12 @@ class RecapService:
                 "Guardrail",
                 "guardrail",
                 "check_studio",
-                {"language": language, "mode": mode, "paragraphs": len(draft.paragraphs)},
+                {
+                    "agent": "RecapWriter",
+                    "language": language,
+                    "mode": mode,
+                    "texts": [draft.title, *draft.paragraphs],
+                },
                 attempt=attempt,
                 parent=span,
             )

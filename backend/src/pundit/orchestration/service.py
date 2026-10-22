@@ -75,7 +75,7 @@ def mock_ports(settings: Settings) -> PortsFactory:
 
 
 def llm_ports(settings: Settings) -> PortsFactory:
-    """Real-model ports (GitHub Models or Foundry), shared by every claim."""
+    """Real-model ports (Ollama, OpenAI-compatible or Foundry), shared by every claim."""
     from pundit.llm.maf_backend import LlmClaimAnalyst, LlmExplainer, build_backend
 
     backend = build_backend(settings)

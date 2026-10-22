@@ -52,6 +52,21 @@ class TeamBrief(BaseModel):
     short_name: str
 
 
+class StudioStats(BaseModel):
+    """The session's studio crew (Day 3 section 14.4)."""
+
+    queued: int
+    processed: int
+    dropped: int
+    errors: int
+    lag_ms_p95: float | None
+    degraded: dict[str, int]
+    commentary: int
+    talking_points: int
+    lower_thirds: int
+    recaps: list[str]
+
+
 class MatchInfo(BaseModel):
     match_id: str
     scenario: str
@@ -68,6 +83,7 @@ class MatchInfo(BaseModel):
     claims: int
     synthetic: bool
     disclaimer: str
+    studio: StudioStats | None = None  # absent with STUDIO_ENABLED=false (the Day 2 shape)
 
 
 class MatchView(BaseModel):
@@ -161,7 +177,7 @@ async def healthz(request: Request) -> Health:
     )
 
 
-@router.post("/matches", response_model=MatchInfo)
+@router.post("/matches", response_model=MatchInfo, response_model_exclude_unset=True)
 async def create_match(body: CreateMatch, request: Request) -> MatchInfo:
     session = await manager(request).create(
         body.scenario,
@@ -174,21 +190,25 @@ async def create_match(body: CreateMatch, request: Request) -> MatchInfo:
     return _info(session)
 
 
-@router.post("/matches/{match_id}/start", response_model=MatchInfo)
+@router.post(
+    "/matches/{match_id}/start", response_model=MatchInfo, response_model_exclude_unset=True
+)
 async def start_match(match_id: str, request: Request) -> MatchInfo:
     session = _session(request, match_id)
     session.start()
     return _info(session)
 
 
-@router.post("/matches/{match_id}/stop", response_model=MatchInfo)
+@router.post(
+    "/matches/{match_id}/stop", response_model=MatchInfo, response_model_exclude_unset=True
+)
 async def stop_match(match_id: str, request: Request) -> MatchInfo:
     session = _session(request, match_id)
     await session.stop()
     return _info(session)
 
 
-@router.get("/matches/{match_id}", response_model=MatchView)
+@router.get("/matches/{match_id}", response_model=MatchView, response_model_exclude_unset=True)
 async def get_match(match_id: str, request: Request) -> MatchView:
     session = _session(request, match_id)
     return MatchView(info=_info(session), snapshot=session.snapshot())

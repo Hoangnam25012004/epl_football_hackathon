@@ -125,6 +125,9 @@ class StudioDirector:
             trigger, offered = await self._queue.get()
             try:
                 await self._process(trigger, offered)
+            except asyncio.CancelledError:
+                self.dropped += 1  # the session stopped while this job was running
+                raise
             except Exception:  # one broken job must not stop the commentary of the match
                 self.errors += 1
                 log.exception("studio job %s failed", trigger.id)

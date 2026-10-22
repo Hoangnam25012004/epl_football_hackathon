@@ -24,6 +24,7 @@ from pundit.agents.contracts import (
     Register,
 )
 from pundit.agents.factpack import stat_fact
+from pundit.agents.phrasebank import capitalize_sentences
 from pundit.agents.studio_guard import StudioScope
 from pundit.agents.studio_text import find_fact, player_name, score_line, team_name, team_short
 from pundit.domain.events import CardEvent, GoalEvent, VarCheckEvent
@@ -351,8 +352,8 @@ def render_recap(pack: RecapPack, language: Lang, mode: Register) -> RecapText:
     return RecapText(
         language=language,
         mode=mode,
-        title=title,
-        paragraphs=tuple(paragraphs[:6]),
+        title=capitalize_sentences(title),
+        paragraphs=tuple(capitalize_sentences(p) for p in paragraphs[:6]),
         source="template",
     )
 

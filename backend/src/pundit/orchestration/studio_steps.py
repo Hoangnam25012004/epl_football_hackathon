@@ -50,6 +50,7 @@ from pundit.agents.graphics import (
     wants_graphic,
 )
 from pundit.agents.guardrail import feedback_lines
+from pundit.agents.phrasebank import fill
 from pundit.agents.rules_library import mentioned_rules
 from pundit.agents.studio_guard import (
     StudioProduct,
@@ -84,6 +85,7 @@ log = logging.getLogger("pundit.studio")
 D = TypeVar("D")
 MAX_LLM_ATTEMPTS = 2  # one retry with the Guardrail's feedback (design L5)
 MIN_TALKING_LINES, MAX_TALKING_LINES = 2, 3
+OFFLINE_REQUESTS_AT_ONCE = 4
 MIN_LLM_S = 0.5  # an LLM call starts only with at least this much budget left (section 14.3)
 LlmOutcome = Literal["ok", "rejected", "failed", "skipped"]
 Gate = Literal["call", "deterministic", "importance", "budget"]
@@ -115,8 +117,10 @@ class StudioBudgets:
     @classmethod
     def offline(cls, settings: Settings) -> "StudioBudgets":
         """`pundit studio`: no replay to keep up with, so every call gets the provider's
-        timeout and one retry."""
-        call = settings.llm_timeout_s
+        timeout and one retry. A job sends up to four requests at once (two commentary
+        languages, the talking point, the graphics); a local server answers them one after the
+        other, so a call may wait for the three others before its own turn."""
+        call = settings.llm_timeout_s * OFFLINE_REQUESTS_AT_ONCE
         return cls(
             talking_point_s=2 * call + 1,
             commentary_s=2 * call + 1,
@@ -713,7 +717,7 @@ class StudioSteps:
     ) -> str:
         """The template version, checked; a rejected template falls back to the plain line."""
         scope = scope_of(pack)
-        for candidate in (text, FALLBACK[(language, mode)].format(**pack_values(pack, language))):
+        for candidate in (text, fill(FALLBACK[(language, mode)], pack_values(pack, language))):
             report = check_studio(
                 candidate, scope, language=language, product="commentary", mode=mode
             )
