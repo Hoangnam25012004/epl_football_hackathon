@@ -26,10 +26,10 @@ from pundit.agents.recap import RecapPack
 from pundit.agents.studio_guard import MAX_CHARS
 from pundit.agents.studio_text import player_name, score_line, team_name
 
-TALKING_PROMPT_VERSION = "talking-v1"
-COMMENTARY_PROMPT_VERSION = "commentary-v1"
+TALKING_PROMPT_VERSION = "talking-v2"
+COMMENTARY_PROMPT_VERSION = "commentary-v2"
 GRAPHICS_PROMPT_VERSION = "graphics-v1"
-RECAP_PROMPT_VERSION = "recap-v1"
+RECAP_PROMPT_VERSION = "recap-v2"
 
 KIND_TEXT: dict[str, str] = {
     "goal": "a goal",
@@ -59,6 +59,8 @@ Numbers
 - Use only numbers that appear in `facts`, written exactly as their `display` (digits; a dot \
 for decimals). You may also write the minute and the score given in the input. No other \
 number: no totals, differences or percentages of your own.
+- Write every number with digits, zero too: "Kestrel Athletic 0", never "no entries" or \
+"không có lần nào".
 - A number belongs to the team or player of its fact: never give it to the other side.
 People and events
 - Name only the players listed in `players`, spelled as given. Never invent a name.

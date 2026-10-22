@@ -49,7 +49,7 @@ def studio_mock_ports(settings: Settings) -> StudioPortsFactory:
     return make
 
 
-def studio_llm_ports(settings: Settings) -> StudioPortsFactory:
+def studio_llm_ports(settings: Settings, *, timeout_s: float | None = None) -> StudioPortsFactory:
     """Real-model writers (Ollama, OpenAI-compatible or Foundry), shared by every job."""
     from pundit.llm.maf_backend import (
         LlmCommentator,
@@ -58,7 +58,7 @@ def studio_llm_ports(settings: Settings) -> StudioPortsFactory:
         build_backend,
     )
 
-    backend = build_backend(settings)
+    backend = build_backend(settings, timeout_s=timeout_s)
     ports = StudioPorts(
         talker=LlmTalkingPointWriter(backend),
         commentator=LlmCommentator(backend),
@@ -67,10 +67,12 @@ def studio_llm_ports(settings: Settings) -> StudioPortsFactory:
     return lambda: ports
 
 
-def default_studio_ports(settings: Settings) -> StudioPortsFactory:
-    return (
-        studio_mock_ports(settings) if settings.provider == "mock" else studio_llm_ports(settings)
-    )
+def default_studio_ports(
+    settings: Settings, *, timeout_s: float | None = None
+) -> StudioPortsFactory:
+    if settings.provider == "mock":
+        return studio_mock_ports(settings)
+    return studio_llm_ports(settings, timeout_s=timeout_s)
 
 
 class StudioService:
@@ -88,11 +90,13 @@ class StudioService:
         use_workflow: bool = True,
     ) -> None:
         self.settings = settings
-        self._ports = ports or default_studio_ports(settings)
-        self.breaker = breaker or CircuitBreaker(clock=clock)
         self.budgets = budgets or (
             StudioBudgets.offline(settings) if offline else StudioBudgets.live(settings)
         )
+        # offline, a call may wait for the other requests of its job: the HTTP client must not
+        # give up before the call budget does
+        self._ports = ports or default_studio_ports(settings, timeout_s=self.budgets.llm_timeout_s)
+        self.breaker = breaker or CircuitBreaker(clock=clock)
         self.llm_min_importance = llm_min_importance or settings.studio_llm_min_importance
         self._clock = clock
         self._trace_clock = trace_clock

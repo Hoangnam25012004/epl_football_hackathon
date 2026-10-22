@@ -202,3 +202,142 @@ def test_mutations_of_the_templates_are_caught(scenario: str, seed: int) -> None
                     else:
                         caught["teams"] += 1
     assert all(count > 0 for count in caught.values()), caught
+
+
+# --------------------------------------------------------------------------- P6 findings (Ollama)
+
+
+def _pack_at(minute: str, kind: str) -> FactPack:
+    trigger = next(
+        t for t in triggers("dominant_loser", 42) if t.display_minute == minute and t.kind == kind
+    )
+    return pack("dominant_loser", 42, trigger.id)
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "language", "mode", "text", "caught"),
+    [
+        # real drafts of qwen2.5:3b (section 23.5): a real number under the wrong metric name
+        ("8'", "dangerous_spell", "en", "casual",
+         "Harbor FC had 4 shots in the box, Kestrel had none.", True),
+        ("19'", "momentum_shift", "vi", "analyst",
+         "Trong 10 phút gần nhất, thế trận đang nghiêng về Kestrel Athletic với chỉ số hỗn loạn "
+         "0.88, trong khi Kestrel Athletic kiểm soát bóng đạt 42%.", True),
+        ("27'", "dangerous_spell", "vi", "analyst",
+         "Kestrel Athletic có 4 lần đưa bóng vào vòng cấm, trong khi chỉ có 1 cú sút vào vòng cấm "
+         "của Harbor Lions FC.", True),
+        ("27'", "dangerous_spell", "en", "casual",
+         "Kestrel kept pressing with four shots in the box.", True),
+        # the same numbers under their own names pass
+        ("8'", "dangerous_spell", "en", "analyst",
+         "Harbor Lions FC kept up the pressure with 3 box entries and 4 penalty-area entries in "
+         "the last 7 minutes, while Kestrel Athletic had none.", False),
+        ("19'", "momentum_shift", "en", "analyst",
+         "The momentum swings to Kestrel Athletic, with a possession ratio of 42% compared to "
+         "Harbor Lions FC's 58% in the last 10 minutes.", False),
+        ("27'", "dangerous_spell", "en", "analyst",
+         "Kestrel Athletic kept their pressure with two shots and four entries into the penalty "
+         "area in the last 10 minutes.", False),
+    ],
+)  # fmt: skip
+def test_a_number_under_the_wrong_metric_name_is_caught(
+    minute: str, kind: str, language: Lang, mode: Register, text: str, caught: bool
+) -> None:
+    found = codes(text, _pack_at(minute, kind), language=language, mode=mode)
+    assert ("UNVERIFIED_NUMBER" in found) is caught, found
+
+
+@pytest.mark.parametrize(
+    ("text", "caught"),
+    [
+        (
+            "E. Brandvold's left-foot shot was off target, while J. Ellery had one shot as well.",
+            True,
+        ),
+        ("J. Ellery had a shot, but it was off target. E. Brandvold also missed his chance.", True),
+        ("J. Ellery shoots and E. Brandvold watches it go wide.", False),
+    ],
+)
+def test_the_goalkeeper_of_a_chance_never_shoots(text: str, caught: bool) -> None:
+    found = codes(text, _pack_at("9'", "big_chance"), language="en", mode="casual")
+    assert ("WRONG_ENTITY" in found) is caught, found
+
+
+def test_a_unit_says_what_the_number_is() -> None:
+    rocket = _pack_at("8'", "rocket_shot")
+    speed = next(f.display for f in rocket.facts if f.key.startswith("shot_speed:"))
+    shooter = player_name(rocket.match, rocket.trigger.roles["shooter"])
+    text = f"Phút 8: {shooter} tung cú sút {speed}, bóng đi chệch khung thành."
+    assert not codes(text, rocket, language="vi", mode="analyst")
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "language", "text", "code"),
+    [
+        # the goalkeeper or another player named as the scorer
+        ("27'", "goal", "vi",
+         "Tới phút 27, E. Brandvold ghi bàn cho Kestrel Athletic.", "WRONG_ENTITY"),
+        # ordinal goal counts are numbers too
+        ("63'", "goal", "vi",
+         "T. Calder đã ghi bàn vào phút 63. Đây là bàn thắng thứ ba của Calder trong trận đấu.",
+         "UNVERIFIED_NUMBER"),
+        ("78'", "goal", "en",
+         "J. Ellery scored his second goal of the match in the 78th minute.", "UNVERIFIED_NUMBER"),
+        # what never happens in these matches, or not at this moment
+        ("90+6'", "full_time", "vi",
+         "Kestrel Athletic vẫn thắng 2-1 sau hiệp phụ.", "WRONG_OUTCOME"),
+        ("63'", "goal", "en",
+         "T. Calder scored his first goal, and M. Holub made an own goal save.", "WRONG_OUTCOME"),
+        ("78'", "goal", "vi",
+         "J. Ellery ghi bàn, Kestrel Athletic giành chiến thắng 2-1.", "WRONG_OUTCOME"),
+        ("68'", "big_chance", "en",
+         "D. Esposti's shot went off target. M. Holub kept it out.", "WRONG_OUTCOME"),
+        # a summary line written by a model does not tell the goals
+        ("45+3'", "period_end", "vi",
+         "Kestrel Athletic ghi bàn ở phút 45+3, mở tỷ số trận đấu.", "WRONG_OUTCOME"),
+        ("90+6'", "full_time", "en", "Harbor scored first but Kestrel won 2-1 in the end.",
+         "WRONG_OUTCOME"),
+    ],
+)  # fmt: skip
+def test_narrative_errors_of_model_drafts_are_caught(
+    minute: str, kind: str, language: Lang, text: str, code: str
+) -> None:
+    found = codes(text, _pack_at(minute, kind), language=language, mode="casual")
+    assert code in found, found
+
+
+@pytest.mark.parametrize(
+    ("minute", "kind", "language", "mode", "text"),
+    [
+        ("27'", "goal", "en", "casual",
+         "M. Ribas scored his first goal of the match in the 27th minute."),
+        ("78'", "goal", "vi", "casual",
+         "J. Ellery ghi bàn thắng thứ hai cho Kestrel Athletic ở phút 78."),
+        ("90+6'", "full_time", "en", "casual", "Kestrel Athletic won the match 2-1."),
+        # "một" is an article here, not the number 1
+        ("55'", "big_chance", "vi", "analyst",
+         "O. Lindqvist tạo ra một cơ hội ngon ăn với xG 0.36, nhưng cú sút bị chặn."),
+    ],
+)  # fmt: skip
+def test_true_drafts_are_kept(
+    minute: str, kind: str, language: Lang, mode: Register, text: str
+) -> None:
+    assert not codes(text, _pack_at(minute, kind), language=language, mode=mode)
+
+
+def test_templates_may_tell_goals_in_summaries_but_models_may_not() -> None:
+    period_end = _pack_at("45+3'", "period_end")
+    line = "Kestrel Athletic ghi bàn ở phút 45+3."
+    assert "WRONG_OUTCOME" in codes(line, period_end, language="vi", mode="casual")
+    template = codes(line, period_end, language="vi", mode="casual", model_text=False)
+    assert "WRONG_OUTCOME" not in template
+
+
+def test_mot_counts_before_a_statistic() -> None:
+    """ "Chỉ có một cú sút" still says 1 shot: only "một cơ hội / pha tấn công / ..." is an
+    article."""
+    chance = _pack_at("55'", "big_chance")
+    found = codes(
+        "Harbor Lions FC chỉ có một cú sút trúng đích.", chance, language="vi", mode="analyst"
+    )
+    assert "UNVERIFIED_NUMBER" in found

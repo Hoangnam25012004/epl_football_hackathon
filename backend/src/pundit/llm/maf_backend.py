@@ -230,10 +230,15 @@ def _entra_token_provider() -> Callable[[], Awaitable[str]]:
 
 
 def build_backend(
-    settings: Settings, *, http_client: httpx.AsyncClient | None = None
+    settings: Settings,
+    *,
+    http_client: httpx.AsyncClient | None = None,
+    timeout_s: float | None = None,
 ) -> MafChatBackend:
-    """The backend of the configured provider (never called in mock mode)."""
-    timeout = settings.llm_timeout_s + 1.0
+    """The backend of the configured provider (never called in mock mode). `timeout_s` is the
+    longest a call may last (default LLM_TIMEOUT_S); the orchestrator's own timeout is the one
+    that counts, the HTTP one only has to be longer."""
+    timeout = (timeout_s or settings.llm_timeout_s) + 1.0
     extra: dict[str, Any] = {"http_client": http_client} if http_client is not None else {}
     api_key: str | Callable[[], Awaitable[str]]
     if settings.provider in ("ollama", "openai"):

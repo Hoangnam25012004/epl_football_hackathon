@@ -15,20 +15,25 @@ OUTCOME_VI: dict[str, tuple[str, ...]] = {
         "ghi bàn", "lập công", "vào lưới", "tung lưới", "thành bàn", "nâng tỷ số", "gỡ hoà",
         "gỡ hòa", "vươn lên dẫn", "mở tỷ số", "bàn thắng",
     ),
-    "save": ("cứu thua", "cản phá", "bắt gọn", "đẩy bóng ra"),
+    "save": ("cứu thua", "cản phá", "bắt gọn", "đẩy bóng ra", "cứu vớt", "cứu bóng"),
     "block": ("bị chặn", "chặn lại", "cản lại"),
     "wide": ("chệch", "ra ngoài", "vọt xà", "không trúng đích"),
     "post": ("dội cột", "trúng cột", "dội xà", "trúng xà", "chạm cột"),
     "yellow": ("thẻ vàng",),
     "red": ("thẻ đỏ", "truất quyền"),
     "offside": ("việt vị",),
+    # what never happens in these matches, or not at this moment (found in model drafts, P6)
+    "extra_time": ("hiệp phụ", "loạt sút luân lưu", "luân lưu", "đá luân lưu"),
+    "own_goal": ("phản lưới", "đốt lưới nhà"),
+    "result": ("thắng trận", "giành chiến thắng", "chiến thắng", "thua trận", "nhận thất bại"),
 }  # fmt: skip
 OUTCOME_EN: dict[str, tuple[str, ...]] = {
     "goal": (
         "scores", "scored", "nets", "netted", "finds the net", "into the net", "equaliser",
         "equalizer", "opens the scoring", "goal!",
     ),
-    "save": ("saves", "saved", "keeps it out", "parried", "parries"),
+    "save": ("saves", "saved", "keeps it out", "parried", "parries", "kept it out",
+             "kept out", "denied", "denies"),
     "block": ("blocked", "is blocked"),
     "wide": ("wide", "off target", "over the bar", "misses the target", "missed the target"),
     "post": ("hits the post", "hit the post", "off the post", "woodwork", "hits the bar",
@@ -36,6 +41,10 @@ OUTCOME_EN: dict[str, tuple[str, ...]] = {
     "yellow": ("yellow card", "booked", "booking"),
     "red": ("red card", "sent off", "sending off"),
     "offside": ("offside",),
+    "extra_time": ("extra time", "extra-time", "penalty shootout", "shootout", "shoot-out"),
+    "own_goal": ("own goal", "own-goal"),
+    "result": ("won the match", "won the game", "win the match", "wins the match", "victory",
+               "lost the match", "lose the match"),
 }  # fmt: skip
 # Matched first (longest match wins), so they never count as outcome words
 NEUTRAL_VI = ("bàn thắng kỳ vọng", "thẻ phạt", "thủ môn")
@@ -62,12 +71,33 @@ NO_GOAL_KINDS = frozenset(
 )  # fmt: skip
 
 
-def forbidden_categories(trigger: Trigger) -> frozenset[str]:
+# Summary lines: a model gives the score but does not tell the goals (the recap does that
+# from the verified list; small models invent who scored when)
+SUMMARY_KINDS = frozenset(
+    {"period_start", "period_end", "full_time", "stat_tick", "added_time", "lull"}
+)
+
+
+def forbidden_categories(trigger: Trigger, *, model_text: bool = False) -> frozenset[str]:
     """Outcome words that contradict what happened at this trigger."""
     found = set(FORBIDDEN_BY_OUTCOME[trigger.outcome]) if trigger.outcome is not None else set()
     if trigger.kind in NO_GOAL_KINDS:
         found.add("goal")
+    found.add("extra_time")  # the synthetic matches never go to extra time
+    if trigger.details.get("own_goal") != "true":
+        found.add("own_goal")
+    if trigger.kind != "full_time":
+        found.add("result")  # nobody has won before the final whistle
+    if model_text and trigger.kind in SUMMARY_KINDS:
+        found.add("goal")
     return frozenset(found)
+
+
+REASONS: dict[str, str] = {
+    "extra_time": "there is no extra time or shootout in this match",
+    "own_goal": "this goal is not an own goal",
+    "result": "the match is not over",
+}
 
 
 def outcome_terms() -> list[Term[str]]:

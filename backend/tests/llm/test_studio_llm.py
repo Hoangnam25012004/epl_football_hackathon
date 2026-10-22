@@ -222,3 +222,27 @@ def test_fault_plan_roles_and_kinds() -> None:
     for text in ("designer:hallucinate", "recapper:wrong_outcome", "talker:bad_choice"):
         with pytest.raises(ValueError):
             FaultPlan.parse(text)
+
+
+def test_offline_calls_get_their_whole_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P6 finding: the HTTP client gave up after LLM_TIMEOUT_S + 1 s while an offline call was
+    still waiting behind the other requests of its job; it now follows the call budget."""
+    from types import SimpleNamespace
+
+    from pundit.llm import maf_backend
+    from pundit.llm.settings import Settings
+    from pundit.orchestration.studio_service import StudioService
+
+    seen: list[float | None] = []
+
+    def fake_backend(settings: Settings, *, timeout_s: float | None = None) -> SimpleNamespace:
+        seen.append(timeout_s)
+        return SimpleNamespace(model="qwen2.5:3b")
+
+    monkeypatch.setattr(maf_backend, "build_backend", fake_backend)
+    settings = Settings.from_env({"USE_MOCK_LLM": "false", "LLM_PROVIDER": "ollama"})
+    offline = StudioService(settings, offline=True)
+    live = StudioService(settings)
+    assert seen == [offline.budgets.llm_timeout_s, live.budgets.llm_timeout_s]
+    assert offline.budgets.llm_timeout_s == 4 * settings.llm_timeout_s
+    assert live.budgets.llm_timeout_s <= settings.studio_job_budget_s
