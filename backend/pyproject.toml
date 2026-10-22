@@ -6,7 +6,10 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "agent-framework-core==1.22.0",
     "agent-framework-openai==1.17.0",
+    "azure-identity==1.26.0",
+    "azure-storage-blob==12.31.0",
     "fastapi>=0.115",
+    "httpx>=0.28,<1",
     "pydantic>=2.8,<3",
     "uvicorn[standard]>=0.30",
 ]

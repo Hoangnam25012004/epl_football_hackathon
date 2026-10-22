@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "description": "Speech to text of a spoken claim (P2): the text only fills the claim box.",
+  "properties": {
+    "confidence": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "provider": {
+      "enum": [
+        "mock",
+        "azure"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "no_match",
+        "silence",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text",
+    "language",
+    "status",
+    "duration_ms",
+    "provider"
+  ],
+  "title": "RecognitionResult",
+  "type": "object"
+}

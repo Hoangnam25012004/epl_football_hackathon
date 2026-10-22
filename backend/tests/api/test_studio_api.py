@@ -108,6 +108,7 @@ def test_hello_echoes_the_profile_and_carries_the_studio_keys(played: Played) ->
         "player": None,
         "beginner": True,
         "metric": None,
+        "voice": None,  # Day 5: added, null without `voice` in the query
     }
 
 

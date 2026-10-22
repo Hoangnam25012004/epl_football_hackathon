@@ -24,3 +24,6 @@ htmlcov/
 .vscode/
 .idea/
 .playwright-mcp/
+
+# Day 5: local audio store (docs/day5-design.md section 8.8)
+.data/

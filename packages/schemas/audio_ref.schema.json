@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "description": "A clip of the server, named by its content (cacheable for ever).",
+  "properties": {
+    "clip_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Clip Id",
+      "type": "string"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "exact": {
+      "title": "Exact",
+      "type": "boolean"
+    },
+    "media_type": {
+      "enum": [
+        "audio/mpeg",
+        "audio/wav"
+      ],
+      "title": "Media Type",
+      "type": "string"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "clip_id",
+    "url",
+    "media_type",
+    "duration_ms",
+    "exact"
+  ],
+  "title": "AudioRef",
+  "type": "object"
+}

@@ -138,6 +138,8 @@ class StudioDirector:
         first = tuple(rule for rule in trigger.rules if rule not in self.seen_rules)
         view = self.host.view_at(trigger.seq)
         output = await self.crew.service.run(StudioJob(trigger=trigger, first_rules=first), view)
+        # the trace first: the Narrator places its spans after the job's (Day 5)
+        _put(self.traces, trigger.id, output.trace or (), MAX_TRACES)
         # a rule is met once an item carried it (a statistics rule only where a text names it)
         self.seen_rules.update(output.commentary.rules)
         _put(self.commentary, output.commentary.id, output.commentary, MAX_COMMENTARY)
@@ -149,7 +151,6 @@ class StudioDirector:
         if output.lower_third is not None:
             _put(self.lower_thirds, output.lower_third.id, output.lower_third, MAX_LOWER_THIRDS)
             self.host.publish_studio("lower_third", output.lower_third)
-        _put(self.traces, trigger.id, output.trace or (), MAX_TRACES)
         self.processed += 1
         self.degraded.update(output.degraded)
         self._lags_ms.append((self._clock() - offered) * 1000)

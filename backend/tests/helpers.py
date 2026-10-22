@@ -25,6 +25,9 @@ from pundit.orchestration.service import ClaimService, StaticSource
 # The Day 2 API tests run with the studio on (default) and again with STUDIO_ENABLED=false,
 # which must give exactly the Day 2 behaviour (docs/day3-design.md section 16.6).
 STUDIO_ON = os.environ.get("STUDIO_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+# Day 5: and again with TTS_PROVIDER=off, which must give exactly the Day 4 app
+# (docs/day5-design.md section 12.5); otherwise the API tests run with the mock voice
+TTS_ON = os.environ.get("TTS_PROVIDER", "mock").strip().lower() != "off"
 DAY2_HELLO_KEYS = {"match", "snapshot", "moments", "claims", "degraded"}
 # Day 4 adds `on_air` (the editors' lower-third decision) to the studio hello
 STUDIO_HELLO_KEYS = {"profile", "talking_points", "lower_thirds", "commentary", "recaps", "on_air"}
@@ -80,7 +83,9 @@ def run[T](coroutine: Coroutine[Any, Any, T]) -> T:
 
 
 def api_settings(**values: Any) -> Settings:
-    """Settings of an API test app: the studio follows STUDIO_ENABLED."""
+    """Settings of an API test app: the studio follows STUDIO_ENABLED, the voice
+    TTS_PROVIDER (mock unless it says off)."""
+    values.setdefault("tts_provider", "mock" if TTS_ON else "off")
     return Settings(studio_enabled=STUDIO_ON, **values)
 
 

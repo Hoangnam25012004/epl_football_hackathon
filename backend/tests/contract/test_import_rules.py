@@ -1,8 +1,9 @@
-"""One-way imports (design section 2.3):
-domain <- stats <- state <- engine <- agents <- llm <- orchestration <- api <- cli.
+"""One-way imports (design section 2.3; Day 5 adds `speech`, docs/day5-design.md 2.5):
+domain <- stats <- state <- engine <- agents <- llm <- orchestration <- speech <- api <- cli.
 
 Agents never import Microsoft Agent Framework, FastAPI or HTTP clients (principle L6); MAF lives
-in orchestration and llm.maf_backend only; FastAPI in api only.
+in orchestration and llm.maf_backend only; FastAPI in api only; HTTP and the Azure SDK of the
+voice in the speech modules that talk to Azure.
 """
 
 import ast
@@ -10,12 +11,16 @@ from pathlib import Path
 
 import pundit
 
-LAYERS = ["domain", "stats", "state", "engine", "agents", "llm", "orchestration", "api", "cli"]
+LAYERS = [
+    "domain", "stats", "state", "engine", "agents", "llm", "orchestration", "speech", "api",
+    "cli",
+]  # fmt: skip
 PACKAGE = Path(pundit.__file__).parent
 EXTERNAL = {
     "agent_framework": {"orchestration", "llm.maf_backend"},
     "openai": {"llm.maf_backend"},
-    "httpx": {"llm.maf_backend"},
+    "httpx": {"llm.maf_backend", "speech.azure_tts", "speech.azure_stt", "speech.auth"},
+    "azure": {"llm.maf_backend", "speech.auth", "speech.durable"},
     "fastapi": {"api"},
     "starlette": {"api"},
     "uvicorn": {"cli"},

@@ -104,3 +104,11 @@ class CircuitBreaker:
         self._failures += 1
         if self._failures >= self.threshold and self._opened_at is None:
             self._opened_at = now
+
+    def trip(self, cooldown_s: float | None = None) -> None:
+        """Open now, for `cooldown_s` (default: the usual cooldown): a failure no retry can fix,
+        such as bad credentials (Day 5 voice)."""
+        wait = self.cooldown_s if cooldown_s is None else cooldown_s
+        self._failures = max(self._failures, self.threshold)
+        self._trial_since = None
+        self._opened_at = self._clock() + wait - self.cooldown_s

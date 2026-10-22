@@ -22,14 +22,17 @@ from pundit.agents.contracts import (
     TalkingPoint,
     TalkingPointStatus,
     TraceSpan,
+    VoiceGender,
 )
-from pundit.agents.personalize import ProfileError, parse_profile, render_lower_third, render_recap
+from pundit.agents.personalize import ProfileError, parse_profile, render_lower_third
+from pundit.agents.voices import voice_list
 from pundit.api.onair import OnAirCommand, OnAirError, OnAirState
 from pundit.api.panels import MAX_IDS, MAX_LAST, EventsPage, Period, StatsPanel, TimelineView
 from pundit.api.sessions import MatchSession, SessionManager, public_claim, public_talking_point
 from pundit.api.studio import StudioDirector, StudioKind
 from pundit.engine.rosters import roster_team
 from pundit.engine.scenarios import EXAMPLE_CLAIMS, SCENARIOS
+from pundit.speech.narrator import Narrator
 from pundit.state.match_state import MatchSnapshot
 
 router = APIRouter()
@@ -102,6 +105,28 @@ class StudioHealth(BaseModel):
     degraded: list[str]
 
 
+class SpeechHealth(BaseModel):
+    """The voice of the app (docs/day5-design.md section 9.4)."""
+
+    provider: str
+    languages: list[str]
+    voices: list[str]
+    store: str
+    breaker: str
+    degraded: list[str]
+    synthesized: int
+    cache_hits: int
+    durable_hits: int
+    throttled: int
+    guard_rejected: int
+    errors: dict[str, int]
+    chars_today: int
+    char_budget: int
+    latency_ms_p95: float | None
+    queue: int
+    stt: str
+
+
 class Health(BaseModel):
     status: Literal["ok"]
     llm_provider: str
@@ -110,6 +135,7 @@ class Health(BaseModel):
     sessions: int
     synthetic: bool = True
     studio: StudioHealth | None = None  # absent when STUDIO_ENABLED=false (the Day 2 shape)
+    speech: SpeechHealth | None = None  # absent when TTS_PROVIDER=off (the Day 4 shape)
 
 
 class TalkingPointStatusBody(BaseModel):
@@ -205,7 +231,15 @@ def _studio_health(sessions: SessionManager) -> StudioHealth | None:
 async def healthz(request: Request) -> Health:
     sessions = manager(request)
     service = sessions.service
+    # only the blocks that exist are set: STUDIO_ENABLED=false / TTS_PROVIDER=off keep the
+    # older shapes (response_model_exclude_unset)
+    blocks: dict[str, Any] = {}
     studio = _studio_health(sessions)
+    if studio is not None:
+        blocks["studio"] = studio
+    speech = _speech_health(request)
+    if speech is not None:
+        blocks["speech"] = speech
     return Health(
         status="ok",
         llm_provider=service.provider,
@@ -213,8 +247,27 @@ async def healthz(request: Request) -> Health:
         degraded=list(service.degraded_now()),
         sessions=len(sessions.sessions),
         synthetic=True,
-        **({"studio": studio} if studio is not None else {}),
+        **blocks,
     )
+
+
+def _speech_health(request: Request) -> SpeechHealth | None:
+    narrator = sessions_narrator(request)
+    if narrator is None:
+        return None
+    stats = narrator.stats()
+    voices = [v.voice for v in voice_list(narrator.settings.tts_languages, narrator.server_audio)]
+    keep = set(SpeechHealth.model_fields) - {"voices", "stt"}
+    return SpeechHealth(
+        **{k: v for k, v in stats.items() if k in keep},
+        voices=voices,
+        stt=narrator.settings.stt_provider,
+    )
+
+
+def sessions_narrator(request: Request) -> Narrator | None:
+    narrator: Narrator | None = getattr(request.app.state, "narrator", None)
+    return narrator
 
 
 @router.post("/matches", response_model=MatchInfo, response_model_exclude_unset=True)
@@ -472,8 +525,9 @@ async def get_recap(
     scope: RecapScope = "FULL",
     lang: Lang = "vi",
     mode: Register = "analyst",
+    voice: Annotated[VoiceGender | None, Query(description="read it aloud (Day 5)")] = None,
 ) -> RecapView:
-    _, director = _director(request, match_id)
+    session, director = _director(request, match_id)
     recap = director.recaps.get(scope)
     if recap is None:
         raise HTTPException(
@@ -481,18 +535,22 @@ async def get_recap(
             detail=f"recap_not_ready: the {scope} recap comes after "
             f"{'half-time' if scope == 'H1' else 'full time'}",
         )
-    return render_recap(recap, Profile(language=lang, mode=mode))
+    profile = Profile(language=lang, mode=mode, voice=voice)
+    return session.recap_view(recap, profile, live=voice is not None)
 
 
 @router.get("/matches/{match_id}/studio/{item_id}", response_model=StudioItemDetail)
 async def get_studio_item(match_id: str, item_id: str, request: Request) -> StudioItemDetail:
-    _, director = _director(request, match_id)
+    session, director = _director(request, match_id)
     found = director.find(item_id)
     if found is None:
         raise HTTPException(status_code=404, detail=f"unknown studio item {item_id!r}")
     kind, item = found
     payload = item.model_dump(mode="json")
-    return StudioItemDetail(kind=kind, item=payload, trace=list(director.trace_of(item_id)))
+    trace = list(director.trace_of(item_id))
+    if session.narrator is not None:  # Day 5: the Narrator's spans follow the studio job
+        trace += session.narrator.spans_of(item_id)
+    return StudioItemDetail(kind=kind, item=payload, trace=trace)
 
 
 @router.post("/matches/{match_id}/talking-points/{item_id}/status", response_model=TalkingPoint)

@@ -14,6 +14,10 @@ Day 4 (docs/day4-design.md section 3): pause / resume / speed stop only the repl
 the studio jobs; the on-air decisions of the editors; read-only panels (timeline, stats, events)
 on the current view; a restart tells the clients of the old session to reconnect once the new
 session is registered.
+
+Day 5 (docs/day5-design.md section 9.1): a viewer who turned the voice on gets a SpeechCue with
+each live commentary line and recap; the Narrator starts making the clip at once. `hello`, resync
+and REST never make a clip (nobody listens to the past).
 """
 
 import asyncio
@@ -21,6 +25,7 @@ import contextlib
 import logging
 from collections import OrderedDict
 from collections.abc import Callable
+from functools import cached_property
 from typing import Any, Literal
 
 from pundit.agents.context import build_match_context
@@ -28,16 +33,19 @@ from pundit.agents.contracts import (
     ClaimRequest,
     ClaimResult,
     CommentaryItem,
+    CommentaryView,
     FactView,
     LowerThird,
     MatchContext,
     Moment,
     Profile,
     Recap,
+    RecapView,
     RuleId,
     TalkingPoint,
     TalkingPointStatus,
 )
+from pundit.agents.narration import commentary_script, recap_moment_lines
 from pundit.agents.personalize import (
     metric_facts,
     render_commentary,
@@ -45,6 +53,7 @@ from pundit.agents.personalize import (
     render_recap,
     tracker_facts,
 )
+from pundit.agents.spoken import SpokenLexicon
 from pundit.agents.triggers import TriggerFeed
 from pundit.api.hub import DEFAULT_QUEUE_SIZE, Client, Hub
 from pundit.api.onair import OnAirCommand, OnAirState, apply_command
@@ -67,6 +76,7 @@ from pundit.engine.generator import generate
 from pundit.engine.match import GeneratedMatch
 from pundit.engine.replay import Clock, RealClock, replay
 from pundit.orchestration.service import ClaimService
+from pundit.speech.narrator import Narrator
 from pundit.state.match_state import MatchSnapshot, MatchState
 
 log = logging.getLogger("pundit.sessions")
@@ -94,9 +104,11 @@ class MatchSession:
         clock: Clock | None = None,
         queue_size: int = DEFAULT_QUEUE_SIZE,
         studio: StudioCrew | None = None,
+        narrator: Narrator | None = None,
     ) -> None:
         self.match = match
         self.service = service
+        self.narrator = narrator if studio is not None else None  # the voice reads the studio
         self.speed = speed
         self.from_minute = from_minute
         self.clock = clock or RealClock()
@@ -227,10 +239,56 @@ class MatchSession:
 
     # ------------------------------------------------------------------ studio (Day 3)
 
+    @cached_property
+    def lexicon(self) -> SpokenLexicon:
+        """How the names of this match are read aloud (the same at every seq)."""
+        return SpokenLexicon.from_match(self.context)
+
+    def _job_end_ms(self, item_id: str) -> float:
+        """Where the studio job of an item ended on its trace (the Narrator's spans follow)."""
+        if self.director is None:
+            return 0.0
+        spans = self.director.trace_of(item_id)
+        return max((s.start_ms + s.duration_ms for s in spans), default=0.0)
+
+    def _commentary_speech(
+        self, view: CommentaryView, item: CommentaryItem, profile: Profile
+    ) -> CommentaryView:
+        """A live line for a viewer who listens: the cue (and the clip, made in background)."""
+        narrator, voice = self.narrator, profile.voice
+        if narrator is None or voice is None or not view.speak:
+            return view
+        script = commentary_script(view)
+        if script is None:
+            return view
+        cue = narrator.cue(
+            script, self.lexicon, gender=voice, item_id=item.id, priority=item.excitement,
+            session_speed=self.speed, match_id=self.match_id,
+            trace_offset_ms=self._job_end_ms(item.id),
+        )  # fmt: skip
+        return view if cue is None else view.model_copy(update={"speech": cue})
+
+    def recap_view(self, recap: Recap, profile: Profile, *, live: bool) -> RecapView:
+        """A recap for one viewer; read aloud (with its key moments) when `live` and the viewer
+        listens: the recap REST endpoint and live messages, never hello."""
+        view = render_recap(recap, profile)
+        narrator, director = self.narrator, self.director
+        if not live or narrator is None or director is None or profile.voice is None:
+            return view
+        lines = recap_moment_lines(
+            recap, self.moments, director.commentary, profile.language, profile.mode
+        )
+        cue = narrator.recap_cue(
+            view, lines, recap.as_of_seq, self.lexicon, gender=profile.voice,
+            match_id=self.match_id,
+        )  # fmt: skip
+        return view if cue is None else view.model_copy(update={"speech": cue})
+
     def render_commentary(
-        self, item: CommentaryItem, profile: Profile, seen: set[RuleId]
+        self, item: CommentaryItem, profile: Profile, seen: set[RuleId], *, live: bool = False
     ) -> tuple[dict[str, Any], RuleId | None]:
-        """One commentary item for one viewer (JSON), and the rule it explained in full."""
+        """One commentary item for one viewer (JSON), and the rule it explained in full. A live
+        message of a viewer who listens also carries its speech cue."""
 
         def tracker() -> tuple[FactView, ...] | None:
             if profile.player is None:
@@ -245,6 +303,8 @@ class MatchSession:
         view, shown = render_commentary(
             item, profile, self.context, seen=seen, tracker=tracker, metric_facts=metric
         )
+        if live:
+            view = self._commentary_speech(view, item, profile)
         return view.model_dump(mode="json"), shown
 
     def publish_studio(self, kind: StudioKind, item: StudioItem) -> None:
@@ -265,12 +325,14 @@ class MatchSession:
             self.hub.publish_each("lower_third", lower_third_for)
         elif isinstance(item, Recap):
             recap = item
-            recaps: dict[tuple[str, str], dict[str, Any]] = {}
+            recaps: dict[tuple[str, str, str | None], dict[str, Any]] = {}
 
             def recap_for(client: Client) -> dict[str, Any]:
-                key = (client.profile.language, client.profile.mode)
+                profile = client.profile
+                key = (profile.language, profile.mode, profile.voice)
                 if key not in recaps:
-                    recaps[key] = render_recap(recap, client.profile).model_dump(mode="json")
+                    view = self.recap_view(recap, profile, live=True)
+                    recaps[key] = view.model_dump(mode="json")
                 return recaps[key]
 
             self.hub.publish_each("recap", recap_for)
@@ -290,7 +352,7 @@ class MatchSession:
             )
             key = (profile.key(), seen)
             if key not in rendered:
-                rendered[key] = self.render_commentary(item, profile, client.seen_rules)
+                rendered[key] = self.render_commentary(item, profile, client.seen_rules, live=True)
             payload, shown = rendered[key]
             if shown is not None:
                 client.seen_rules.add(shown)
@@ -518,9 +580,11 @@ class SessionManager:
         queue_size: int = DEFAULT_QUEUE_SIZE,
         max_sessions: int = 16,
         studio: StudioCrew | None = None,
+        narrator: Narrator | None = None,
     ) -> None:
         self.service = service
         self.studio = studio
+        self.narrator = narrator  # one for the app: clips are shared by every session
         self.clock_factory = clock_factory
         self.queue_size = queue_size
         self.max_sessions = max_sessions
@@ -565,6 +629,7 @@ class SessionManager:
                 clock=self.clock_factory(),
                 queue_size=self.queue_size,
                 studio=self.studio,
+                narrator=self.narrator,
             )
             self.sessions[match_id] = session
         if existing is not None:

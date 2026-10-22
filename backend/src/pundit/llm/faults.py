@@ -114,3 +114,64 @@ class FaultCounter:
             return None
         queue[0].count -= 1
         return queue[0].kind
+
+
+# Day 5: faults of the mock speech synthesizer (docs/day5-design.md section 8.2)
+TtsFaultKind = Literal["error", "timeout", "throttle", "bad_audio", "auth"]
+TTS_KINDS: tuple[TtsFaultKind, ...] = get_args(TtsFaultKind)
+
+
+@dataclass(frozen=True)
+class TtsFault:
+    kind: TtsFaultKind
+    count: int | None  # None: every call
+
+
+@dataclass(frozen=True)
+class TtsFaultPlan:
+    """`MOCK_TTS_FAULTS=timeout:2,error` means: the next two synthesis calls time out, then
+    every call fails. Unlike the LLM plan the counters are global to the synthesizer: speech is
+    not grouped by claim."""
+
+    faults: tuple[TtsFault, ...] = ()
+
+    @classmethod
+    def parse(cls, text: str) -> "TtsFaultPlan":
+        faults: list[TtsFault] = []
+        for item in (part.strip() for part in text.split(",")):
+            if not item:
+                continue
+            pieces = [p.strip() for p in item.split(":")]
+            if len(pieces) not in (1, 2) or pieces[0] not in TTS_KINDS:
+                raise ValueError(f"{item!r}: use kind[:count] with kind in {', '.join(TTS_KINDS)}")
+            count: int | None = None
+            if len(pieces) == 2:
+                if not pieces[1].isdigit() or int(pieces[1]) < 1:
+                    raise ValueError(f"{item!r}: count must be a whole number >= 1")
+                count = int(pieces[1])
+            kind = next(k for k in TTS_KINDS if k == pieces[0])
+            faults.append(TtsFault(kind, count))
+        return cls(tuple(faults))
+
+
+@dataclass
+class _TtsLeft:
+    kind: TtsFaultKind
+    count: int | None
+
+
+class TtsFaultCounter:
+    """The faults left; `take` consumes the fault of one call (or None)."""
+
+    def __init__(self, plan: TtsFaultPlan) -> None:
+        self._left = [_TtsLeft(f.kind, f.count) for f in plan.faults]
+
+    def take(self) -> TtsFaultKind | None:
+        while self._left and self._left[0].count == 0:
+            self._left.pop(0)
+        if not self._left:
+            return None
+        entry = self._left[0]
+        if entry.count is not None:
+            entry.count -= 1
+        return entry.kind

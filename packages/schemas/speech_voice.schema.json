@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "description": "A voice the fan player can choose (GET /speech/voices).",
+  "properties": {
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "gender": {
+      "enum": [
+        "female",
+        "male"
+      ],
+      "title": "Gender",
+      "type": "string"
+    },
+    "lang": {
+      "enum": [
+        "vi-VN",
+        "en-GB"
+      ],
+      "title": "Lang",
+      "type": "string"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "server_audio": {
+      "title": "Server Audio",
+      "type": "boolean"
+    },
+    "voice": {
+      "title": "Voice",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lang",
+    "language",
+    "gender",
+    "voice",
+    "display_name",
+    "server_audio"
+  ],
+  "title": "SpeechVoice",
+  "type": "object"
+}

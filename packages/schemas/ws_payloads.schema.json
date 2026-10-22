@@ -176,6 +176,47 @@
       "title": "AssertionResult",
       "type": "object"
     },
+    "AudioRef": {
+      "additionalProperties": false,
+      "description": "A clip of the server, named by its content (cacheable for ever).",
+      "properties": {
+        "clip_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Clip Id",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "exact": {
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "media_type": {
+          "enum": [
+            "audio/mpeg",
+            "audio/wav"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clip_id",
+        "url",
+        "media_type",
+        "duration_ms",
+        "exact"
+      ],
+      "title": "AudioRef",
+      "type": "object"
+    },
     "BallDeadEvent": {
       "additionalProperties": false,
       "properties": {
@@ -968,6 +1009,17 @@
           "default": false,
           "title": "Speak",
           "type": "boolean"
+        },
+        "speech": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpeechCue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "title": "Text",
@@ -3974,6 +4026,22 @@
           ],
           "default": null,
           "title": "Team"
+        },
+        "voice": {
+          "anyOf": [
+            {
+              "enum": [
+                "female",
+                "male"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Voice"
         }
       },
       "title": "Profile",
@@ -4054,6 +4122,17 @@
           ],
           "title": "Source",
           "type": "string"
+        },
+        "speech": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpeechCue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "stats": {
           "default": [],
@@ -4375,6 +4454,155 @@
         "speed_kmh"
       ],
       "title": "ShotEvent",
+      "type": "object"
+    },
+    "SpeechCue": {
+      "additionalProperties": false,
+      "description": "What to read aloud for one item and one voice; `audio` or `note`, never both.",
+      "properties": {
+        "audio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudioRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "gender": {
+          "enum": [
+            "female",
+            "male"
+          ],
+          "title": "Gender",
+          "type": "string"
+        },
+        "lang": {
+          "enum": [
+            "vi-VN",
+            "en-GB"
+          ],
+          "title": "Lang",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "enum": [
+                "server_off",
+                "speed",
+                "circuit_open",
+                "throttled",
+                "budget",
+                "guard"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "preset": {
+          "enum": [
+            "calm",
+            "lively",
+            "excited",
+            "peak",
+            "burst",
+            "tension",
+            "explainer",
+            "recap",
+            "greeting"
+          ],
+          "title": "Preset",
+          "type": "string"
+        },
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/SpeechSegment"
+          },
+          "maxItems": 24,
+          "title": "Segments",
+          "type": "array"
+        },
+        "voice": {
+          "title": "Voice",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lang",
+        "voice",
+        "gender",
+        "preset",
+        "segments"
+      ],
+      "title": "SpeechCue",
+      "type": "object"
+    },
+    "SpeechSegment": {
+      "additionalProperties": false,
+      "description": "One part of a spoken script: the words read (numbers written as words) and their prosody,\nshared by the SSML of the server and the browser's voice (docs/day5-design.md V4).",
+      "properties": {
+        "pause_before_ms": {
+          "default": 0,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Pause Before Ms",
+          "type": "integer"
+        },
+        "pitch": {
+          "maximum": 1.5,
+          "minimum": 0.5,
+          "title": "Pitch",
+          "type": "number"
+        },
+        "preset": {
+          "enum": [
+            "calm",
+            "lively",
+            "excited",
+            "peak",
+            "burst",
+            "tension",
+            "explainer",
+            "recap",
+            "greeting"
+          ],
+          "title": "Preset",
+          "type": "string"
+        },
+        "rate": {
+          "maximum": 2.0,
+          "minimum": 0.5,
+          "title": "Rate",
+          "type": "number"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "volume": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Volume",
+          "type": "number"
+        }
+      },
+      "required": [
+        "text",
+        "preset",
+        "rate",
+        "pitch",
+        "volume"
+      ],
+      "title": "SpeechSegment",
       "type": "object"
     },
     "StatusPayload": {

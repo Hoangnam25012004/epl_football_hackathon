@@ -1,5 +1,118 @@
 {
   "$defs": {
+    "SpeechHealth": {
+      "description": "The voice of the app (docs/day5-design.md section 9.4).",
+      "properties": {
+        "breaker": {
+          "title": "Breaker",
+          "type": "string"
+        },
+        "cache_hits": {
+          "title": "Cache Hits",
+          "type": "integer"
+        },
+        "char_budget": {
+          "title": "Char Budget",
+          "type": "integer"
+        },
+        "chars_today": {
+          "title": "Chars Today",
+          "type": "integer"
+        },
+        "degraded": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Degraded",
+          "type": "array"
+        },
+        "durable_hits": {
+          "title": "Durable Hits",
+          "type": "integer"
+        },
+        "errors": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Errors",
+          "type": "object"
+        },
+        "guard_rejected": {
+          "title": "Guard Rejected",
+          "type": "integer"
+        },
+        "languages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Languages",
+          "type": "array"
+        },
+        "latency_ms_p95": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latency Ms P95"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "queue": {
+          "title": "Queue",
+          "type": "integer"
+        },
+        "store": {
+          "title": "Store",
+          "type": "string"
+        },
+        "stt": {
+          "title": "Stt",
+          "type": "string"
+        },
+        "synthesized": {
+          "title": "Synthesized",
+          "type": "integer"
+        },
+        "throttled": {
+          "title": "Throttled",
+          "type": "integer"
+        },
+        "voices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Voices",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provider",
+        "languages",
+        "voices",
+        "store",
+        "breaker",
+        "degraded",
+        "synthesized",
+        "cache_hits",
+        "durable_hits",
+        "throttled",
+        "guard_rejected",
+        "errors",
+        "chars_today",
+        "char_budget",
+        "latency_ms_p95",
+        "queue",
+        "stt"
+      ],
+      "title": "SpeechHealth",
+      "type": "object"
+    },
     "StudioHealth": {
       "properties": {
         "degraded": {
@@ -63,6 +176,17 @@
     "sessions": {
       "title": "Sessions",
       "type": "integer"
+    },
+    "speech": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SpeechHealth"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "status": {
       "const": "ok",

@@ -111,6 +111,11 @@ def parse_profile(params: Mapping[str, str], match: MatchContext) -> Profile:
         spec = REGISTRY.get(metric)
         if spec is None or spec.scope == "match":
             errors.append(f"metric {metric!r} is not a team metric of the catalog")
+    voice = (params.get("voice") or "").strip().lower() or None
+    if voice == "off":
+        voice = None
+    elif voice is not None and voice not in ("female", "male"):
+        errors.append(f"voice must be female, male or off, got {voice!r}")
     if errors:
         raise ProfileError("; ".join(errors))
     return Profile(
@@ -120,6 +125,7 @@ def parse_profile(params: Mapping[str, str], match: MatchContext) -> Profile:
         player=player,
         beginner=beginner,
         metric=metric,
+        voice=voice,  # type: ignore[arg-type]
     )
 
 

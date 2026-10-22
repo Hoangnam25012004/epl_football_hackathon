@@ -172,4 +172,12 @@ def test_env_example_is_a_valid_mock_configuration() -> None:
     values = read_env_file(example)
     assert "LLM_API_KEY" in values and values["LLM_API_KEY"] == ""  # names only, no secret
     assert "GITHUB_TOKEN" not in values
-    assert Settings.from_env(values).provider == "mock"
+    for secret in ("SPEECH_KEY", "AUDIO_BLOB_CONNECTION_STRING", "FOUNDRY_API_KEY"):
+        assert values[secret] == "", secret
+    settings = Settings.from_env(values)
+    assert settings.provider == "mock"
+    assert (settings.tts_provider, settings.stt_provider, settings.audio_store) == (
+        "mock",
+        "off",
+        "local",
+    )

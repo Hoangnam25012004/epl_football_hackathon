@@ -14,11 +14,13 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
 from pundit.agents.context import build_match_context
 from pundit.agents.contracts import (
+    AudioRef,
     ClaimRequest,
     ClaimResult,
     CommentaryView,
@@ -29,7 +31,10 @@ from pundit.agents.contracts import (
     Moment,
     Profile,
     RecapView,
+    RecognitionResult,
     RuleId,
+    SpeechCue,
+    SpeechVoice,
     StudioOutput,
     TalkingPoint,
     Trigger,
@@ -43,6 +48,7 @@ from pundit.agents.personalize import (
     render_commentary,
     tracker_facts,
 )
+from pundit.agents.prosody import PRESETS
 from pundit.agents.recap import RECAP_SCOPES, build_recap_pack
 from pundit.agents.triggers import detect_triggers
 from pundit.domain.errors import InvalidEventError, PunditError
@@ -241,22 +247,34 @@ def _schemas() -> dict[str, str]:
         "timeline.schema.json": serialized(TimelineView),
         "ws_payloads.schema.json": serialized(WsPayloads),
     }
-    return day4 | {
-        "event.schema.json": dump(EVENT_ADAPTER.json_schema(mode="serialization")),
-        "match_meta.schema.json": dump(MatchMeta.model_json_schema(mode="serialization")),
-        "stat_result.schema.json": dump(StatResult.model_json_schema(mode="serialization")),
-        "claim_request.schema.json": dump(ClaimRequest.model_json_schema(mode="validation")),
-        "claim_result.schema.json": dump(ClaimResult.model_json_schema(mode="serialization")),
-        "moment.schema.json": dump(Moment.model_json_schema(mode="serialization")),
-        "ws_message.schema.json": dump(WsMessage.model_json_schema(mode="serialization")),
-        "talking_point.schema.json": dump(TalkingPoint.model_json_schema(mode="serialization")),
-        "lower_third_view.schema.json": dump(
-            LowerThirdView.model_json_schema(mode="serialization")
-        ),
-        "commentary_view.schema.json": dump(CommentaryView.model_json_schema(mode="serialization")),
-        "recap_view.schema.json": dump(RecapView.model_json_schema(mode="serialization")),
-        "profile.schema.json": dump(Profile.model_json_schema(mode="validation")),
+    day5 = {  # the voice (docs/day5-design.md section 3.6)
+        "speech_cue.schema.json": serialized(SpeechCue),
+        "audio_ref.schema.json": serialized(AudioRef),
+        "speech_voice.schema.json": serialized(SpeechVoice),
+        "recognition_result.schema.json": serialized(RecognitionResult),
     }
+    return (
+        day4
+        | day5
+        | {
+            "event.schema.json": dump(EVENT_ADAPTER.json_schema(mode="serialization")),
+            "match_meta.schema.json": dump(MatchMeta.model_json_schema(mode="serialization")),
+            "stat_result.schema.json": dump(StatResult.model_json_schema(mode="serialization")),
+            "claim_request.schema.json": dump(ClaimRequest.model_json_schema(mode="validation")),
+            "claim_result.schema.json": dump(ClaimResult.model_json_schema(mode="serialization")),
+            "moment.schema.json": dump(Moment.model_json_schema(mode="serialization")),
+            "ws_message.schema.json": dump(WsMessage.model_json_schema(mode="serialization")),
+            "talking_point.schema.json": dump(TalkingPoint.model_json_schema(mode="serialization")),
+            "lower_third_view.schema.json": dump(
+                LowerThirdView.model_json_schema(mode="serialization")
+            ),
+            "commentary_view.schema.json": dump(
+                CommentaryView.model_json_schema(mode="serialization")
+            ),
+            "recap_view.schema.json": dump(RecapView.model_json_schema(mode="serialization")),
+            "profile.schema.json": dump(Profile.model_json_schema(mode="validation")),
+        }
+    )
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
@@ -578,6 +596,148 @@ def _cmd_recap(args: argparse.Namespace) -> int:
                 f"  {span.span_id} {indent}{span.agent:<12} {span.kind:<9} {span.name:<18} "
                 f"{span.status:<9} attempt {span.attempt} {span.duration_ms:9.1f} ms{error}"
             )
+    if args.audio:  # Day 5: the recap read aloud, with its key moments
+        return _recap_audio(args, match)
+    return 0
+
+
+def _voice_settings(provider: str | None) -> Settings:
+    """Settings of a voice command: the .env file and the environment, with the provider of the
+    command line (TTS_PROVIDER)."""
+    env = {**read_env_file(ENV_FILE), **os.environ}
+    if provider:
+        env["TTS_PROVIDER"] = provider
+    return Settings.from_env(env)
+
+
+def _cmd_speak(args: argparse.Namespace) -> int:
+    """Read one sentence aloud (dev tool): the spoken words, the SSML, SpeechGuard, the audio."""
+    from pundit.agents.narration import ScriptPart, SpeechScript
+    from pundit.agents.speech_cue import draft_cue
+    from pundit.agents.spoken import EMPTY_LEXICON, SpokenLexicon
+    from pundit.agents.ssml import clip_id
+    from pundit.agents.voices import voice_for
+    from pundit.speech.narrator import build_synthesizer
+    from pundit.speech.ports import SynthesisRequest
+
+    lexicon = EMPTY_LEXICON
+    if args.scenario:
+        match = generate(args.scenario, args.seed)
+        first = LogView.from_events(match.meta, match.events[:1])
+        lexicon = SpokenLexicon.from_match(build_match_context(first))
+    voice = voice_for(args.lang, args.voice)
+    script = SpeechScript(
+        "commentary", args.lang, (ScriptPart("commentary", args.text, args.preset),)
+    )
+    draft = draft_cue(script, voice, lexicon)
+    print(f"spoken  {' | '.join(s.text for s in draft.segments)}")
+    print(f"voice   {voice.name}, preset {args.preset}, about {draft.estimate_ms} ms, "
+          f"{draft.billable_chars} billable characters")  # fmt: skip
+    print(f"ssml    {draft.ssml}")
+    if not draft.report.passed:
+        for problem in draft.report.problems:
+            print(f"GUARD   {problem.code}: {problem.detail}")
+        return 1
+    print("guard   passed (a typed text is not verified content: dev use only)")
+    if args.ssml_only or not args.out:
+        return 0
+    settings = _voice_settings(args.provider)
+    synthesizer = build_synthesizer(settings)
+    if synthesizer is None:
+        print("error: no synthesizer: use --provider mock or azure")
+        return 2
+    request = SynthesisRequest(
+        clip_id=clip_id(synthesizer.name, voice.name, synthesizer.output_format, draft.ssml),
+        ssml=draft.ssml, voice=voice.name, lang=voice.lang, kind="commentary", priority=3,
+        billable_chars=draft.billable_chars, estimate_ms=draft.estimate_ms,
+        segment_offsets_ms=draft.segment_offsets_ms,
+    )  # fmt: skip
+
+    async def once() -> tuple[bytes, int, str]:
+        try:
+            audio = await synthesizer.synthesize(request, timeout_s=settings.tts_recap_timeout_s)
+        finally:
+            await synthesizer.aclose()
+        return audio.data, audio.duration_ms, audio.media_type
+
+    data, duration, media_type = asyncio.run(once())
+    Path(args.out).write_bytes(data)
+    print(f"wrote   {args.out} ({media_type}, {duration} ms, provider {synthesizer.name})")
+    return 0
+
+
+def _choices(text: str, allowed: tuple[str, ...], what: str) -> list[str]:
+    values = [part.strip() for part in text.split(",") if part.strip()]
+    bad = [v for v in values if v not in allowed]
+    if bad or not values:
+        raise ValueError(f"{what} must be among {', '.join(allowed)}, got {text!r}")
+    return values
+
+
+def _cmd_tts(args: argparse.Namespace) -> int:
+    """`pundit tts warm`: make every clip of a demo match into the durable store."""
+    from pundit.speech.narrator import build_narrator
+    from pundit.speech.warm import warm_match
+
+    settings = _voice_settings(args.provider)
+    narrator = build_narrator(settings)
+    if narrator is None or not narrator.server_audio:
+        print("error: warming needs server audio: TTS_PROVIDER=mock or azure")
+        return 2
+    voices = _choices(args.voices, ("female", "male"), "--voices")
+    modes = _choices(args.modes, ("casual", "analyst"), "--modes")
+    match = _load(args)
+
+    async def warm() -> Any:
+        try:
+            return await warm_match(
+                narrator, match, voices=voices, modes=modes,  # type: ignore[arg-type]
+                beginner=(False, True) if args.beginner else (False,),
+            )  # fmt: skip
+        finally:
+            await narrator.aclose()
+
+    report = asyncio.run(warm())
+    store = narrator.durable.name if narrator.durable is not None else "none"
+    print(
+        f"{match.meta.match_id} | tts warm | provider {settings.tts_provider} | store {store} | "
+        f"{report.made} clips ready, {report.failed} not made, {report.seconds} s | synthetic data"
+    )
+    for note, count in sorted(report.notes.items()):
+        print(f"  not made: {note} x{count}")
+    stats = narrator.stats()
+    print(
+        f"  synthesized {stats['synthesized']}, cache hits {stats['cache_hits']}, durable hits "
+        f"{stats['durable_hits']}, {stats['chars_today']} billable characters"
+    )
+    return 0 if report.failed == 0 else 1
+
+
+def _recap_audio(args: argparse.Namespace, match: GeneratedMatch) -> int:
+    from pundit.speech.narrator import build_narrator
+    from pundit.speech.warm import recap_clip
+
+    settings = _voice_settings(args.tts_provider)
+    narrator = build_narrator(settings)
+    if narrator is None or not narrator.server_audio:
+        print("error: --audio needs server audio: TTS_PROVIDER=mock or azure")
+        return 2
+
+    async def make() -> Any:
+        try:
+            return await recap_clip(
+                narrator, match, scope=args.scope, mode=args.mode, gender=args.voice
+            )
+        finally:
+            await narrator.aclose()
+
+    result = asyncio.run(make())
+    if isinstance(result, str):
+        print(f"error: no audio for the recap ({result})")
+        return 1
+    Path(args.audio).write_bytes(result.path.read_bytes())
+    print(f"wrote {args.audio} ({result.media_type}, {result.duration_ms / 1000:.1f} s, "
+          f"voice {args.voice})")  # fmt: skip
     return 0
 
 
@@ -740,7 +900,31 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=["analyst", "casual"], default="analyst")
     p.add_argument("--provider", choices=providers, default="mock")
     p.add_argument("--trace", action="store_true", help="print the agent trace")
+    p.add_argument("--audio", help="also write the recap read aloud to this file (Day 5)")
+    p.add_argument("--voice", choices=["female", "male"], default="female")
+    p.add_argument("--tts-provider", choices=["mock", "azure"], default=None)
     p.set_defaults(func=_cmd_recap)
+
+    p = sub.add_parser("speak", help="read a sentence aloud: spoken words, SSML, guard, audio")
+    p.add_argument("--text", required=True)
+    p.add_argument("--lang", choices=["vi"], default="vi")
+    p.add_argument("--voice", choices=["female", "male"], default="female")
+    p.add_argument("--preset", choices=sorted(PRESETS), default="calm")
+    p.add_argument("--scenario", choices=sorted(SCENARIOS), help="read its team / player names")
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--out", help="write the audio here (.wav with mock, .mp3 with azure)")
+    p.add_argument("--provider", choices=["mock", "azure"], default=None)
+    p.add_argument("--ssml-only", action="store_true", help="print, do not synthesize")
+    p.set_defaults(func=_cmd_speak)
+
+    p = sub.add_parser("tts", help="make the voice clips of a match ahead of time")
+    p.add_argument("action", choices=["warm"])
+    source(p)
+    p.add_argument("--voices", default="female,male", help="female,male")
+    p.add_argument("--modes", default="casual,analyst", help="casual,analyst")
+    p.add_argument("--beginner", action="store_true", help="also the 'new to football' lines")
+    p.add_argument("--provider", choices=["mock", "azure"], default=None)
+    p.set_defaults(func=_cmd_tts)
 
     p = sub.add_parser("serve", help="run the API (REST + WebSocket) and, with --ui, the UI")
     p.add_argument("--host", default="127.0.0.1")

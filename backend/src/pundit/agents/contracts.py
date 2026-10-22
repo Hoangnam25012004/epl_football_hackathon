@@ -111,6 +111,18 @@ TalkingAngle = Literal["headline", "stat", "story"]
 TalkingPointStatus = Literal["new", "approved", "dismissed", "pinned"]
 LowerThirdTemplate = Literal["score_update", "team_compare", "player_card", "momentum"]
 RecapScope = Literal["H1", "FULL"]
+# Day 5 voice (docs/day5-design.md section 3)
+VoiceGender = Literal["female", "male"]
+SpeechLang = Literal["vi-VN", "en-GB"]
+ProsodyPreset = Literal[
+    "calm", "lively", "excited", "peak", "burst", "tension", "explainer", "recap", "greeting",
+]  # fmt: skip
+# why a cue has no audio of the server: server_off / circuit_open / throttled / budget -> the
+# browser reads it; speed -> nobody reads it; guard -> never read (the script failed SpeechGuard)
+SpeechNote = Literal["server_off", "speed", "circuit_open", "throttled", "budget", "guard"]
+AudioMediaType = Literal["audio/mpeg", "audio/wav"]
+CLIP_ID_PATTERN = r"^[0-9a-f]{32}$"
+MAX_SPEECH_SEGMENTS = 24  # a recap: opening, up to 6 paragraphs, header, up to 8 moments, closing
 
 
 class Contract(BaseModel):
@@ -746,11 +758,13 @@ class Profile(Contract):
     player: PlayerId | None = None  # player focus
     beginner: bool = False  # "Người mới xem"
     metric: str | None = None  # one metric only
+    voice: VoiceGender | None = None  # Day 5: read the commentary aloud with this voice
 
     def key(self) -> str:
         beginner = "1" if self.beginner else "0"
         parts = (self.mode, self.language, self.team, self.player, beginner, self.metric)
-        return "|".join(part or "-" for part in parts)
+        key = "|".join(part or "-" for part in parts)
+        return f"{key}|{self.voice}" if self.voice else key  # unchanged without a voice
 
 
 class FactView(Contract):
@@ -763,6 +777,70 @@ class RuleView(Contract):
     title: str
     text: str
     depth: Literal["full", "short"]
+
+
+class SpeechSegment(Contract):
+    """One part of a spoken script: the words read (numbers written as words) and their prosody,
+    shared by the SSML of the server and the browser's voice (docs/day5-design.md V4)."""
+
+    text: str = Field(min_length=1)
+    preset: ProsodyPreset
+    rate: float = Field(ge=0.5, le=2.0)  # 1.0 = the voice's own pace
+    pitch: float = Field(ge=0.5, le=1.5)
+    volume: float = Field(ge=0.0, le=1.0)
+    pause_before_ms: int = Field(default=0, ge=0, le=1000)
+
+
+class AudioRef(Contract):
+    """A clip of the server, named by its content (cacheable for ever)."""
+
+    clip_id: str = Field(pattern=CLIP_ID_PATTERN)
+    url: str  # "/audio/{clip_id}.mp3": same origin
+    media_type: AudioMediaType
+    duration_ms: int = Field(ge=0)
+    exact: bool  # False: estimated, the clip is not made yet
+
+
+class SpeechCue(Contract):
+    """What to read aloud for one item and one voice; `audio` or `note`, never both."""
+
+    lang: SpeechLang
+    voice: str  # Azure short name, e.g. "vi-VN-HoaiMyNeural"
+    gender: VoiceGender
+    preset: ProsodyPreset  # of the main part
+    segments: tuple[SpeechSegment, ...] = Field(max_length=MAX_SPEECH_SEGMENTS)
+    audio: AudioRef | None = None
+    note: SpeechNote | None = None
+
+    @model_validator(mode="after")
+    def _audio_or_note(self) -> Self:
+        if (self.audio is None) == (self.note is None):
+            raise ValueError("a speech cue has either audio or a note")
+        if (self.note == "guard") != (not self.segments):
+            raise ValueError("only a cue rejected by SpeechGuard has no segments")
+        return self
+
+
+class SpeechVoice(Contract):
+    """A voice the fan player can choose (GET /speech/voices)."""
+
+    lang: SpeechLang
+    language: Lang
+    gender: VoiceGender
+    voice: str
+    display_name: str
+    server_audio: bool  # False: the browser reads the scripts itself
+
+
+class RecognitionResult(Contract):
+    """Speech to text of a spoken claim (P2): the text only fills the claim box."""
+
+    text: str
+    language: Lang
+    status: Literal["ok", "no_match", "silence", "error"]
+    confidence: float | None = None
+    duration_ms: int = Field(ge=0)
+    provider: Literal["mock", "azure"]
 
 
 class CommentaryView(Contract):
@@ -787,6 +865,7 @@ class CommentaryView(Contract):
     speak: bool = False
     excitement: int = 0
     source: ItemSource
+    speech: SpeechCue | None = None  # Day 5: live messages of a viewer who turned the voice on
 
 
 class GraphicStatView(Contract):
@@ -837,6 +916,7 @@ class RecapView(Contract):
     revision: int
     source: ItemSource
     degraded: tuple[Degraded, ...] = ()
+    speech: SpeechCue | None = None  # Day 5: the recap read aloud (with its key moments)
 
 
 # Model drafts: what an LLM port returns, before the Guardrail

@@ -12,14 +12,24 @@ GitHub Models was retired on 2026-07-30 and is no longer a provider.
 """
 
 import os
-from collections.abc import Mapping
+import tempfile
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from pundit.agents.contracts import Lang
+from pundit.agents.voices import SPOKEN_LANGUAGES
 from pundit.domain.errors import PunditError
-from pundit.llm.faults import FaultPlan
+from pundit.llm.faults import FaultPlan, TtsFaultPlan
+
+# Day 5 voice (docs/day5-design.md section 3.7)
+TtsProvider = Literal["off", "browser", "mock", "azure"]
+AudioStoreKind = Literal["none", "local", "blob"]
+SttProvider = Literal["off", "mock", "azure"]
+DEFAULT_AUDIO_STORE_DIR = Path(".data") / "audio"  # relative to the working directory (backend/)
+DEFAULT_AZURE_RPM = 18
 
 Provider = Literal["mock", "ollama", "openai", "foundry"]
 RealProvider = Literal["ollama", "openai", "foundry"]
@@ -35,6 +45,7 @@ DEFAULT_RECAP_BUDGET_S = 30.0
 DEFAULT_CORS = "http://localhost:3000"
 TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
 FALSE_WORDS = frozenset({"0", "false", "no", "off"})
+ZERO_ALLOWED = frozenset({"MOCK_LLM_LATENCY_MS", "MOCK_TTS_LATENCY_MS"})
 RETIRED = {
     "github": "GitHub Models was retired on 2026-07-30: use LLM_PROVIDER=ollama (local) or foundry",
 }
@@ -73,6 +84,53 @@ class Settings(BaseModel):
     studio_drop_at: int = Field(default=256, ge=1)
     # Day 4: the static export of the frontend, served at "/" (docs/day4-design.md section 3.7)
     ui_dir: str | None = None
+    # Day 5: voice (docs/day5-design.md section 3.7)
+    tts_provider: TtsProvider = "mock"
+    tts_languages: tuple[Lang, ...] = ("vi",)
+    speech_region: str | None = None
+    speech_key: SecretStr | None = None  # dev only; managed identity on Azure
+    speech_endpoint: str | None = None  # custom domain, needed by Entra ID
+    speech_resource_id: str | None = None
+    tts_max_rpm: int | None = Field(default=None, ge=1, le=100_000)  # None: by provider
+    tts_max_concurrency: int = Field(default=4, ge=1, le=64)
+    tts_timeout_s: float = Field(default=4.0, gt=0)
+    tts_recap_timeout_s: float = Field(default=45.0, gt=0)
+    tts_get_wait_s: float = Field(default=10.0, gt=0)
+    tts_max_speed: float = Field(default=20.0, gt=0)
+    tts_daily_char_budget: int = Field(default=200_000, ge=0)
+    audio_cache_dir: str | None = None
+    audio_cache_max_mb: int = Field(default=256, ge=1)
+    audio_store: AudioStoreKind = "local"
+    audio_store_dir: str | None = None
+    audio_blob_account_url: str | None = None
+    audio_blob_container: str = "audio"
+    audio_blob_connection_string: SecretStr | None = None  # Azurite / dev only
+    mock_tts_latency_ms: float = Field(default=0.0, ge=0)
+    mock_tts_faults: str = ""
+    mock_tts_time_scale: float = Field(default=1.0, gt=0, le=10)
+    stt_provider: SttProvider = "off"
+    stt_max_seconds: float = Field(default=15.0, gt=0, le=60)
+    mock_stt_text: str | None = None
+
+    @property
+    def speech_enabled(self) -> bool:
+        return self.tts_provider != "off"
+
+    @property
+    def rate_per_minute(self) -> int:
+        """Syntheses per minute: TTS_MAX_RPM, else 18 for Azure (the Free tier allows 20 per
+        60 s) and no real limit for the mock (tests and the demo without Azure)."""
+        if self.tts_max_rpm is not None:
+            return self.tts_max_rpm
+        return DEFAULT_AZURE_RPM if self.tts_provider == "azure" else 60_000
+
+    @property
+    def cache_dir(self) -> Path:
+        return Path(self.audio_cache_dir or Path(tempfile.gettempdir()) / "pundit-audio")
+
+    @property
+    def store_dir(self) -> Path:
+        return Path(self.audio_store_dir) if self.audio_store_dir else DEFAULT_AUDIO_STORE_DIR
 
     @property
     def provider(self) -> Provider:
@@ -114,6 +172,13 @@ class Settings(BaseModel):
                 "job": self.studio_job_budget_s,
                 "recap": self.recap_budget_s,
             },
+            "speech": {
+                "tts_provider": self.tts_provider,
+                "tts_languages": list(self.tts_languages),
+                "audio_store": self.audio_store,
+                "stt_provider": self.stt_provider,
+                "mock_tts_faults": self.mock_tts_faults or None,
+            },
         }
 
     @classmethod
@@ -147,7 +212,7 @@ class Settings(BaseModel):
             except ValueError:
                 problems.append(f"{name} must be a number, got {value!r}")
                 return default
-            if parsed < 0 or (parsed == 0 and name != "MOCK_LLM_LATENCY_MS"):
+            if parsed < 0 or (parsed == 0 and name not in ZERO_ALLOWED):
                 problems.append(f"{name} must be > 0, got {value!r}")
                 return default
             return parsed
@@ -194,6 +259,7 @@ class Settings(BaseModel):
         drop_at = integer("STUDIO_DROP_AT", 256, 1, 100_000)
         if drop_at > queue_size:
             problems.append("STUDIO_DROP_AT must not exceed STUDIO_QUEUE_SIZE")
+        speech = _speech_values(get, number, integer, problems)
         settings_values: dict[str, object] = {
             "use_mock_llm": use_mock,
             "llm_provider": provider if provider in REAL_PROVIDERS else None,
@@ -220,10 +286,97 @@ class Settings(BaseModel):
             "studio_queue_size": queue_size,
             "studio_drop_at": min(drop_at, queue_size),
             "ui_dir": get("UI_DIR"),
+            **speech,
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))
         return cls.model_validate(settings_values)
+
+
+def _choice[T: str](value: str | None, choices: tuple[T, ...], default: T) -> T | None:
+    """`value` as one of `choices` (case-insensitive), `default` when missing, None when bad."""
+    if value is None:
+        return default
+    for choice in choices:
+        if choice == value.lower():
+            return choice
+    return None
+
+
+def _speech_values(
+    get: Callable[[str], str | None],
+    number: Callable[[str, float], float],
+    integer: Callable[[str, int, int, int], int],
+    problems: list[str],
+) -> dict[str, object]:
+    """The Day 5 variables (docs/day5-design.md section 3.7), checked like the others."""
+    tts = _choice(get("TTS_PROVIDER"), get_args(TtsProvider), "mock")
+    if tts is None:
+        problems.append("TTS_PROVIDER must be off, browser, mock or azure")
+        tts = "mock"
+    stt = _choice(get("STT_PROVIDER"), get_args(SttProvider), "off")
+    if stt is None:
+        problems.append("STT_PROVIDER must be off, mock or azure")
+        stt = "off"
+    store = _choice(get("AUDIO_STORE"), get_args(AudioStoreKind), "local")
+    if store is None:
+        problems.append("AUDIO_STORE must be none, local or blob")
+        store = "local"
+    languages: list[str] = []
+    for code in (get("TTS_LANGUAGES") or "vi").split(","):
+        code = code.strip().lower()
+        if not code:
+            continue
+        if code not in SPOKEN_LANGUAGES:
+            problems.append(f"TTS_LANGUAGES: {code!r} has no spoken pack (supported: vi)")
+        elif code not in languages:
+            languages.append(code)
+    if not languages:
+        languages = ["vi"]
+    key, region = get("SPEECH_KEY"), get("SPEECH_REGION")
+    endpoint, resource = get("SPEECH_ENDPOINT"), get("SPEECH_RESOURCE_ID")
+    if "azure" in (tts, stt) and not ((key and region) or (endpoint and resource)):
+        problems.append(
+            "Azure Speech needs SPEECH_KEY + SPEECH_REGION (dev) or SPEECH_ENDPOINT + "
+            "SPEECH_RESOURCE_ID (Entra ID / managed identity)"
+        )
+    blob_url, blob_conn = get("AUDIO_BLOB_ACCOUNT_URL"), get("AUDIO_BLOB_CONNECTION_STRING")
+    if store == "blob" and not (blob_url or blob_conn):
+        problems.append("AUDIO_STORE=blob needs AUDIO_BLOB_ACCOUNT_URL (or a connection string)")
+    faults = get("MOCK_TTS_FAULTS") or ""
+    if faults:
+        try:
+            TtsFaultPlan.parse(faults)
+        except ValueError as exc:
+            problems.append(f"MOCK_TTS_FAULTS: {exc}")
+    return {
+        "tts_provider": tts,
+        "tts_languages": tuple(languages),
+        "speech_region": region,
+        "speech_key": SecretStr(key) if key else None,
+        "speech_endpoint": endpoint.rstrip("/") if endpoint else None,
+        "speech_resource_id": resource,
+        "tts_max_rpm": integer("TTS_MAX_RPM", 0, 1, 100_000) or None,
+        "tts_max_concurrency": integer("TTS_MAX_CONCURRENCY", 4, 1, 64),
+        "tts_timeout_s": number("TTS_TIMEOUT_S", 4.0),
+        "tts_recap_timeout_s": number("TTS_RECAP_TIMEOUT_S", 45.0),
+        "tts_get_wait_s": number("TTS_GET_WAIT_S", 10.0),
+        "tts_max_speed": number("TTS_MAX_SPEED", 20.0),
+        "tts_daily_char_budget": integer("TTS_DAILY_CHAR_BUDGET", 200_000, 0, 1_000_000_000),
+        "audio_cache_dir": get("AUDIO_CACHE_DIR"),
+        "audio_cache_max_mb": integer("AUDIO_CACHE_MAX_MB", 256, 1, 100_000),
+        "audio_store": store,
+        "audio_store_dir": get("AUDIO_STORE_DIR"),
+        "audio_blob_account_url": blob_url,
+        "audio_blob_container": get("AUDIO_BLOB_CONTAINER") or "audio",
+        "audio_blob_connection_string": SecretStr(blob_conn) if blob_conn else None,
+        "mock_tts_latency_ms": number("MOCK_TTS_LATENCY_MS", 0.0),
+        "mock_tts_faults": faults,
+        "mock_tts_time_scale": min(number("MOCK_TTS_TIME_SCALE", 1.0), 10.0),
+        "stt_provider": stt,
+        "stt_max_seconds": min(number("STT_MAX_SECONDS", 15.0), 60.0),
+        "mock_stt_text": get("MOCK_STT_TEXT"),
+    }
 
 
 def read_env_file(path: Path) -> dict[str, str]:

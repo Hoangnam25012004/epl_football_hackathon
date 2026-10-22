@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
 
-from pundit.api import routes, ws
+from pundit.api import audio, routes, ws
 from pundit.api.hub import DEFAULT_QUEUE_SIZE
 from pundit.api.sessions import SessionManager
 from pundit.api.studio import StudioCrew
@@ -21,6 +21,7 @@ from pundit.llm.settings import Settings
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.service import ClaimService
 from pundit.orchestration.studio_service import StudioService
+from pundit.speech.narrator import Narrator, build_narrator
 
 log = logging.getLogger("pundit.api")
 IMMUTABLE = "public, max-age=31536000, immutable"
@@ -64,15 +65,25 @@ def create_app(
     studio: StudioCrew | None = None,
     clock_factory: Callable[[], Clock] = RealClock,
     queue_size: int = DEFAULT_QUEUE_SIZE,
+    narrator: Narrator | None = None,
 ) -> FastAPI:
     """Build the app. Tests inject services (fault plans, fake clocks) and a replay clock.
-    The studio runs unless STUDIO_ENABLED=false (then the app is exactly the Day 2 one)."""
+    The studio runs unless STUDIO_ENABLED=false (then the app is exactly the Day 2 one); the
+    voice reads the studio unless TTS_PROVIDER=off (then the app is exactly the Day 4 one)."""
     settings = settings or Settings.from_env()
     service = service or ClaimService(settings)
     if studio is None and settings.studio_enabled:
         studio = default_crew(settings)
+    if studio is None:
+        narrator = None
+    elif narrator is None:
+        narrator = build_narrator(settings)
     sessions = SessionManager(
-        service, clock_factory=clock_factory, queue_size=queue_size, studio=studio
+        service,
+        clock_factory=clock_factory,
+        queue_size=queue_size,
+        studio=studio,
+        narrator=narrator,
     )
 
     @asynccontextmanager
@@ -80,6 +91,8 @@ def create_app(
         log.info("pundit api starting: %s", settings.describe())
         yield
         await sessions.shutdown()
+        if narrator is not None:
+            await narrator.aclose()
 
     app = FastAPI(
         title="Pundit Copilot API",
@@ -92,6 +105,7 @@ def create_app(
     )
     app.state.manager = sessions
     app.state.settings = settings
+    app.state.narrator = narrator
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -100,6 +114,8 @@ def create_app(
     )
     app.include_router(routes.router)
     app.include_router(ws.router)
+    if narrator is not None:  # mounted only with the voice: TTS_PROVIDER=off is the Day 4 app
+        app.include_router(audio.router)
     ui = ui_directory(settings)
     if ui is not None:  # mounted last: every API route and /docs match first
         app.mount("/", UIFiles(directory=ui, html=True), name="ui")

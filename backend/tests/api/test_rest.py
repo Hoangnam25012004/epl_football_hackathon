@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers import STUDIO_ON, api_settings, generated
+from helpers import STUDIO_ON, TTS_ON, api_settings, generated
 
 from pundit.agents.moments import detect_all
 from pundit.api.app import create_app
@@ -57,6 +57,12 @@ def test_health(client: TestClient) -> None:
             "lag_ms_p95": None,
             "degraded": [],
         }
+    if STUDIO_ON and TTS_ON:  # Day 5: the voice block; absent with TTS_PROVIDER=off
+        speech = body.pop("speech")
+        assert speech["provider"] == "mock" and speech["breaker"] == "closed"
+        assert speech["voices"] == ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]
+        assert speech["languages"] == ["vi"] and speech["stt"] == "off"
+        assert speech["synthesized"] == 0 and speech["degraded"] == []
     assert body == expected
 
 

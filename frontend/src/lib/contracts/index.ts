@@ -16,6 +16,8 @@ export interface Contracts {
   CreateMatch: CreateMatch;
   OnAirCommand: OnAirCommand;
   ClaimRequest: ClaimRequest;
+  SpeechVoice: SpeechVoice;
+  RecognitionResult: RecognitionResult;
 }
 /**
  * This interface was referenced by `Contracts`'s JSON-Schema
@@ -265,6 +267,7 @@ export interface CommentaryView {
   relevance?: "high" | "normal" | "low";
   source: "llm" | "template";
   speak?: boolean;
+  speech?: SpeechCue | null;
   text: string;
   trigger_id: string;
 }
@@ -300,6 +303,70 @@ export interface RuleView {
 export interface FactView {
   display: string;
   label: string;
+}
+/**
+ * What to read aloud for one item and one voice; `audio` or `note`, never both.
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "SpeechCue".
+ */
+export interface SpeechCue {
+  audio?: AudioRef | null;
+  gender: "female" | "male";
+  lang: "vi-VN" | "en-GB";
+  note?: ("server_off" | "speed" | "circuit_open" | "throttled" | "budget" | "guard") | null;
+  preset:
+    | "calm"
+    | "lively"
+    | "excited"
+    | "peak"
+    | "burst"
+    | "tension"
+    | "explainer"
+    | "recap"
+    | "greeting";
+  /**
+   * @maxItems 24
+   */
+  segments: SpeechSegment[];
+  voice: string;
+}
+/**
+ * A clip of the server, named by its content (cacheable for ever).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AudioRef".
+ */
+export interface AudioRef {
+  clip_id: string;
+  duration_ms: number;
+  exact: boolean;
+  media_type: "audio/mpeg" | "audio/wav";
+  url: string;
+}
+/**
+ * One part of a spoken script: the words read (numbers written as words) and their prosody,
+ * shared by the SSML of the server and the browser's voice (docs/day5-design.md V4).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "SpeechSegment".
+ */
+export interface SpeechSegment {
+  pause_before_ms?: number;
+  pitch: number;
+  preset:
+    | "calm"
+    | "lively"
+    | "excited"
+    | "peak"
+    | "burst"
+    | "tension"
+    | "explainer"
+    | "recap"
+    | "greeting";
+  rate: number;
+  text: string;
+  volume: number;
 }
 /**
  * This interface was referenced by `Contracts`'s JSON-Schema
@@ -909,6 +976,7 @@ export interface Profile {
   mode?: "analyst" | "casual";
   player?: string | null;
   team?: string | null;
+  voice?: ("female" | "male") | null;
 }
 /**
  * Payload of `recap` and of GET /matches/{id}/recap.
@@ -934,6 +1002,7 @@ export interface RecapView {
   revision: number;
   scope: "H1" | "FULL";
   source: "llm" | "template";
+  speech?: SpeechCue | null;
   stats?: GraphicStatView[];
   title: string;
 }
@@ -1204,9 +1273,37 @@ export interface Health {
   llm_provider: string;
   model: string;
   sessions: number;
+  speech?: SpeechHealth | null;
   status: "ok";
   studio?: StudioHealth | null;
   synthetic?: boolean;
+}
+/**
+ * The voice of the app (docs/day5-design.md section 9.4).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "SpeechHealth".
+ */
+export interface SpeechHealth {
+  breaker: string;
+  cache_hits: number;
+  char_budget: number;
+  chars_today: number;
+  degraded: string[];
+  durable_hits: number;
+  errors: {
+    [k: string]: number;
+  };
+  guard_rejected: number;
+  languages: string[];
+  latency_ms_p95: number | null;
+  provider: string;
+  queue: number;
+  store: string;
+  stt: string;
+  synthesized: number;
+  throttled: number;
+  voices: string[];
 }
 /**
  * This interface was referenced by `Contracts`'s JSON-Schema
@@ -1248,5 +1345,33 @@ export interface ClaimRequest {
   include_trace?: boolean;
   language?: "auto" | "vi" | "en";
   match_id: string;
+  text: string;
+}
+/**
+ * A voice the fan player can choose (GET /speech/voices).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "SpeechVoice".
+ */
+export interface SpeechVoice {
+  display_name: string;
+  gender: "female" | "male";
+  lang: "vi-VN" | "en-GB";
+  language: "vi" | "en";
+  server_audio: boolean;
+  voice: string;
+}
+/**
+ * Speech to text of a spoken claim (P2): the text only fills the claim box.
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "RecognitionResult".
+ */
+export interface RecognitionResult {
+  confidence?: number | null;
+  duration_ms: number;
+  language: "vi" | "en";
+  provider: "mock" | "azure";
+  status: "ok" | "no_match" | "silence" | "error";
   text: string;
 }
