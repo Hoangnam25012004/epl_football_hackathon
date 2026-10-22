@@ -1,4 +1,4 @@
-"""LLM-facing data shapes (docs/day2-design.md section 4.4).
+"""LLM-facing data shapes (docs/day2-design.md section 4.4; Day 3 section 13.3).
 
 OpenAI strict structured output does not accept the discriminated unions of the internal
 contracts (`oneOf`), so the model fills these flat models instead; `dto_to_spec` converts the
@@ -15,8 +15,13 @@ from pundit.agents.contracts import (
     Assertion,
     ClaimContext,
     ClaimSpec,
+    CommentaryDraft,
+    GraphicsChoice,
+    LowerThirdTemplate,
     MatchContext,
+    RecapDraft,
     Subject,
+    TalkingDraft,
 )
 from pundit.domain.matchtime import FULL, H1, H2, MinuteWindow, RollingWindow
 from pundit.llm.ports import LlmOutputError
@@ -183,3 +188,87 @@ def dto_to_spec(dto: LlmClaimSpec, ctx: ClaimContext) -> ClaimSpec:
             notes=notes,
         )
     return ClaimSpec(language=language, assertions=tuple(assertions), notes=notes)
+
+
+# --------------------------------------------------------------------------- studio (Day 3)
+
+MAX_RAW_CHARS = 600  # what is kept of one model text; the Guardrail enforces the product limits
+_QUOTES = (('"', '"'), ("“", "”"), ("'", "'"), ("«", "»"))
+_BULLETS = ("- ", "* ", "• ")
+
+
+class LlmTalkingPoint(Dto):
+    en: list[str]
+    vi: list[str]
+
+
+class LlmCommentary(Dto):
+    analyst: str
+    casual: str
+
+
+class LlmGraphicsChoice(Dto):
+    template: LowerThirdTemplate
+    stat_keys: list[str]
+
+
+class LlmRecap(Dto):
+    title: str
+    paragraphs: list[str]
+
+
+def clean_text(text: str, limit: int = MAX_RAW_CHARS) -> str:
+    """Whitespace collapsed, a list bullet and wrapping quotes removed, length bounded.
+    Numbers are never touched: a wrong number is the Guardrail's business."""
+    cleaned = " ".join(text.split())
+    for bullet in _BULLETS:
+        if cleaned.startswith(bullet):
+            cleaned = cleaned[len(bullet) :].lstrip()
+    for left, right in _QUOTES:
+        if len(cleaned) >= 2 and cleaned.startswith(left) and cleaned.endswith(right):
+            inner = cleaned[1:-1]
+            if left not in inner and right not in inner:
+                cleaned = inner.strip()
+    return cleaned[:limit]
+
+
+def _lines(items: list[str], language: str, errors: list[str]) -> tuple[str, ...]:
+    lines = tuple(line for line in (clean_text(item) for item in items) if line)
+    if len(lines) < 2:
+        errors.append(f"write 2 or 3 lines in {language}, got {len(lines)}")
+    return lines[:3]
+
+
+def to_talking_draft(dto: LlmTalkingPoint) -> TalkingDraft:
+    errors: list[str] = []
+    en, vi = _lines(dto.en, "en", errors), _lines(dto.vi, "vi", errors)
+    if errors:
+        raise LlmOutputError("the talking point is incomplete", errors=errors, raw=str(dto))
+    return TalkingDraft(en=en, vi=vi)
+
+
+def to_commentary_draft(dto: LlmCommentary) -> CommentaryDraft:
+    analyst, casual = clean_text(dto.analyst), clean_text(dto.casual)
+    missing = [name for name, text in (("analyst", analyst), ("casual", casual)) if not text]
+    if missing:
+        errors = [f"the {name} text is empty" for name in missing]
+        raise LlmOutputError("the commentary is incomplete", errors=errors, raw=str(dto))
+    return CommentaryDraft(analyst=analyst, casual=casual)
+
+
+def to_graphics_choice(dto: LlmGraphicsChoice) -> GraphicsChoice:
+    keys = tuple(dict.fromkeys(key.strip() for key in dto.stat_keys if key.strip()))
+    return GraphicsChoice(template=dto.template, stat_keys=keys)
+
+
+def to_recap_draft(dto: LlmRecap) -> RecapDraft:
+    title = clean_text(dto.title, 120)
+    paragraphs = tuple(p for p in (clean_text(item) for item in dto.paragraphs) if p)
+    errors: list[str] = []
+    if not title:
+        errors.append("the title is empty")
+    if not 1 <= len(paragraphs) <= 6:
+        errors.append(f"write 3 to 5 paragraphs, got {len(paragraphs)}")
+    if errors:
+        raise LlmOutputError("the recap is incomplete", errors=errors, raw=str(dto))
+    return RecapDraft(title=title, paragraphs=paragraphs)

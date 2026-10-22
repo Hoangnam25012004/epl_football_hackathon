@@ -1,4 +1,4 @@
-"""Ports of the two LLM roles and the errors an adapter may raise (section 8.1).
+"""Ports of the LLM roles and the errors an adapter may raise (section 8.1; Day 3 section 13.1).
 
 The orchestrator decides about retries and fallbacks from the error type: a timeout or a
 transport error is never retried, an invalid output is retried once with feedback.
@@ -9,10 +9,19 @@ from typing import Protocol
 from pundit.agents.contracts import (
     ClaimContext,
     ClaimSpec,
+    CommentaryDraft,
     ExplanationDraft,
+    FactPack,
+    GraphicsChoice,
+    GraphicsOptions,
     GuardrailViolation,
     JudgedClaim,
+    Lang,
+    RecapDraft,
+    Register,
+    TalkingDraft,
 )
+from pundit.agents.recap import RecapPack
 
 
 class LlmError(Exception):
@@ -48,3 +57,40 @@ class ExplainerPort(Protocol):
     async def explain(
         self, judged: JudgedClaim, feedback: list[GuardrailViolation] | None = None
     ) -> ExplanationDraft: ...
+
+
+# --------------------------------------------------------------------------- studio (Day 3)
+
+
+class TalkingPointWriterPort(Protocol):
+    model: str
+
+    async def write(
+        self, pack: FactPack, feedback: list[GuardrailViolation] | None = None
+    ) -> TalkingDraft: ...
+
+
+class CommentatorPort(Protocol):
+    model: str
+
+    async def comment(
+        self, pack: FactPack, language: Lang, feedback: list[GuardrailViolation] | None = None
+    ) -> CommentaryDraft: ...
+
+
+class GraphicsDesignerPort(Protocol):
+    model: str
+
+    async def choose(self, pack: FactPack, options: GraphicsOptions) -> GraphicsChoice: ...
+
+
+class RecapWriterPort(Protocol):
+    model: str
+
+    async def write(
+        self,
+        pack: RecapPack,
+        language: Lang,
+        mode: Register,
+        feedback: list[GuardrailViolation] | None = None,
+    ) -> RecapDraft: ...

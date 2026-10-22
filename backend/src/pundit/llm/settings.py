@@ -29,6 +29,9 @@ DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
 DEFAULT_TIMEOUTS = (4.0, 8.0)  # LLM_TIMEOUT_S, CLAIM_BUDGET_S for hosted models
 # A local model on a laptop CPU needs far longer than a hosted one; still bounded.
 PROVIDER_TIMEOUTS: dict[str, tuple[float, float]] = {"ollama": (90.0, 200.0)}
+# Day 3 recaps are not real-time: the budget follows the provider (mock answers at once)
+RECAP_BUDGETS: dict[str, float] = {"mock": 5.0, "ollama": 200.0}
+DEFAULT_RECAP_BUDGET_S = 30.0
 DEFAULT_CORS = "http://localhost:3000"
 TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
 FALSE_WORDS = frozenset({"0", "false", "no", "off"})
@@ -58,6 +61,16 @@ class Settings(BaseModel):
     mock_llm_faults: str = ""
     mock_llm_latency_ms: float = Field(default=0.0, ge=0)
     cors_origins: tuple[str, ...] = (DEFAULT_CORS,)
+    # Day 3 studio (docs/day3-design.md section 13.6)
+    studio_enabled: bool = True
+    studio_llm_min_importance: int = Field(default=1, ge=1, le=3)
+    studio_tp_budget_s: float = Field(default=3.0, gt=0)
+    studio_commentary_budget_s: float = Field(default=2.5, gt=0)
+    studio_graphics_budget_s: float = Field(default=1.5, gt=0)
+    studio_job_budget_s: float = Field(default=4.0, gt=0)
+    recap_budget_s: float = Field(default=DEFAULT_RECAP_BUDGET_S, gt=0)
+    studio_queue_size: int = Field(default=512, ge=8)
+    studio_drop_at: int = Field(default=256, ge=1)
 
     @property
     def provider(self) -> Provider:
@@ -92,6 +105,13 @@ class Settings(BaseModel):
             "llm_timeout_s": self.llm_timeout_s,
             "claim_budget_s": self.claim_budget_s,
             "mock_llm_faults": self.mock_llm_faults or None,
+            "studio_enabled": self.studio_enabled,
+            "studio_budgets_s": {
+                "talking_point": self.studio_tp_budget_s,
+                "commentary": self.studio_commentary_budget_s,
+                "job": self.studio_job_budget_s,
+                "recap": self.recap_budget_s,
+            },
         }
 
     @classmethod
@@ -130,6 +150,20 @@ class Settings(BaseModel):
                 return default
             return parsed
 
+        def integer(name: str, default: int, low: int, high: int) -> int:
+            value = get(name)
+            if value is None:
+                return default
+            try:
+                parsed = int(value)
+            except ValueError:
+                problems.append(f"{name} must be a whole number, got {value!r}")
+                return default
+            if not low <= parsed <= high:
+                problems.append(f"{name} must be between {low} and {high}, got {value!r}")
+                return default
+            return parsed
+
         use_mock = flag("USE_MOCK_LLM", True)
         provider = (get("LLM_PROVIDER") or "").lower() or None
         if not use_mock:
@@ -153,6 +187,11 @@ class Settings(BaseModel):
                 problems.append(f"MOCK_LLM_FAULTS: {exc}")
         active = provider if not use_mock and provider in REAL_PROVIDERS else None
         timeout, budget = PROVIDER_TIMEOUTS.get(active or "", DEFAULT_TIMEOUTS)
+        recap_budget = RECAP_BUDGETS.get(active or "mock", DEFAULT_RECAP_BUDGET_S)
+        queue_size = integer("STUDIO_QUEUE_SIZE", 512, 8, 100_000)
+        drop_at = integer("STUDIO_DROP_AT", 256, 1, 100_000)
+        if drop_at > queue_size:
+            problems.append("STUDIO_DROP_AT must not exceed STUDIO_QUEUE_SIZE")
         settings_values: dict[str, object] = {
             "use_mock_llm": use_mock,
             "llm_provider": provider if provider in REAL_PROVIDERS else None,
@@ -169,6 +208,15 @@ class Settings(BaseModel):
             "cors_origins": tuple(
                 o.strip() for o in (get("CORS_ORIGINS") or DEFAULT_CORS).split(",") if o.strip()
             ),
+            "studio_enabled": flag("STUDIO_ENABLED", True),
+            "studio_llm_min_importance": integer("STUDIO_LLM_MIN_IMPORTANCE", 1, 1, 3),
+            "studio_tp_budget_s": number("STUDIO_TP_BUDGET_S", 3.0),
+            "studio_commentary_budget_s": number("STUDIO_COMMENTARY_BUDGET_S", 2.5),
+            "studio_graphics_budget_s": number("STUDIO_GRAPHICS_BUDGET_S", 1.5),
+            "studio_job_budget_s": number("STUDIO_JOB_BUDGET_S", 4.0),
+            "recap_budget_s": number("RECAP_BUDGET_S", recap_budget),
+            "studio_queue_size": queue_size,
+            "studio_drop_at": min(drop_at, queue_size),
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))

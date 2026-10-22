@@ -1,6 +1,6 @@
-"""Real LLM adapter (docs/day2-design.md section 8.3): Microsoft Foundry, a local Ollama model or
-any OpenAI-compatible endpoint, through Microsoft Agent Framework's OpenAI-compatible chat client
-(Chat Completions + structured output).
+"""Real LLM adapter (docs/day2-design.md section 8.3; Day 3 section 13.5): Microsoft Foundry, a
+local Ollama model or any OpenAI-compatible endpoint, through Microsoft Agent Framework's
+OpenAI-compatible chat client (Chat Completions + structured output).
 
 Every provider speaks the same API; only the base URL and the credential change. The HTTP client
 never retries (`max_retries=0`): retries are decided by orchestration/resilience.py, so a slow
@@ -19,14 +19,41 @@ from pydantic import BaseModel, ValidationError
 from pundit.agents.contracts import (
     ClaimContext,
     ClaimSpec,
+    CommentaryDraft,
     ExplanationDraft,
+    FactPack,
+    GraphicsChoice,
+    GraphicsOptions,
     GuardrailViolation,
     JudgedClaim,
+    Lang,
+    RecapDraft,
+    Register,
+    TalkingDraft,
 )
-from pundit.llm.dto import LlmClaimSpec, LlmExplanation, dto_to_spec
+from pundit.agents.recap import RecapPack
+from pundit.llm.dto import (
+    LlmClaimSpec,
+    LlmCommentary,
+    LlmExplanation,
+    LlmGraphicsChoice,
+    LlmRecap,
+    LlmTalkingPoint,
+    dto_to_spec,
+    to_commentary_draft,
+    to_graphics_choice,
+    to_recap_draft,
+    to_talking_draft,
+)
 from pundit.llm.ports import ContentFiltered, LlmError, LlmOutputError
 from pundit.llm.prompts import analyst_messages, explainer_messages
 from pundit.llm.settings import ConfigError, Settings
+from pundit.llm.studio_prompts import (
+    commentary_messages,
+    graphics_messages,
+    recap_messages,
+    talking_messages,
+)
 
 T = TypeVar("T", bound=BaseModel)
 FOUNDRY_SCOPE = "https://cognitiveservices.azure.com/.default"
@@ -116,6 +143,68 @@ class LlmExplainer:
         return ExplanationDraft(
             text=out.text.strip(), language=judged.language, source="llm", attempt=1
         )
+
+
+class LlmTalkingPointWriter:
+    """TalkingPointWriterPort backed by a real model."""
+
+    def __init__(self, backend: MafChatBackend) -> None:
+        self._backend = backend
+        self.model = backend.model
+
+    async def write(
+        self, pack: FactPack, feedback: list[GuardrailViolation] | None = None
+    ) -> TalkingDraft:
+        system, user = talking_messages(pack, feedback)
+        dto = await self._backend.structured(system=system, user=user, schema=LlmTalkingPoint)
+        return to_talking_draft(dto)
+
+
+class LlmCommentator:
+    """CommentatorPort backed by a real model."""
+
+    def __init__(self, backend: MafChatBackend) -> None:
+        self._backend = backend
+        self.model = backend.model
+
+    async def comment(
+        self, pack: FactPack, language: Lang, feedback: list[GuardrailViolation] | None = None
+    ) -> CommentaryDraft:
+        system, user = commentary_messages(pack, language, feedback)
+        dto = await self._backend.structured(system=system, user=user, schema=LlmCommentary)
+        return to_commentary_draft(dto)
+
+
+class LlmGraphicsDesigner:
+    """GraphicsDesignerPort backed by a real model."""
+
+    def __init__(self, backend: MafChatBackend) -> None:
+        self._backend = backend
+        self.model = backend.model
+
+    async def choose(self, pack: FactPack, options: GraphicsOptions) -> GraphicsChoice:
+        system, user = graphics_messages(pack, options)
+        dto = await self._backend.structured(system=system, user=user, schema=LlmGraphicsChoice)
+        return to_graphics_choice(dto)
+
+
+class LlmRecapWriter:
+    """RecapWriterPort backed by a real model."""
+
+    def __init__(self, backend: MafChatBackend) -> None:
+        self._backend = backend
+        self.model = backend.model
+
+    async def write(
+        self,
+        pack: RecapPack,
+        language: Lang,
+        mode: Register,
+        feedback: list[GuardrailViolation] | None = None,
+    ) -> RecapDraft:
+        system, user = recap_messages(pack, language, mode, feedback)
+        dto = await self._backend.structured(system=system, user=user, schema=LlmRecap)
+        return to_recap_draft(dto)
 
 
 def foundry_base_url(endpoint: str) -> str:

@@ -9,14 +9,37 @@ on the order of claims.
 from dataclasses import dataclass
 from typing import Literal, get_args
 
-Role = Literal["analyst", "explainer"]
-FaultKind = Literal["timeout", "error", "invalid_json", "wrong_entity", "hallucinate", "unsafe"]
+Role = Literal["analyst", "explainer", "talker", "commentator", "designer", "recapper"]
+FaultKind = Literal[
+    "timeout",
+    "error",
+    "invalid_json",
+    "wrong_entity",
+    "hallucinate",
+    "unsafe",
+    "wrong_player",  # studio: a player of the squad who is not part of the moment
+    "wrong_outcome",  # studio: "scores" for a shot that was saved
+    "wrong_language",  # studio: English text where Vietnamese was asked
+    "bad_choice",  # graphics designer: a stat that is not among the candidates
+]
 
 ROLES: tuple[Role, ...] = get_args(Role)
 KINDS: tuple[FaultKind, ...] = get_args(FaultKind)
+_WRITER_FAULTS: frozenset[FaultKind] = frozenset(
+    {"timeout", "error", "invalid_json", "hallucinate", "unsafe", "wrong_player",
+     "wrong_outcome", "wrong_language"}
+)  # fmt: skip
+_RECAP_FAULTS: frozenset[FaultKind] = frozenset(
+    {"timeout", "error", "invalid_json", "hallucinate", "unsafe", "wrong_player",
+     "wrong_language"}
+)  # fmt: skip
 ROLE_FAULTS: dict[Role, frozenset[FaultKind]] = {
     "analyst": frozenset({"timeout", "error", "invalid_json", "wrong_entity"}),
     "explainer": frozenset({"timeout", "error", "invalid_json", "hallucinate", "unsafe"}),
+    "talker": _WRITER_FAULTS,  # Day 3 talking points
+    "commentator": _WRITER_FAULTS,  # Day 3 commentary
+    "designer": frozenset({"timeout", "error", "invalid_json", "bad_choice"}),
+    "recapper": _RECAP_FAULTS,
 }
 
 
