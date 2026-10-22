@@ -15,7 +15,10 @@ MAX_ITEM_ID = 128
 
 
 class OnAirState(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    # always sent in full: the exported schema marks every field required
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", json_schema_serialization_defaults_required=True
+    )
 
     mode: Literal["auto", "manual"] = "auto"
     item_id: str | None = None  # the lower-third taken on air (manual mode)

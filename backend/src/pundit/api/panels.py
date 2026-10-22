@@ -45,7 +45,9 @@ CACHE_SIZE = 16
 
 
 class _View(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", json_schema_serialization_defaults_required=True
+    )
 
 
 class TimelinePoint(_View):

@@ -2997,6 +2997,14 @@
           "type": "integer"
         }
       },
+      "required": [
+        "mode",
+        "item_id",
+        "hold",
+        "revision",
+        "last_action",
+        "at_match_ms"
+      ],
       "title": "OnAirState",
       "type": "object"
     },

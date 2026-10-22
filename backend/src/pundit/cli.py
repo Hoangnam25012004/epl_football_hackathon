@@ -215,6 +215,7 @@ def _schemas() -> dict[str, str]:
         Health,
         MatchInfo,
         MatchView,
+        PlayerBrief,
         ScenarioInfo,
         StudioItemDetail,
     )
@@ -233,6 +234,7 @@ def _schemas() -> dict[str, str]:
         "match_view.schema.json": serialized(MatchView),
         "on_air.schema.json": serialized(OnAirState),
         "on_air_command.schema.json": dump(OnAirCommand.model_json_schema(mode="validation")),
+        "player_brief.schema.json": serialized(PlayerBrief),
         "scenario_info.schema.json": serialized(ScenarioInfo),
         "stats_panel.schema.json": serialized(StatsPanel),
         "studio_item_detail.schema.json": serialized(StudioItemDetail),

@@ -70,6 +70,17 @@ def test_matches_list(client: TestClient) -> None:
     assert [m["match_id"] for m in listed] == [MATCH] and listed[0]["status"] == "created"
 
 
+def test_players_of_both_squads(client: TestClient) -> None:
+    assert client.get("/matches/nope-1/players").status_code == 404
+    create(client, autostart=False)
+    players = client.get(f"/matches/{MATCH}/players").json()
+    teams = [p["team"] for p in players]
+    assert teams[0] == "harbor_lions" and teams[-1] == "kestrel_athletic"
+    assert teams == sorted(teams, key=lambda t: t != "harbor_lions")  # home squad first
+    home = [p["shirt"] for p in players if p["team"] == "harbor_lions"]
+    assert home == sorted(home) and all(p["name"] and p["short_name"] for p in players)
+
+
 def test_pause_resume_speed(client: TestClient) -> None:
     for path in ("pause", "resume"):
         assert client.post(f"/matches/nope-1/{path}").status_code == 404

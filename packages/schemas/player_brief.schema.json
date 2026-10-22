@@ -1,0 +1,39 @@
+{
+  "description": "A fictional player, for the player-focus picker of the fan player.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "position": {
+      "title": "Position",
+      "type": "string"
+    },
+    "shirt": {
+      "title": "Shirt",
+      "type": "integer"
+    },
+    "short_name": {
+      "title": "Short Name",
+      "type": "string"
+    },
+    "team": {
+      "title": "Team",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "team",
+    "shirt",
+    "name",
+    "short_name",
+    "position"
+  ],
+  "title": "PlayerBrief",
+  "type": "object"
+}

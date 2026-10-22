@@ -27,6 +27,7 @@ DAY4_FILES = {
     "match_view.schema.json",
     "on_air.schema.json",
     "on_air_command.schema.json",
+    "player_brief.schema.json",
     "scenario_info.schema.json",
     "stats_panel.schema.json",
     "studio_item_detail.schema.json",

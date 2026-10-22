@@ -149,6 +149,17 @@ class SpeedBody(BaseModel):
     speed: float = Field(gt=0, le=1000)
 
 
+class PlayerBrief(BaseModel):
+    """A fictional player, for the player-focus picker of the fan player."""
+
+    id: str
+    team: str
+    shirt: int
+    name: str
+    short_name: str
+    position: str
+
+
 DEFAULT_SEED = 42
 
 
@@ -279,6 +290,25 @@ async def list_scenarios() -> list[ScenarioInfo]:
 @router.get("/matches", response_model=list[MatchInfo], response_model_exclude_unset=True)
 async def list_matches(request: Request) -> list[MatchInfo]:
     return [_info(session) for session in manager(request).list()]
+
+
+@router.get("/matches/{match_id}/players", response_model=list[PlayerBrief])
+async def get_players(match_id: str, request: Request) -> list[PlayerBrief]:
+    """Both squads, home team first, by shirt number."""
+    meta = _session(request, match_id).meta
+    order = {team: index for index, team in enumerate(meta.team_ids)}
+    players = sorted(meta.players.values(), key=lambda p: (order.get(p.team_id, 9), p.shirt))
+    return [
+        PlayerBrief(
+            id=player.id,
+            team=player.team_id,
+            shirt=player.shirt,
+            name=player.name,
+            short_name=player.short_name,
+            position=player.position,
+        )
+        for player in players
+    ]
 
 
 @router.post(
