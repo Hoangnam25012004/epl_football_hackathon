@@ -93,6 +93,14 @@ def _term_regex(phrase: str, mode: MatchMode) -> re.Pattern[str]:
     return re.compile(f"{before}{body}{after}")
 
 
+@cache
+def _term_search(phrase: str, mode: MatchMode) -> tuple[re.Pattern[str], str]:
+    """The regex of a phrase and a piece every match contains (its first word up to a hyphen):
+    a phrase whose first word is not in the text is skipped without running the regex."""
+    key = lower(nfc(phrase)) if mode == "lower" else fold(nfc(phrase))
+    return _term_regex(phrase, mode), re.split(r"[\s-]+", key.strip())[0]
+
+
 @dataclass(frozen=True)
 class Term[P]:
     phrase: str
@@ -124,7 +132,10 @@ def find_terms[P](
     candidates: list[Hit[P]] = []
     for term in terms:
         haystack = text.view(term.mode)
-        for found in _term_regex(term.phrase, term.mode).finditer(haystack):
+        pattern, needle = _term_search(term.phrase, term.mode)
+        if needle not in haystack:
+            continue
+        for found in pattern.finditer(haystack):
             candidates.append(Hit(found.start(), found.end(), term))
     candidates.sort(key=lambda h: (-(h.end - h.start), h.start))
     chosen: list[Hit[P]] = []

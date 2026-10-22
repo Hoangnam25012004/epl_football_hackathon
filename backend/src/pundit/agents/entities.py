@@ -5,6 +5,7 @@ with `ambiguous_entity` instead of picking one.
 """
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Literal
 
 from pundit.agents.contracts import MatchContext
@@ -46,25 +47,40 @@ class Mention:
         return len(self.candidates) > 1
 
 
-def entity_terms(ctx: MatchContext) -> list[Term[EntityTerm]]:
+Roster = tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[tuple[str, tuple[str, ...]], ...]]
+
+
+def entity_terms(ctx: MatchContext) -> tuple[Term[EntityTerm], ...]:
+    """Terms of every name; built once per roster (the clock and score of `ctx` do not
+    matter), since every check of every studio text looks names up."""
+    roster: Roster = (
+        tuple((team.id, tuple(team.aliases)) for team in ctx.teams),
+        tuple((player.id, tuple(player.aliases)) for player in ctx.players),
+    )
+    return _entity_terms(roster)
+
+
+@lru_cache(maxsize=32)
+def _entity_terms(roster: Roster) -> tuple[Term[EntityTerm], ...]:
+    teams, players = roster
     owners: dict[str, list[tuple[str, str]]] = {}
-    for team in ctx.teams:
-        for alias in team.aliases:
-            owners.setdefault(alias, []).append(("team", team.id))
-    for player in ctx.players:
-        for alias in player.aliases:
-            owners.setdefault(alias, []).append(("player", player.id))
+    for team_id, aliases in teams:
+        for alias in aliases:
+            owners.setdefault(alias, []).append(("team", team_id))
+    for player_id, aliases in players:
+        for alias in aliases:
+            owners.setdefault(alias, []).append(("player", player_id))
     terms: list[Term[EntityTerm]] = []
     for alias, entries in owners.items():
         kinds = {kind for kind, _ in entries}
         ids = tuple(sorted({entity for _, entity in entries}))
         kind: EntityKind | Literal["mixed"] = "mixed" if len(kinds) > 1 else entries[0][0]  # type: ignore[assignment]
         terms.append(Term(alias, EntityTerm(kind, ids)))
-    home, away = ctx.teams[0].id, ctx.teams[1].id
+    home, away = teams[0][0], teams[1][0]
     terms += [Term(p, EntityTerm("team", (home,))) for p in HOME_PHRASES]
     terms += [Term(p, EntityTerm("team", (away,))) for p in AWAY_PHRASES]
     terms += [Term(p, EntityTerm("both_teams", ())) for p in BOTH_PHRASES]
-    return terms
+    return tuple(terms)
 
 
 def _phrase(term: Term[EntityTerm]) -> Literal["name", "home", "away", "both"]:
