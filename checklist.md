@@ -131,6 +131,8 @@
 
 ## Ngày 4 — 24/10: Studio Dashboard + overlay lower-third + Fan VN Player
 
+> Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day4-design.md](docs/day4-design.md). Next.js static export do FastAPI phục vụ (một origin); overlay tự động + biên tập viên Take / Clear / Hold; UI song ngữ; phạm vi P0 + P1 + màn so sánh Analyst / Casual.
+
 **Studio Dashboard**
 - [ ] **P0** Scoreboard + đồng hồ trận + nút điều khiển replay (play / pause / tốc độ)
 - [ ] **P0** Feed sự kiện real-time
