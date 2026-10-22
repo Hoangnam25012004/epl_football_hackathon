@@ -99,31 +99,33 @@
 > Thiết kế chi tiết, thứ tự thực hiện và kế hoạch test: [docs/day3-design.md](docs/day3-design.md). **Template trước, LLM trong ngân sách** (chưa gắn Foundry: mock cho dev/CI, Ollama chạy offline).
 
 **Talking-Point Agent**
-- [ ] **P0** Khi có moment, sinh 2–3 câu bình luận ngắn (tiếng Anh + tiếng Việt) kèm số liệu đã kiểm chứng
-- [ ] **P0** Đi qua Guardrail trước khi đẩy ra UI
+- [x] **P0** Khi có moment, sinh 2–3 câu bình luận ngắn (tiếng Anh + tiếng Việt) kèm số liệu đã kiểm chứng
+- [x] **P0** Đi qua Guardrail trước khi đẩy ra UI
 
 **Graphics Agent**
-- [ ] **P0** Chọn chỉ số + template lower-third, xuất JSON: `title`, `subtitle`, `stats[]`, `team_colors`, `duration`
-- [ ] **P1** 3 template: so sánh 2 đội, chỉ số 1 cầu thủ, momentum
+- [x] **P0** Chọn chỉ số + template lower-third, xuất JSON: `title`, `subtitle`, `stats[]`, `team_colors`, `duration`
+- [x] **P1** 3 template: so sánh 2 đội, chỉ số 1 cầu thủ, momentum
 
 **Vietnamese Commentator Agent**
-- [ ] **P0** System prompt văn phong bình luận Việt + bảng thuật ngữ (lật cánh, phản công, pressing tầm cao…)
-- [ ] **P0** Sinh bình luận tiếng Việt real-time cho mỗi moment
-- [ ] **P0** Chế độ **"Người mới xem"**: thư viện giải thích luật (việt vị, VAR, phạt đền, thẻ, phạt góc), tự kích hoạt đúng tình huống
-- [ ] **P0** Recap cuối hiệp / cuối trận (văn bản)
-- [ ] **P1** Recap song ngữ Anh – Việt
+- [x] **P0** System prompt văn phong bình luận Việt + bảng thuật ngữ (lật cánh, phản công, pressing tầm cao…)
+- [x] **P0** Sinh bình luận tiếng Việt real-time cho mỗi moment
+- [x] **P0** Chế độ **"Người mới xem"**: thư viện giải thích luật (việt vị, VAR, phạt đền, thẻ, phạt góc), tự kích hoạt đúng tình huống
+- [x] **P0** Recap cuối hiệp / cuối trận (văn bản)
+- [x] **P1** Recap song ngữ Anh – Việt
 
 **Personalization Agent (bắt buộc theo Rules)**
-- [ ] **P0** Hồ sơ người xem: chế độ Analyst / Casual, ngôn ngữ, CLB yêu thích
-- [ ] **P0** Cùng một moment, Analyst và Casual nhận output **khác biệt rõ ràng**
-- [ ] **P1** Chế độ **Player focus**: theo dõi một cầu thủ suốt trận
-- [ ] **P2** Chế độ "một chỉ số duy nhất" (người xem chọn chỉ số muốn theo dõi)
+- [x] **P0** Hồ sơ người xem: chế độ Analyst / Casual, ngôn ngữ, CLB yêu thích
+- [x] **P0** Cùng một moment, Analyst và Casual nhận output **khác biệt rõ ràng**
+- [x] **P1** Chế độ **Player focus**: theo dõi một cầu thủ suốt trận
+- [x] **P2** Chế độ "một chỉ số duy nhất" (người xem chọn chỉ số muốn theo dõi)
 
 **API**
-- [ ] **P0** WebSocket đẩy thêm `talking_point`, `lower_third`, `commentary` (bình luận VI/EN theo hồ sơ; thay cho tên dự kiến `vn_commentary`), `recap`
-- [ ] **P0** `GET /matches/{id}/recap?lang=vi`
+- [x] **P0** WebSocket đẩy thêm `talking_point`, `lower_third`, `commentary` (bình luận VI/EN theo hồ sơ; thay cho tên dự kiến `vn_commentary`), `recap`
+- [x] **P0** `GET /matches/{id}/recap?lang=vi`
 
 **Hoàn thành khi:** replay trận mẫu thì có talking points, JSON lower-third và bình luận tiếng Việt chạy ra liên tục, không có số liệu bịa.
+
+**Kết quả (22/10):** đạt. 12/12 trận (4 kịch bản × 3 seed) PASS báo cáo studio: 0 rò rỉ, 0 lỗi oracle, D1–D4 100%, khoảng lặng ≤ 5'; ma trận lỗi 200 job 0 rò rỉ; smoke server thật 14/14; perf 9/9; chạy Ollama thật, đọc lại mọi câu LLM đã đăng và mọi bản nháp bị chặn qua 3 vòng, vá 15 lỗ hổng / chặn nhầm của Guardrail (mỗi phát hiện có test; luật tỷ số, phía momentum, chen tiếng Anh nằm ở `agents/narrative.py`). Chi tiết: [docs/day3-design.md](docs/day3-design.md) §23. Lưu ý máy dev: Windows chặn `.venv/Scripts/python.exe` (§23.2 dòng 18).
 
 ---
 

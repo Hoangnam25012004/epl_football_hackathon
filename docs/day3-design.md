@@ -1172,11 +1172,135 @@ Chạy theo thứ tự. Mỗi pha có điều kiện qua; chưa qua thì không 
 
 ---
 
-## 23. As-built (điền sau khi hoàn thành)
+## 23. As-built (22/10/2026)
 
-- 23.1. Kết quả spike MAF fan-out / fan-in.
-- 23.2. Khác biệt so với thiết kế (nếu có) và lý do.
-- 23.3. Bảng số lượng thực tế (thay cho ước tính ở 4.3) và bảng luật "Người mới xem" thực tế (thay cho 9.4).
-- 23.4. Kết quả kiểm thử theo mục 17 (P1–P8): số test, coverage, báo cáo `pundit studio --report` của 4 kịch bản, ma trận lỗi, hiệu năng.
-- 23.5. Kết quả chạy Ollama offline và các phát hiện khi đọc lại câu LLM.
-- 23.6. Việc còn lại cho Ngày 4–5.
+### 23.1. Spike MAF fan-out / fan-in
+- Trên `agent-framework-core==1.22.0`, `WorkflowBuilder.add_fan_out_edges(source, targets)` và `add_fan_in_edges(sources, target)` chạy đúng. Handler fan-in nhận `list[BranchResult]`.
+- Ba nhánh mỗi nhánh 0,2 s xong trong 0,209 s (cùng một superstep). 10 workflow chạy song song không lẫn trạng thái. Overhead build + run khoảng 1,9 ms mỗi lần.
+- **Quyết định:** dùng MAF fan-out / fan-in (`orchestration/studio_workflow.py`). Runner `asyncio.gather` (`run_studio_pipeline`) giữ làm lưới an toàn `orchestrator_fallback`.
+- Test xác nhận: MAF cho kết quả y hệt runner asyncio trên mọi trigger của `dominant_loser-42`. Với model mock trễ 0,15 s, một job 3 nhánh xong dưới 0,4 s, tức các nhánh chạy song song thật.
+
+### 23.2. Khác biệt so với thiết kế và lý do
+
+| # | Chỗ | Thiết kế | As-built | Lý do |
+|---|---|---|---|---|
+| 1 | Hợp đồng | Trường `register`; kiểu `Outcome` | Trường `mode`; kiểu `EventOutcome` | `register` trùng thuộc tính của `BaseModel` (Pydantic cảnh báo). `Outcome` đã dùng cho kết quả assertion của Ngày 2 |
+| 2 | `Trigger`, `FactPack` | `FactPack` có `as_of_seq`, `clock_display`, `score` riêng | `Trigger` thêm `roles`, `details`. `FactPack` nhúng `match: MatchContext`; `as_of_seq` là property | Template và Guardrail cần biết ai làm gì (người ghi bàn, thủ môn...) và cần tên, tỷ số, đồng hồ tại `as_of` |
+| 3 | Message workflow | `StudioJob` → `FactPack` | Thêm `StudioPlan` (StudioIntake → FactPackBuilder) | Intake chọn nhánh; message có kiểu cho mỗi cạnh |
+| 4 | Module | — | Thêm `agents/studio_text.py`, `agents/studio_values.py`, `llm/studio_prompts.py`, `orchestration/studio_eval.py` | Tách phần điền giá trị template; prompt studio tách khỏi prompt claim; chạy offline và báo cáo dùng chung cho CLI, test và script |
+| 5 | Bình luận bằng LLM | `commentary-vi-v1`, chỉ VI (EN là P1) | `commentary-v1` cho cả VI và EN; `CommentatorPort.comment(pack, language, feedback)` | Làm luôn P1. VI và EN gọi song song |
+| 6 | Retry | — | Talking point: nhận ngôn ngữ khi ≥ 2 câu qua, bỏ câu trượt, retry 1 lần. Bình luận live: không retry; offline: retry 1 lần | Đúng mục 6 và 8.4 |
+| 7 | Cờ `llm_skipped` | Gắn khi không đủ 3 điều kiện gọi LLM | Chỉ gắn khi breaker mở hoặc hết ngân sách | Trigger dưới `STUDIO_LLM_MIN_IMPORTANCE` là chính sách, không phải suy giảm |
+| 8 | Luật nhóm số liệu (9.2) | Gắn khi văn bản nhắc chỉ số | `mentioned_rules` lọc theo cả 4 bản. Thêm: chỉ giải thích khi **chính bản người xem đọc** có nhắc chỉ số. `seen_rules` của director cập nhật theo luật của item sau job | Không giảng xG dưới một câu không nói xG. Casual không bao giờ nói xG nên casual không gặp luật xG |
+| 9 | Cue `lull` | Sau 5 phút không có trigger | Sau 4,5 phút | Khoảng lặng = ngưỡng + thời gian chờ event kế tiếp. Với 4,5 phút, khoảng lặng dài nhất đo được ≤ 5,0 phút trên 12 trận |
+| 10 | Số mục bình luận / trận | 60–110 | 50–110 | Ma trận 4 × 3 đo được 53–99. `balanced-7` là trận ít sự kiện, không phải lỗi |
+| 11 | Chọn câu | `crc32` theo trigger | Khoá `crc32` **không chứa ngôn ngữ**; ngân hàng VI / EN song song (cùng số tầng, cùng số mẫu, cùng chỉ số ở cùng vị trí); mọi nhóm ≥ 3 mẫu | Bảo đảm S-5 (hai ngôn ngữ cùng một bộ số). Bổ sung mẫu cho 5 nhóm bình luận hiếm (phạt đền, phản lưới, VAR) và 42 nhóm talking point |
+| 12 | Trình bày | — | `capitalize_sentences`: viết hoa chữ đầu câu, giữ "xG" | Template tiếng Việt mở đầu bằng `{minute}` ra "phút 36: ..." (phát hiện ở P7) |
+| 13 | Cửa sổ trong câu | "10 phút qua" viết cứng | Placeholder `{last5}`, `{last10}` lấy nhãn cửa sổ thực | Đầu trận cửa sổ bị cắt (ví dụ "7 phút gần nhất"); viết cứng sẽ sai |
+| 14 | Recap | 120–220 từ | Template đo được: analyst 64–124 từ, casual 34–61 từ. LLM viết lần lượt vi/casual → vi/analyst → en/analyst → en/casual; breaker riêng | Bản casual ngắn có chủ đích (người mới xem). Thứ tự ưu tiên giúp model chậm dùng ngân sách cho bản được xem nhiều nhất |
+| 15 | Ngân sách offline | Timeout của provider mỗi lần gọi | 4 × `LLM_TIMEOUT_S` mỗi lần gọi | Một job gửi tối đa 4 request cùng lúc; Ollama trên CPU trả lời lần lượt, request cuối phải chờ 3 request trước |
+| 16 | API | `/healthz` có khối `studio` | Thêm: `/matches/{id}` có khối `studio` (số đo director). Khi studio tắt, `MatchInfo` và `Health` bỏ hẳn khối này (`response_model_exclude_unset`) | Giữ đúng hình dạng Ngày 2 khi `STUDIO_ENABLED=false` |
+| 17 | Director | Job đang chờ khi dừng phiên được đếm vào `dropped` | Đếm cả job đang chạy dở bị huỷ | Không mất job mà không ai biết |
+| 18 | Môi trường | — | Windows Application Control chặn `backend/.venv/Scripts/python.exe` (os error 4551) từ 22/10. Kiểm thử chạy bằng Python gốc của uv cộng site-packages của venv | Kết quả tương đương; cần mở chặn hoặc tạo lại venv trên máy dev |
+| 19 | Guardrail studio | Bảng 12.2, 12.3 | Thêm: tên chỉ số đứng sát con số phải khớp Fact của chỉ số đó; thủ môn không sút / ghi bàn / chặn cú sút bị chặn, ở bàn thắng chỉ người ghi bàn "ghi bàn"; số thứ tự bàn thắng phải khớp; từ chỉ kết quả thêm hiệp phụ, phản lưới, thắng trận; câu tổng kết do model viết không kể bàn thắng; "một" làm mạo từ không phải số. Vòng 3 (`agents/narrative.py`): "dẫn trước / gỡ hòa / lead / level" khớp tỷ số; "led to the goal" khi không có bàn; đội "được lợi / chịu áp lực" ở momentum và đợt ép sân đúng phía; câu VI không chen cụm tiếng Anh; tên đội không viết sai; "0.72 bàn thắng kỳ vọng" là xG | Lỗ hổng và chặn nhầm tìm thấy khi đọc lại câu của model thật ở P6 (mục 23.5) |
+| 20 | Prompt | `talking-v1`, `commentary-vi-v1`, `recap-v1` | `talking-v2`, `commentary-v2`, `recap-v2` (`graphics-v1` giữ nguyên) | Thêm quy tắc "mọi số viết bằng chữ số, kể cả 0" sau P6 |
+| 21 | Hiệu năng Guardrail | — | `find_terms` bỏ qua cụm từ khi từ đầu tiên của nó không có trong văn bản (khỏi chạy regex); `entity_terms` cache theo đội hình thay vì dựng lại ở mỗi lần gọi | Sau P6, mỗi job gọi Guardrail cho khoảng 14 văn bản, mỗi lần tìm tên 4 lần. `test_job_latency_p95` đo được 170–240 ms (ngân sách 150 ms), kể cả trên code trước vòng 3. Hành vi không đổi; số đo sau tối ưu ở mục 23.4 |
+
+### 23.3. Số lượng thực tế (thay cho ước tính ở 4.3 và 9.4)
+
+Đo bằng `scripts/studio_matrix.py` (mock, 22/10). "Khoảng lặng" là khoảng cách dài nhất giữa hai mục bình luận liên tiếp trong cùng một hiệp.
+
+| Trận | Bình luận | Talking point | Lower-third | Khoảng lặng dài nhất |
+|---|---|---|---|---|
+| `dominant_loser-3` | 72 | 18 | 21 | 4,5' |
+| `dominant_loser-7` | 89 | 23 | 29 | 5,0' |
+| `dominant_loser-42` | 77 | 17 | 15 | 4,5' |
+| `comeback_var-3` | 67 | 13 | 16 | 4,7' |
+| `comeback_var-7` | 80 | 18 | 24 | 4,9' |
+| `comeback_var-42` | 93 | 25 | 29 | 4,5' |
+| `red_card_swing-3` | 90 | 19 | 24 | 4,6' |
+| `red_card_swing-7` | 99 | 27 | 30 | 4,6' |
+| `red_card_swing-42` | 98 | 18 | 28 | 4,7' |
+| `balanced-3` | 66 | 15 | 19 | 4,8' |
+| `balanced-7` | 53 | 12 | 19 | 4,6' |
+| `balanced-42` | 62 | 11 | 12 | 4,6' |
+
+- Số talking point luôn bằng số trigger importance ≥ 2; số lower-third luôn đúng bảng 7.1.
+- Mỗi trận có 2 recap (H1, FULL), mỗi recap phát 2 bản (`revision` 1 template, 2 bản mock LLM).
+- Số mục có `speak = true`: 23–35 mỗi trận mẫu (Ngày 5 đọc thành tiếng).
+
+Luật "Người mới xem" theo thứ tự xuất hiện lần đầu (4 trận mẫu, khớp bảng 9.4; `chaos` chỉ xuất hiện ở trận có bản bình luận nhắc tới "hỗn loạn"):
+
+| Trận | Luật theo thứ tự xuất hiện |
+|---|---|
+| `dominant_loser-42` | 5' possession · 9' xg · 10' offside · 19' momentum · 20' corner · 45+1' added_time · 59' yellow_card · 59' substitution |
+| `comeback_var-7` | 5' possession · 6' corner · 8' xg · 17' momentum · 26' yellow_card · 31' chaos · 36' var · 36' offside · 45+1' added_time · 60' substitution |
+| `red_card_swing-7` | 3' xg · 11' corner · 16' possession · 25' yellow_card · 31' chaos · 45+1' added_time · 49' momentum · 52' red_card · 61' substitution · 68' offside |
+| `balanced-3` | 3' corner · 4' offside · 6' xg · 16' possession · 27' momentum · 27' yellow_card · 45+1' added_time · 64' substitution |
+
+`penalty`, `second_yellow` và VAR "giữ nguyên" không có trong 4 trận mẫu; chúng được test trên dữ liệu dựng tay (`tests/agents/test_studio_triggers.py`).
+
+### 23.4. Kết quả kiểm thử theo mục 17
+
+| Pha | Kết quả |
+|---|---|
+| **P1. Gate tĩnh** | `ruff check .`, `ruff format --check .` (176 file), `mypy --strict` (101 file của package; 3 script mới cũng sạch): **sạch** |
+| **P2. Hồi quy + coverage** | `pytest -m "not slow and not perf and not live" --cov`: **1640 passed**, coverage tổng **95 %** (module studio 87–99 %). Sau đó thêm 4 test (đồng thời mục 16.5 và timeout offline), đều qua. Lượt cuối, sau P6 vòng 3 và tối ưu Guardrail: `pytest -m "not live"` (mặc định + slow + perf) **1764 passed** trong 9 phút 5 giây |
+| **P3. Slow, perf, hồi quy hành vi cũ** | `-m slow`: **44 passed** (gồm mọi mẫu câu, khoảng lặng và báo cáo trên 4 × 3 trận). `-m perf`: **9 passed** (job 3 nhánh p95 < 150 ms, job chỉ bình luận p95 < 60 ms, cả trận offline < 15 s, replay 1000x chậm thêm ≤ 20 %, event → item p95 < 300 ms). Sau P6, các luật mới khiến `test_job_latency_p95` hỏng (p95 170–240 ms trong pytest, kể cả trên code trước vòng 3). Tối ưu ở mục 23.2 dòng 21 đưa median job 3 nhánh từ khoảng 80 ms xuống khoảng 40 ms (p95 65–104 ms đo ngoài pytest); 9 test perf qua lại. Test API / WS Ngày 2 với `STUDIO_ENABLED=false`: **34 passed**. `pundit eval`: 100 % của 20, 0 verdict sai, held-out 90 %, **PASSED** |
+| **P4. Hệ thống, mock** | `scripts/studio_matrix.py`: **12/12 trận PASS** (0 rò rỉ, 0 lỗi oracle, D1–D4 100 %, khoảng lặng ≤ 5,0'). Ma trận lỗi 10 × 10 trên một bàn thắng và một cú sút bị cứu thua: 200 job, 183 có fallback template, **0 rò rỉ, 0 vượt ngân sách** (lâu nhất 290 ms). S-1 và S-2 **PASS** |
+| **P5. Live session** | `scripts/smoke_studio.py` (20x, 3 hồ sơ, 5 claim song song, dừng rồi chạy tiếp, tắt server): **14/14 kiểm tra đạt**. 1954 message mỗi người xem, cùng chuỗi `n`, 77 bình luận, 17 talking point, 15 lower-third, lag studio p95 ≈ 100 ms, 0 job mất, không lỗi trong log, không task treo. 299 s |
+| **P6. LLM thật offline** | Mục 23.5 |
+| **P7. Nghiệm thu thủ công** | (1) Casual VI, fan HAR, người mới xem: câu tự nhiên, giải thích việt vị 10' và phạt góc 20' đúng lần đầu, câu mở đầu "Đội của bạn ghi bàn!" khi Harbor ghi bàn (63'), "Tiếc quá, đối thủ vừa có bàn." ở 27' và 78'. (2) Analyst: cùng moment nhưng có `facts`, xG, momentum. (3) `comeback_var-7`: giải thích VAR ở bàn bị huỷ 36', lower-third "VAR: KHÔNG CÔNG NHẬN BÀN THẮNG" thay graphic bàn đó (`supersedes`). (4) `red_card_swing-7`: thẻ đỏ 52' có talking point, player card và lời giải thích thẻ đỏ. (5) Recap casual VI 54 từ. (6) `MOCK_LLM_FAULTS=commentator:wrong_outcome:1,talker:hallucinate`: 176 bản nháp bị chặn (`WRONG_OUTCOME` 142, `UNVERIFIED_NUMBER` 34), **0 rò rỉ**; ở chế độ offline bản nháp được viết lại thành công nên không cần template; dùng `:2` để thấy fallback. (7) Thay bằng P5 (3 hồ sơ). (8) Đọc lại 15 lời giải thích luật: đúng luật IFAB và khớp định nghĩa chỉ số. **Phát hiện:** câu VI mở đầu bằng "phút 36:" viết thường, đã sửa (`capitalize_sentences`) và có test |
+| **P8. Ghi kết quả** | Mục này; `checklist.md`, `claude.md`; commit local (chưa push) |
+
+### 23.5. Chạy Ollama offline (P6)
+
+Lệnh: `pundit studio --scenario dominant_loser --seed 42 --provider ollama --llm-min-importance 2 --report --json out.jsonl`, model `qwen2.5:3b` trên CPU. LLM viết cho 17 trigger importance ≥ 2: 68 bản bình luận, 34 bản talking point (EN + VI), 15 lower-third, 2 recap × 4 bản. Đọc lại toàn bộ bằng `scripts/studio_review.py`.
+
+**Lượt 1 (Guardrail trước P6), 28 phút:**
+- Câu LLM được đăng: bình luận 51/68, talking point 22/34, lower-third 11/15, recap 0/8. 99 lần gọi, 4 lần lỗi (4 %).
+- 85 bản nháp bị chặn: `UNGROUNDED` 53, `WRONG_REGISTER` 26, `WRONG_OUTCOME` 25, `WRONG_ATTRIBUTION` 17, `UNVERIFIED_NUMBER` 12, `TOO_LONG` 8, `WRONG_LANGUAGE` 5 (có câu chen chữ Trung Quốc). Báo cáo: 0 rò rỉ, 0 lỗi oracle, D1–D4 đạt.
+
+**Phát hiện khi đọc lại, và cách xử lý** (mỗi phát hiện có test):
+
+| # | Phát hiện | Ví dụ thật | Xử lý |
+|---|---|---|---|
+| 1 | HTTP client bỏ cuộc sau `LLM_TIMEOUT_S + 1` s trong khi lần gọi offline còn xếp hàng | Bình luận VI timeout sau 91 s | `build_backend(timeout_s=...)` theo ngân sách lần gọi |
+| 2 | Số 0 viết bằng chữ nên câu bị chặn `UNGROUNDED` | "Kestrel Athletic had no penalty-area entries..." | Prompt v2: mọi số viết bằng chữ số, kể cả 0 |
+| 3 | **Số thật gắn sai tên chỉ số** (lọt Guardrail) | "Harbor FC had **4 shots** in the box" (4 là số lần vào vòng cấm); "chỉ số hỗn loạn **0.88**" (0.88 là momentum) | Luật mới: tên chỉ số đứng sát con số phải khớp Fact của đúng chỉ số đó (`UNVERIFIED_NUMBER`). Đơn vị (km/h) thắng tên chỉ số; số thập phân không bao giờ là số đếm |
+| 4 | **Đảo vai trò** (lọt) | "E. Brandvold's left-foot shot..." (Brandvold là thủ môn); "Tới phút 27, **E. Brandvold** ghi bàn" (người ghi bàn là M. Ribas) | `WRONG_ENTITY`: thủ môn không sút, không ghi bàn; ở bàn thắng chỉ người ghi bàn "ghi bàn" |
+| 5 | **Số thứ tự của bàn thắng** (lọt) | "bàn thắng **thứ ba** của Calder", "his **second** goal" (đều là bàn đầu) | Số thứ tự phải khớp số bàn đã kiểm chứng |
+| 6 | **Bịa diễn biến** (lọt) | "Kestrel ghi bàn ở phút 45+3" (bàn ở phút 27'), "Harbor scored first", "thắng 2-1 **sau hiệp phụ**", "own goal save", "kept it out" cho cú sút đi chệch | `WRONG_OUTCOME`: không có hiệp phụ / luân lưu; phản lưới chỉ khi đúng là phản lưới; "thắng trận" chỉ ở hết trận; câu tổng kết do model viết không kể bàn thắng (recap kể từ danh sách đã kiểm chứng); thêm từ chỉ cứu thua |
+| 7 | **Chặn nhầm** câu tiếng Việt tự nhiên | "tạo ra **một** cơ hội ngon ăn" bị đọc là số 1 | "một" trước "cơ hội / tình huống / pha tấn công / đợt..." là mạo từ; "chỉ có một cú sút" vẫn là số |
+| 8 | Recap: casual quá nhiều số, quá 300 ký tự (chặn đúng); hai lần trả về sai số đoạn; breaker recap mở | — | Giữ 5 đoạn đầu thay vì báo lỗi; lỗi chi tiết ghi vào trace. Recap template (`revision 1`) vẫn được phát |
+
+- Đối chiếu lại 104 câu LLM đã đăng ở lượt 1 bằng luật mới: **19 câu bị chặn**, đều là lỗi thật (9 sai số / sai tên chỉ số, 3 sai cầu thủ, 9 sai diễn biến; có câu dính nhiều mã). Hai lần chặn nhầm do chính luật mới (số thập phân bị coi là số cú sút) được sửa ở vòng 2.
+- Quét lại mọi mẫu câu trên 12 trận, mutation test và báo cáo eval: luật mới không chặn nhầm template nào.
+
+**Lượt cuối (Guardrail sau vòng 1–2), 38 phút:**
+- Câu LLM được đăng: bình luận 40/68, talking point 30/34 (từ 22/34), lower-third 11/15, recap 0/8. 96 lần gọi, 4 lần lỗi; 14 lần writer rơi về template.
+- 87 bản nháp bị chặn: `UNVERIFIED_NUMBER` 38, `UNGROUNDED` 36, `WRONG_OUTCOME` 35, `WRONG_REGISTER` 28, `WRONG_ATTRIBUTION` 9, `TOO_LONG` 6, `WRONG_ENTITY` 3, `WRONG_LANGUAGE` 3, `WRONG_COMPARISON` 3 (một bản nháp có thể dính nhiều mã). Báo cáo: **0 rò rỉ, 0 lỗi oracle**, D1 100 %, D2 100 % (bản chặt 91 %, 40/44), D3 100 %, D4 100 %, **PASSED**.
+- Một lượt chạy trúng lúc Ollama tự cập nhật và tắt server: 6/6 lần gọi lỗi kết nối, breaker mở, mọi mục dùng template, 0 rò rỉ; báo cáo `FAILED` với lý do "LLM NOT WORKING" và exit 1. Đây là bằng chứng phục hồi khi lỗi: studio vẫn phát đủ nội dung, và báo cáo không giả vờ là LLM đã chạy.
+
+**Vòng 3: đọc lại 119 câu LLM đã đăng và 87 bản nháp bị chặn của lượt cuối** (mỗi phát hiện có test):
+
+| # | Phát hiện | Ví dụ thật | Xử lý |
+|---|---|---|---|
+| 9 | **Từ chỉ tỷ số trái với tỷ số** (lọt) | "đưa Harbor Lions FC **vượt lên dẫn trước**" ở bàn gỡ 1-1; "maintaining **their lead**" khi Harbor đang thua 1-2 | `WRONG_OUTCOME` (`agents/narrative.py`): lead / bị dẫn / level phải khớp tỷ số tại trigger; bỏ qua khi lợi thế đã mất hoặc đang được tìm ("cancels out the lead", "pushing for an equaliser"). Không áp dụng cho recap vì recap kể cả trận |
+| 10 | **Bàn thắng "được gây ra" khi không có bàn** (lọt) | "This sustained pressure **has led to the goal**" (49', không có bàn); "leading to Harbor's goal" | "led to / resulted in … goal" tính là từ chỉ bàn thắng. "led to a shot on goal" vẫn được |
+| 11 | **Sai phía** của momentum / đợt ép sân (lọt) | "in favor of **Kestrel Athletic**" ở momentum của Harbor (50'); "**Harbor Lions FC** đang chịu áp lực" ở chính đợt ép sân của Harbor (56') | `WRONG_ATTRIBUTION`: ở `momentum_shift` / `dangerous_spell`, đội đứng sau "in favour of / nghiêng về" phải là đội của trigger, và đội đó không "chịu áp lực / under pressure" |
+| 12 | **Thủ môn chặn cú sút bị chặn** (lọt) | "blocked by Kestrel Athletic's goalkeeper **M. Holub**" | `WRONG_ENTITY`: cú sút `blocked` là do hậu vệ chặn |
+| 13 | **Chen tiếng Anh vào câu tiếng Việt** (lọt) | "đi **off target**", "**a spell of sustained pressure by** Harbor Lions FC trong phút 49", "tại **full time**" | `WRONG_LANGUAGE` (câu model viết): hai từ tiếng Anh liền nhau, tức từ không thể là âm tiết tiếng Việt, trừ tên riêng, thuật ngữ, đơn vị. Một từ lẻ như "pressing" vẫn được |
+| 14 | **Viết sai tên đội** (lọt) | "**Haror** Lions FC", "Harbour Lions FC" | `WRONG_ENTITY` (câu model viết): từ viết hoa chỉ khác một chữ cái so với một từ trong tên đội |
+| 15 | **Chặn nhầm** | "0.72 bàn thắng kỳ vọng" bị đọc thành số bàn thắng (làm mất một recap của model); "Đây là **một** cú sút xa"; "a 0.35 chance of scoring" | Sau con số, "bàn thắng kỳ vọng" / "expected goals" là xG; số thập phân + "chance / cơ hội" là xG; "là một" + danh từ là mạo từ. "0.87 cú sút" và "chỉ có một cú sút trúng đích" vẫn bị chặn |
+
+- Đối chiếu lại bằng luật vòng 3: **13/119** câu đã đăng của lượt cuối và **22/104** câu của lượt 1 bị chặn, **tất cả là lỗi thật**. Không câu đúng nào bị chặn.
+- Mọi lần chặn khác trong 87 bản nháp đều có ít nhất một lý do đúng. Hai kiểu chặn chặt có chủ đích được giữ: talking point viết số 0 bằng chữ ("không có cú sút") bị `UNGROUNDED` vì prompt v2 yêu cầu chữ số; "at 63" không có dấu phút thì không được hiểu là phút.
+- Quét lại mọi mẫu câu trên 12 trận, cả đường template lẫn đường mock LLM (template đi qua luật dành cho câu model), cùng mutation test, eval và một test fuzz 150 văn bản ngẫu nhiên: luật vòng 3 không chặn nhầm template nào và không làm Guardrail lỗi. 362 test studio (kể cả slow) và 238 test Guardrail / oracle claim của Ngày 2 đều qua.
+
+**Giới hạn còn lại:** luật từ khoá không phán được mọi câu định tính của model 3B. Còn lọt: cặp số sau dấu phẩy không gắn với đội ("…, with a possession advantage of 56% to 44%"); câu đúng số nhưng vô nghĩa ("reducing Harbor's chances to 0.36 xG"); dùng sai lượng từ ("tung 4 **cú** vào vòng cấm" cho 4 lần vào vòng cấm). Template vẫn là đường chính; tỷ lệ câu LLM được đăng sẽ đo lại với Foundry ở Ngày 5.
+
+### 23.6. Việc còn lại cho Ngày 4–5
+- **Ngày 4 (UI):** Studio Dashboard, overlay và Fan VN Player dùng các message WS `commentary`, `talking_point`, `lower_third`, `recap`, `talking_point_status`, REST mục 15.1 và schema trong `packages/schemas/` (mục 21).
+- **Ngày 5:** gắn Foundry (chỉ đổi cấu hình, cùng port), đo lại tỷ lệ câu LLM được đăng với model mạnh hơn; Azure Speech đọc `CommentaryView` có `speak = true` theo `excitement`.
+- Máy dev: mở chặn `.venv/Scripts/python.exe` hoặc tạo lại venv (mục 23.2, dòng 18).
