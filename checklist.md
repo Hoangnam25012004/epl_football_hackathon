@@ -173,6 +173,8 @@
 
 ## Ngày 5 — 25/10: Azure Speech TTS + deploy lên Container Apps + App Insights
 
+> Phần giọng đọc: thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day5-design.md](docs/day5-design.md). Chưa có Azure nên làm **mock-first**: WAV tất định cho dev / CI, giọng của trình duyệt để nghe tiếng Việt; Azure Speech gắn sau bằng cấu hình. Phần triển khai Azure có tài liệu riêng.
+
 **Giọng đọc tiếng Việt**
 - [ ] **P0** Tích hợp Azure AI Speech TTS cho bình luận real-time (stream audio về Fan VN Player)
 - [ ] **P0** SSML: nhấn giọng / tăng tốc độ khi có bàn thắng hoặc tình huống nguy hiểm
