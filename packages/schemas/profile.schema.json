@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "description": "Who is watching (Day 3 section 11): one per WebSocket connection.",
+  "properties": {
+    "beginner": {
+      "default": false,
+      "title": "Beginner",
+      "type": "boolean"
+    },
+    "language": {
+      "default": "vi",
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "metric": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Metric"
+    },
+    "mode": {
+      "default": "analyst",
+      "enum": [
+        "analyst",
+        "casual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "player": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Player"
+    },
+    "team": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Team"
+    }
+  },
+  "title": "Profile",
+  "type": "object"
+}

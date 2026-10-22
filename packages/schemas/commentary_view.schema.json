@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "FactView": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "display"
+      ],
+      "title": "FactView",
+      "type": "object"
+    },
+    "RuleView": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "enum": [
+            "full",
+            "short"
+          ],
+          "title": "Depth",
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "offside",
+            "var",
+            "penalty",
+            "second_yellow",
+            "red_card",
+            "yellow_card",
+            "corner",
+            "substitution",
+            "added_time",
+            "xg",
+            "possession",
+            "momentum",
+            "ppda",
+            "chaos",
+            "tempo"
+          ],
+          "title": "Rule",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "title",
+        "text",
+        "depth"
+      ],
+      "title": "RuleView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Payload of the WebSocket message `commentary`: one item for one profile.",
+  "properties": {
+    "clock_ms": {
+      "title": "Clock Ms",
+      "type": "integer"
+    },
+    "display_minute": {
+      "title": "Display Minute",
+      "type": "string"
+    },
+    "emphasis": {
+      "default": "neutral",
+      "enum": [
+        "own_team",
+        "opponent",
+        "neutral",
+        "focus_player"
+      ],
+      "title": "Emphasis",
+      "type": "string"
+    },
+    "excitement": {
+      "default": 0,
+      "title": "Excitement",
+      "type": "integer"
+    },
+    "explanation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RuleView"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "facts": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/FactView"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "framing": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Framing"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "importance": {
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "title": "Importance",
+      "type": "integer"
+    },
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "analyst",
+        "casual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "period": {
+      "title": "Period",
+      "type": "integer"
+    },
+    "player_tracker": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/FactView"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Player Tracker"
+    },
+    "relevance": {
+      "default": "normal",
+      "enum": [
+        "high",
+        "normal",
+        "low"
+      ],
+      "title": "Relevance",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "llm",
+        "template"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "speak": {
+      "default": false,
+      "title": "Speak",
+      "type": "boolean"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "trigger_id": {
+      "title": "Trigger Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "trigger_id",
+    "kind",
+    "period",
+    "clock_ms",
+    "display_minute",
+    "importance",
+    "language",
+    "mode",
+    "text",
+    "source"
+  ],
+  "title": "CommentaryView",
+  "type": "object"
+}

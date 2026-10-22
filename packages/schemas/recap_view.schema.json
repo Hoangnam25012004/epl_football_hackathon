@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "GraphicStatView": {
+      "additionalProperties": false,
+      "properties": {
+        "away": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Away"
+        },
+        "highlight": {
+          "anyOf": [
+            {
+              "enum": [
+                "home",
+                "away"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Highlight"
+        },
+        "home": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "GraphicStatView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Payload of `recap` and of GET /matches/{id}/recap.",
+  "properties": {
+    "degraded": {
+      "default": [],
+      "items": {
+        "enum": [
+          "analyst_fallback",
+          "analyst_disagreement",
+          "explainer_fallback",
+          "circuit_open",
+          "orchestrator_fallback",
+          "writer_fallback",
+          "llm_skipped"
+        ],
+        "type": "string"
+      },
+      "title": "Degraded",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "key_moment_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Key Moment Ids",
+      "type": "array"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "analyst",
+        "casual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "paragraphs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Paragraphs",
+      "type": "array"
+    },
+    "revision": {
+      "title": "Revision",
+      "type": "integer"
+    },
+    "scope": {
+      "enum": [
+        "H1",
+        "FULL"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "llm",
+        "template"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "stats": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/GraphicStatView"
+      },
+      "title": "Stats",
+      "type": "array"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "scope",
+    "language",
+    "mode",
+    "title",
+    "paragraphs",
+    "revision",
+    "source"
+  ],
+  "title": "RecapView",
+  "type": "object"
+}

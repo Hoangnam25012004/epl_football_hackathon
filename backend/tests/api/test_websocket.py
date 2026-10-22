@@ -5,18 +5,18 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import DAY2_HELLO_KEYS, STUDIO_HELLO_KEYS, STUDIO_ON, api_settings
 from starlette.websockets import WebSocketDisconnect
 
 from pundit.api.app import create_app
 from pundit.engine.replay import SteppingClock
-from pundit.llm.settings import Settings
 
 MATCH = "dominant_loser-42"
 
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app(Settings(), clock_factory=SteppingClock)) as test_client:
+    with TestClient(create_app(api_settings(), clock_factory=SteppingClock)) as test_client:
         yield test_client
 
 
@@ -41,7 +41,10 @@ def test_two_clients_see_the_same_stream(client: TestClient) -> None:
         hello_a, hello_b = first.receive_json(), second.receive_json()
         assert hello_a["type"] == hello_b["type"] == "hello" and hello_a["n"] == hello_b["n"]
         assert hello_a["v"] == 1 and hello_a["match_id"] == MATCH
-        assert set(hello_a["payload"]) == {"match", "snapshot", "moments", "claims", "degraded"}
+        # Day 3 adds the studio keys (only when the studio is on)
+        assert set(hello_a["payload"]) == DAY2_HELLO_KEYS | (
+            STUDIO_HELLO_KEYS if STUDIO_ON else set()
+        )
         client.post(f"/matches/{MATCH}/start")
         stream_a, stream_b = read_until_finished(first), read_until_finished(second)
     assert stream_a == stream_b

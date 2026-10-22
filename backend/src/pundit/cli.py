@@ -1,5 +1,5 @@
-"""Command line: `pundit generate | replay | stats | validate | schema | scenarios` (Day 1) and
-`pundit claim | moments | eval | serve` (Day 2).
+"""Command line: `pundit generate | replay | stats | validate | schema | scenarios` (Day 1),
+`pundit claim | moments | eval | serve` (Day 2) and `pundit studio | recap` (Day 3).
 
 Exit codes: 0 success, 1 invalid data, unsatisfiable scenario or failed evaluation, 2 bad
 arguments or configuration.
@@ -12,15 +12,42 @@ import json
 import logging
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from pundit.agents.contracts import ClaimRequest, ClaimResult, Moment, WsMessage
+from pundit.agents.context import build_match_context
+from pundit.agents.contracts import (
+    ClaimRequest,
+    ClaimResult,
+    CommentaryView,
+    FactView,
+    LowerThird,
+    LowerThirdView,
+    MatchContext,
+    Moment,
+    Profile,
+    RecapView,
+    RuleId,
+    StudioOutput,
+    TalkingPoint,
+    Trigger,
+    WsMessage,
+)
 from pundit.agents.moments import detect_all
+from pundit.agents.personalize import (
+    ProfileError,
+    metric_facts,
+    parse_profile,
+    render_commentary,
+    tracker_facts,
+)
+from pundit.agents.recap import RECAP_SCOPES, build_recap_pack
+from pundit.agents.triggers import detect_triggers
 from pundit.domain.errors import InvalidEventError, PunditError
 from pundit.domain.events import EVENT_ADAPTER, PassEvent
+from pundit.domain.log import EventLog, LogView
 from pundit.domain.matchtime import (
     RollingWindow,
     minute_exact,
@@ -36,7 +63,10 @@ from pundit.engine.scenarios import SCENARIOS
 from pundit.engine.validate import validate_match
 from pundit.llm.settings import ConfigError, Settings, load_settings, read_env_file
 from pundit.orchestration.evaluation import load_eval, run_eval, seq_at
+from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.service import ClaimService, StaticSource
+from pundit.orchestration.studio_eval import build_report, run_offline
+from pundit.orchestration.studio_service import StudioService
 from pundit.state.match_state import MatchState
 from pundit.stats import REGISTRY, MetricParams, StatResult, compute, display
 from pundit.stats.possession import possession_totals
@@ -188,6 +218,13 @@ def _schemas() -> dict[str, str]:
         "claim_result.schema.json": dump(ClaimResult.model_json_schema(mode="serialization")),
         "moment.schema.json": dump(Moment.model_json_schema(mode="serialization")),
         "ws_message.schema.json": dump(WsMessage.model_json_schema(mode="serialization")),
+        "talking_point.schema.json": dump(TalkingPoint.model_json_schema(mode="serialization")),
+        "lower_third_view.schema.json": dump(
+            LowerThirdView.model_json_schema(mode="serialization")
+        ),
+        "commentary_view.schema.json": dump(CommentaryView.model_json_schema(mode="serialization")),
+        "recap_view.schema.json": dump(RecapView.model_json_schema(mode="serialization")),
+        "profile.schema.json": dump(Profile.model_json_schema(mode="validation")),
     }
 
 
@@ -316,6 +353,203 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     return 0 if passed else 1
 
 
+def _studio_settings(provider: str) -> Settings:
+    """Settings of a studio run: the .env file and the environment (MOCK_LLM_FAULTS, budgets),
+    with the provider of the command line."""
+    env = {**read_env_file(ENV_FILE), **os.environ}
+    if provider == "mock":
+        env["USE_MOCK_LLM"] = "true"
+    else:
+        env.update({"USE_MOCK_LLM": "false", "LLM_PROVIDER": provider})
+    return Settings.from_env(env)
+
+
+def _profile_arg(text: str) -> dict[str, str]:
+    params: dict[str, str] = {}
+    for item in (part.strip() for part in text.split(",")):
+        if not item:
+            continue
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise argparse.ArgumentTypeError(f"{item!r}: use key=value, e.g. mode=casual,lang=vi")
+        params[key.strip()] = value.strip()
+    return params
+
+
+def _stars(importance: int) -> str:
+    return "*" * importance
+
+
+def _print_lower_third(item: LowerThird, profile: Profile) -> None:
+    vi = profile.language == "vi"
+    stats = []
+    for stat in item.stats:
+        label = stat.label_vi if vi else stat.label_en
+        shown = stat.value if stat.value is not None else f"{stat.home}-{stat.away}"
+        stats.append(f"{label} {shown}")
+    title, subtitle = (item.title_vi, item.subtitle_vi) if vi else (item.title_en, item.subtitle_en)
+    note = f" (replaces {', '.join(item.supersedes)})" if item.supersedes else ""
+    print(f"        lower-third {item.template} [{item.source}]: {title} | {subtitle}{note}")
+    print(f"            {' · '.join(stats)}")
+
+
+def _print_output(
+    output: StudioOutput,
+    profile: Profile,
+    seen: set[RuleId],
+    views: Callable[[int], LogView],
+    context_match: MatchContext,
+) -> None:
+    """One studio job as the viewer of `profile` sees it, with the studio's items."""
+    item = output.commentary
+
+    def tracker() -> tuple[FactView, ...] | None:
+        if profile.player is None:
+            return None
+        return tracker_facts(views(item.as_of_seq), profile.player, profile.language)
+
+    def metric() -> tuple[FactView, ...] | None:
+        if profile.metric is None:
+            return None
+        return metric_facts(views(item.as_of_seq), profile.metric, profile.language)
+
+    view, shown = render_commentary(
+        item, profile, context_match, seen=seen, tracker=tracker, metric_facts=metric
+    )
+    if shown is not None:
+        seen.add(shown)
+    low = " (low)" if view.relevance == "low" else ""
+    print(
+        f"[{view.display_minute:>6}] {view.kind:<16} {_stars(view.importance):<3} "
+        f"[{view.source}]{low} {view.text}"
+    )
+    if view.framing:
+        print(f"        framing: {view.framing}")
+    if view.facts:
+        print(f"        facts: {' · '.join(f'{f.label} {f.display}' for f in view.facts)}")
+    if view.player_tracker:
+        tracked = " · ".join(f"{f.label} {f.display}" for f in view.player_tracker)
+        print(f"        player: {tracked}")
+    if view.explanation is not None:
+        rule = view.explanation
+        print(f"        rule ({rule.depth}): {rule.title}: {rule.text}")
+    tp = output.talking_point
+    if tp is not None:
+        for language, lines, source in (("en", tp.en, tp.source_en), ("vi", tp.vi, tp.source_vi)):
+            said = " | ".join(line.text for line in lines)
+            print(f"        talking point {language} [{source}]: {said}")
+    if output.lower_third is not None:
+        _print_lower_third(output.lower_third, profile)
+    if output.degraded:
+        print(f"        degraded: {', '.join(output.degraded)}")
+
+
+def _cmd_studio(args: argparse.Namespace) -> int:
+    match = _load(args)
+    settings = _studio_settings(args.provider)
+    meta = match.meta
+    context_match = build_match_context(LogView.from_events(meta, match.events[:1]))
+    try:
+        profile = parse_profile(args.profile, context_match)
+    except ProfileError as exc:
+        print(f"error: bad --profile: {exc}", file=sys.stderr)
+        return 2
+    min_importance = args.llm_min_importance or (1 if settings.provider == "mock" else 2)
+    service = StudioService(settings, offline=True, llm_min_importance=min_importance)
+    recaps = RecapService(settings)
+    log = EventLog(meta)
+    for event in match.events:
+        log.append(event)
+    seen: set[RuleId] = set()
+    out = open(args.json, "w", encoding="utf-8") if args.json else None  # noqa: SIM115
+
+    def write(kind: str, payload: dict[str, object]) -> None:
+        if out is not None:
+            out.write(json.dumps({"type": kind, **payload}, ensure_ascii=False) + "\n")
+
+    def on_output(trigger: Trigger, output: StudioOutput) -> None:
+        if not args.quiet:
+            _print_output(output, profile, seen, lambda seq: log.view(seq + 1), context_match)
+        write("commentary", {"item": output.commentary.model_dump(mode="json")})
+        if output.talking_point is not None:
+            write("talking_point", {"item": output.talking_point.model_dump(mode="json")})
+        if output.lower_third is not None:
+            write("lower_third", {"item": output.lower_third.model_dump(mode="json")})
+        spans = [span.model_dump(mode="json") for span in output.trace or ()]
+        write("trace", {"trigger_id": trigger.id, "kind": trigger.kind, "spans": spans})
+
+    print(
+        f"{meta.match_id} | studio | provider {settings.provider} ({settings.model_name}) | "
+        f"profile {profile.key()} | LLM from importance {min_importance} | synthetic data"
+    )
+    try:
+        run = asyncio.run(run_offline(match, service, recaps, on_output=on_output))
+        for scope, revisions in run.recaps.items():
+            final = revisions[-1]
+            text = final.text(profile.language, profile.mode)
+            if not args.quiet:
+                print(f"RECAP {scope} revision {final.revision} [{text.source}]: {text.title}")
+                for paragraph in text.paragraphs:
+                    print(f"        {paragraph}")
+            for recap in revisions:
+                write("recap", {"item": recap.model_dump(mode="json")})
+            spans = [span.model_dump(mode="json") for span in run.recap_traces.get(scope, ())]
+            write("trace", {"trigger_id": final.id, "kind": "recap", "spans": spans})
+    finally:
+        if out is not None:
+            out.close()
+    if not args.report:
+        return 0
+    report = build_report(run)
+    print()
+    for line in report.lines():
+        print(line)
+    failures = report.failures()
+    for failure in failures:
+        print(f"FAIL        {failure}")
+    print("PASSED" if not failures else "FAILED")
+    return 0 if not failures else 1
+
+
+def _cmd_recap(args: argparse.Namespace) -> int:
+    match = _load(args)
+    settings = _studio_settings(args.provider)
+    meta = match.meta
+    log = EventLog(meta)
+    for event in match.events:
+        log.append(event)
+    kind = next(k for k, scope in RECAP_SCOPES.items() if scope == args.scope)
+    trigger = next(t for t in detect_triggers(meta, match.events) if t.kind == kind)
+    moments = [m for m in detect_all(meta, match.events) if m.seq <= trigger.seq]
+    pack = build_recap_pack(args.scope, log.view(trigger.seq + 1), moments)
+    service = RecapService(settings)
+    first = service.template(pack)
+    improved, trace = asyncio.run(service.improve(pack, first))
+    final = improved or first
+    text = final.text(args.lang, args.mode)
+    words = sum(len(part.split()) for part in text.paragraphs)
+    print(
+        f"{meta.match_id} | recap {args.scope} | {args.lang}/{args.mode} | revision "
+        f"{final.revision} [{text.source}] | {words} words | provider {settings.provider} "
+        f"({settings.model_name}) | synthetic data"
+    )
+    print(text.title)
+    for paragraph in text.paragraphs:
+        print(f"  {paragraph}")
+    if final.degraded:
+        print(f"DEGRADED  {', '.join(final.degraded)}")
+    if args.trace:
+        print("TRACE")
+        for span in trace.spans:
+            indent = "  " if span.parent_id else ""
+            error = f" error={span.error}" if span.error else ""
+            print(
+                f"  {span.span_id} {indent}{span.agent:<12} {span.kind:<9} {span.name:<18} "
+                f"{span.status:<9} attempt {span.attempt} {span.duration_ms:9.1f} ms{error}"
+            )
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -436,6 +670,39 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--file", action="append", help="eval JSON file (repeatable); default: both")
     p.add_argument("--provider", choices=["mock", "ollama", "openai", "foundry"], default="mock")
     p.set_defaults(func=_cmd_eval)
+
+    providers = ["mock", "ollama", "openai", "foundry"]
+    p = sub.add_parser(
+        "studio", help="run the studio over a whole match: commentary, talking points, graphics"
+    )
+    source(p)
+    p.add_argument("--provider", choices=providers, default="mock")
+    p.add_argument(
+        "--profile",
+        type=_profile_arg,
+        default={},
+        help="viewer, e.g. mode=casual,lang=vi,club=HAR,beginner=1 (also player=, metric=)",
+    )
+    p.add_argument(
+        "--llm-min-importance",
+        type=int,
+        choices=[1, 2, 3],
+        default=None,
+        help="call the model from this importance (default: 1 with mock, 2 with a real model)",
+    )
+    p.add_argument("--json", help="write every item and trace to this JSONL file")
+    p.add_argument("--report", action="store_true", help="print the evaluation report")
+    p.add_argument("--quiet", action="store_true", help="do not print the items")
+    p.set_defaults(func=_cmd_studio)
+
+    p = sub.add_parser("recap", help="write the half-time or full-time recap of a match")
+    source(p)
+    p.add_argument("--scope", choices=["H1", "FULL"], default="FULL")
+    p.add_argument("--lang", choices=["vi", "en"], default="vi")
+    p.add_argument("--mode", choices=["analyst", "casual"], default="analyst")
+    p.add_argument("--provider", choices=providers, default="mock")
+    p.add_argument("--trace", action="store_true", help="print the agent trace")
+    p.set_defaults(func=_cmd_recap)
 
     p = sub.add_parser("serve", help="run the API (REST + WebSocket)")
     p.add_argument("--host", default="127.0.0.1")

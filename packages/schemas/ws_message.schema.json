@@ -23,7 +23,12 @@
         "moment",
         "claim",
         "status",
-        "resync"
+        "resync",
+        "talking_point",
+        "lower_third",
+        "commentary",
+        "recap",
+        "talking_point_status"
       ],
       "title": "Type",
       "type": "string"

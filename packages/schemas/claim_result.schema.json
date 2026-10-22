@@ -314,7 +314,11 @@
             "WRONG_COMPARISON",
             "WRONG_ATTRIBUTION",
             "FRAGMENT",
-            "UNGROUNDED"
+            "UNGROUNDED",
+            "WRONG_ENTITY",
+            "WRONG_OUTCOME",
+            "WRONG_LANGUAGE",
+            "WRONG_REGISTER"
           ],
           "title": "Code",
           "type": "string"
@@ -626,7 +630,9 @@
           "analyst_disagreement",
           "explainer_fallback",
           "circuit_open",
-          "orchestrator_fallback"
+          "orchestrator_fallback",
+          "writer_fallback",
+          "llm_skipped"
         ],
         "type": "string"
       },

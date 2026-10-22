@@ -1,6 +1,7 @@
 """Shared test helpers: cached generated matches, claim contexts and a mock claim service."""
 
 import asyncio
+import os
 from collections.abc import Coroutine
 from functools import cache
 from typing import Any
@@ -21,6 +22,11 @@ from pundit.llm.settings import Settings
 from pundit.orchestration.evaluation import seq_at
 from pundit.orchestration.service import ClaimService, StaticSource
 
+# The Day 2 API tests run with the studio on (default) and again with STUDIO_ENABLED=false,
+# which must give exactly the Day 2 behaviour (docs/day3-design.md section 16.6).
+STUDIO_ON = os.environ.get("STUDIO_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+DAY2_HELLO_KEYS = {"match", "snapshot", "moments", "claims", "degraded"}
+STUDIO_HELLO_KEYS = {"profile", "talking_points", "lower_thirds", "commentary", "recaps"}
 SCENARIO_KEYS = ("dominant_loser", "comeback_var", "red_card_swing", "balanced")
 SCRIPTED_KEYS = ("dominant_loser", "comeback_var", "red_card_swing")
 SEEDS = tuple(range(8))
@@ -70,6 +76,11 @@ def claim_context(
 
 def run[T](coroutine: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coroutine)
+
+
+def api_settings(**values: Any) -> Settings:
+    """Settings of an API test app: the studio follows STUDIO_ENABLED."""
+    return Settings(studio_enabled=STUDIO_ON, **values)
 
 
 def mock_service(**settings: Any) -> ClaimService:

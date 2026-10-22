@@ -1,0 +1,253 @@
+{
+  "$defs": {
+    "GraphicStatView": {
+      "additionalProperties": false,
+      "properties": {
+        "away": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Away"
+        },
+        "highlight": {
+          "anyOf": [
+            {
+              "enum": [
+                "home",
+                "away"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Highlight"
+        },
+        "home": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "GraphicStatView",
+      "type": "object"
+    },
+    "TeamBadge": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_color": {
+          "title": "Primary Color",
+          "type": "string"
+        },
+        "secondary_color": {
+          "title": "Secondary Color",
+          "type": "string"
+        },
+        "short_name": {
+          "title": "Short Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name",
+        "primary_color",
+        "secondary_color"
+      ],
+      "title": "TeamBadge",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Payload of `lower_third`: a lower-third in the profile's language.",
+  "properties": {
+    "away": {
+      "$ref": "#/$defs/TeamBadge"
+    },
+    "clock_ms": {
+      "title": "Clock Ms",
+      "type": "integer"
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+    },
+    "duration_ms": {
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "home": {
+      "$ref": "#/$defs/TeamBadge"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "language": {
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "match_clock": {
+      "title": "Match Clock",
+      "type": "string"
+    },
+    "period": {
+      "title": "Period",
+      "type": "integer"
+    },
+    "player": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_]+-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Player"
+    },
+    "priority": {
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "title": "Priority",
+      "type": "integer"
+    },
+    "show_at_match_ms": {
+      "title": "Show At Match Ms",
+      "type": "integer"
+    },
+    "source": {
+      "enum": [
+        "rule",
+        "llm"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "stats": {
+      "items": {
+        "$ref": "#/$defs/GraphicStatView"
+      },
+      "title": "Stats",
+      "type": "array"
+    },
+    "subtitle": {
+      "title": "Subtitle",
+      "type": "string"
+    },
+    "supersedes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Supersedes",
+      "type": "array"
+    },
+    "synthetic": {
+      "const": true,
+      "default": true,
+      "title": "Synthetic",
+      "type": "boolean"
+    },
+    "template": {
+      "enum": [
+        "score_update",
+        "team_compare",
+        "player_card",
+        "momentum"
+      ],
+      "title": "Template",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "trigger_id": {
+      "title": "Trigger Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "trigger_id",
+    "template",
+    "language",
+    "title",
+    "subtitle",
+    "stats",
+    "home",
+    "away",
+    "period",
+    "clock_ms",
+    "match_clock",
+    "show_at_match_ms",
+    "duration_ms",
+    "priority",
+    "evidence_event_ids",
+    "source",
+    "disclaimer"
+  ],
+  "title": "LowerThirdView",
+  "type": "object"
+}

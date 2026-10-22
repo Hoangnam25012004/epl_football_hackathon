@@ -6,19 +6,18 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers import generated
+from helpers import STUDIO_ON, api_settings, generated
 
 from pundit.agents.moments import detect_all
 from pundit.api.app import create_app
 from pundit.engine.replay import SteppingClock
-from pundit.llm.settings import Settings
 
 MATCH = "dominant_loser-42"
 
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app(Settings(), clock_factory=SteppingClock)) as test_client:
+    with TestClient(create_app(api_settings(), clock_factory=SteppingClock)) as test_client:
         yield test_client
 
 
@@ -42,7 +41,7 @@ def create(client: TestClient, **body: Any) -> dict[str, Any]:
 
 def test_health(client: TestClient) -> None:
     body = client.get("/healthz").json()
-    assert body == {
+    expected: dict[str, Any] = {
         "status": "ok",
         "llm_provider": "mock",
         "model": "mock",
@@ -50,6 +49,15 @@ def test_health(client: TestClient) -> None:
         "sessions": 0,
         "synthetic": True,
     }
+    if STUDIO_ON:  # Day 3: the studio block; absent with STUDIO_ENABLED=false
+        expected["studio"] = {
+            "enabled": True,
+            "queued": 0,
+            "dropped": 0,
+            "lag_ms_p95": None,
+            "degraded": [],
+        }
+    assert body == expected
 
 
 def test_match_lifecycle_and_moments(client: TestClient) -> None:
@@ -134,7 +142,7 @@ def test_invalid_input(client: TestClient, path: str, body: dict[str, Any]) -> N
 
 
 def test_llm_failures_are_never_5xx() -> None:
-    settings = Settings(mock_llm_faults="analyst:error,explainer:error", llm_timeout_s=0.5)
+    settings = api_settings(mock_llm_faults="analyst:error,explainer:error", llm_timeout_s=0.5)
     with TestClient(create_app(settings, clock_factory=SteppingClock)) as client:
         create(client)
         wait_finished(client)
@@ -146,15 +154,17 @@ def test_llm_failures_are_never_5xx() -> None:
 
 
 def test_shutdown_leaves_no_task() -> None:
-    app = create_app(Settings(), clock_factory=SteppingClock)
+    app = create_app(api_settings(), clock_factory=SteppingClock)
     with TestClient(app) as client:
         create(client, speed=1)  # slow replay, still running at shutdown
     sessions = app.state.manager.sessions
     assert sessions and all(s._task is None or s._task.done() for s in sessions.values())
+    # Day 3: the studio and recap workers are cancelled too
+    assert not any(s.director is not None and s.director.active() for s in sessions.values())
 
 
 def test_cors_allows_the_dashboard() -> None:
-    with TestClient(create_app(Settings(), clock_factory=SteppingClock)) as client:
+    with TestClient(create_app(api_settings(), clock_factory=SteppingClock)) as client:
         response = client.options(
             "/healthz",
             headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},

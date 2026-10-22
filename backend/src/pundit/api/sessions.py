@@ -4,6 +4,11 @@ One replay task per session is the only writer: it applies each event to the Mat
 the MomentDetector and broadcasts through the Hub, in that order (an event is never broadcast
 before it is applied). Claims read immutable prefix views (`view_at`), so a replay running at
 20x never moves the numbers of a claim being verified.
+
+Day 3 (docs/day3-design.md sections 11 and 14.4): the replay also detects cues and, after it has
+broadcast an event and its moments, offers their triggers to the session's StudioDirector. The
+studio items are published per viewer profile: one message number for everybody, the payload
+rendered once per profile.
 """
 
 import asyncio
@@ -13,9 +18,31 @@ from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any, Literal
 
-from pundit.agents.contracts import ClaimRequest, ClaimResult, Moment
-from pundit.agents.moments import MomentDetector
-from pundit.api.hub import DEFAULT_QUEUE_SIZE, Hub
+from pundit.agents.context import build_match_context
+from pundit.agents.contracts import (
+    ClaimRequest,
+    ClaimResult,
+    CommentaryItem,
+    FactView,
+    LowerThird,
+    MatchContext,
+    Moment,
+    Profile,
+    Recap,
+    RuleId,
+    TalkingPoint,
+    TalkingPointStatus,
+)
+from pundit.agents.personalize import (
+    metric_facts,
+    render_commentary,
+    render_lower_third,
+    render_recap,
+    tracker_facts,
+)
+from pundit.agents.triggers import TriggerFeed
+from pundit.api.hub import DEFAULT_QUEUE_SIZE, Client, Hub
+from pundit.api.studio import StudioCrew, StudioDirector, StudioItem, StudioKind
 from pundit.domain.events import EVENT_ADAPTER, Event
 from pundit.domain.log import LogView
 from pundit.domain.meta import MatchMeta
@@ -34,6 +61,9 @@ HELLO_CLAIMS = 20
 SNAPSHOT_EVERY_MS = 30_000  # of match time, so the throttle does not depend on the speed
 SNAPSHOT_AFTER = frozenset({"goal", "card", "period_end", "var_check", "substitution"})
 SILENT_EVENTS = frozenset({"player_physical"})
+HELLO_TALKING_POINTS = 20
+HELLO_LOWER_THIRDS = 5
+HELLO_COMMENTARY = 30
 
 
 class MatchSession:
@@ -46,6 +76,7 @@ class MatchSession:
         from_minute: float = 0.0,
         clock: Clock | None = None,
         queue_size: int = DEFAULT_QUEUE_SIZE,
+        studio: StudioCrew | None = None,
     ) -> None:
         self.match = match
         self.service = service
@@ -54,10 +85,20 @@ class MatchSession:
         self.clock = clock or RealClock()
         self.queue_size = queue_size
         self.state = MatchState(match.meta)
-        self.detector = MomentDetector(match.meta)
+        self.feed = TriggerFeed(match.meta)
+        self.detector = self.feed.moments
         self.moments: list[Moment] = []
         self.claims: OrderedDict[str, ClaimResult] = OrderedDict()
-        self.hub = Hub(match.meta.match_id, self.state_payload)
+        self.director = StudioDirector(studio, self) if studio is not None else None
+        # names and squads for profiles and personalization (the same at every seq)
+        self.context: MatchContext = build_match_context(
+            LogView.from_events(match.meta, match.events[:1])
+        )
+        self.hub = Hub(
+            match.meta.match_id,
+            self.state_payload,
+            state_for=self.client_state if studio is not None else None,
+        )
         self.status: SessionStatus = "created"
         self.error: str | None = None
         self._task: asyncio.Task[None] | None = None
@@ -112,6 +153,7 @@ class MatchSession:
             "claims": len(self.claims),
             "synthetic": True,
             "disclaimer": meta.disclaimer,
+            **({"studio": self.director.stats()} if self.director is not None else {}),
         }
 
     def state_payload(self) -> dict[str, Any]:
@@ -126,6 +168,124 @@ class MatchSession:
             ],
             "degraded": self.service.degraded_now(),
         }
+
+    def client_state(self, client: Client) -> dict[str, Any]:
+        """`hello` / `resync` for one viewer: the Day 2 state plus the latest studio items in
+        the viewer's language and register. Rules explained here count as seen."""
+        payload = self.state_payload()
+        director = self.director
+        if director is None:
+            return payload
+        profile = client.profile
+        commentary = []
+        for item in list(director.commentary.values())[-HELLO_COMMENTARY:]:
+            view, shown = self.render_commentary(item, profile, client.seen_rules)
+            if shown is not None:
+                client.seen_rules.add(shown)
+            commentary.append(view)
+        payload.update(
+            {
+                "profile": profile.model_dump(mode="json"),
+                "talking_points": [
+                    public_talking_point(tp).model_dump(mode="json")
+                    for tp in list(director.talking_points.values())[-HELLO_TALKING_POINTS:]
+                ],
+                "lower_thirds": [
+                    render_lower_third(lt, profile).model_dump(mode="json")
+                    for lt in list(director.lower_thirds.values())[-HELLO_LOWER_THIRDS:]
+                ],
+                "commentary": commentary,
+                "recaps": [
+                    render_recap(director.recaps[scope], profile).model_dump(mode="json")
+                    for scope in ("H1", "FULL")
+                    if scope in director.recaps
+                ],
+            }
+        )
+        return payload
+
+    # ------------------------------------------------------------------ studio (Day 3)
+
+    def render_commentary(
+        self, item: CommentaryItem, profile: Profile, seen: set[RuleId]
+    ) -> tuple[dict[str, Any], RuleId | None]:
+        """One commentary item for one viewer (JSON), and the rule it explained in full."""
+
+        def tracker() -> tuple[FactView, ...] | None:
+            if profile.player is None:
+                return None
+            return tracker_facts(self.view_at(item.as_of_seq), profile.player, profile.language)
+
+        def metric() -> tuple[FactView, ...] | None:
+            if profile.metric is None:
+                return None
+            return metric_facts(self.view_at(item.as_of_seq), profile.metric, profile.language)
+
+        view, shown = render_commentary(
+            item, profile, self.context, seen=seen, tracker=tracker, metric_facts=metric
+        )
+        return view.model_dump(mode="json"), shown
+
+    def publish_studio(self, kind: StudioKind, item: StudioItem) -> None:
+        """Broadcast a studio item, rendered once per profile (the director calls this)."""
+        if isinstance(item, TalkingPoint):
+            self.hub.publish("talking_point", public_talking_point(item).model_dump(mode="json"))
+        elif isinstance(item, LowerThird):
+            lower_third = item
+            cache: dict[str, dict[str, Any]] = {}
+
+            def lower_third_for(client: Client) -> dict[str, Any]:
+                key = client.profile.language
+                if key not in cache:
+                    view = render_lower_third(lower_third, client.profile)
+                    cache[key] = view.model_dump(mode="json")
+                return cache[key]
+
+            self.hub.publish_each("lower_third", lower_third_for)
+        elif isinstance(item, Recap):
+            recap = item
+            recaps: dict[tuple[str, str], dict[str, Any]] = {}
+
+            def recap_for(client: Client) -> dict[str, Any]:
+                key = (client.profile.language, client.profile.mode)
+                if key not in recaps:
+                    recaps[key] = render_recap(recap, client.profile).model_dump(mode="json")
+                return recaps[key]
+
+            self.hub.publish_each("recap", recap_for)
+        else:
+            self._publish_commentary(item)
+        del kind
+
+    def _publish_commentary(self, item: CommentaryItem) -> None:
+        rendered: dict[tuple[str, frozenset[str]], tuple[dict[str, Any], RuleId | None]] = {}
+
+        def commentary_for(client: Client) -> dict[str, Any]:
+            profile = client.profile
+            seen = (
+                frozenset(rule for rule in item.rules if rule in client.seen_rules)
+                if profile.beginner
+                else frozenset()
+            )
+            key = (profile.key(), seen)
+            if key not in rendered:
+                rendered[key] = self.render_commentary(item, profile, client.seen_rules)
+            payload, shown = rendered[key]
+            if shown is not None:
+                client.seen_rules.add(shown)
+            return payload
+
+        self.hub.publish_each("commentary", commentary_for)
+
+    def set_talking_point_status(
+        self, item_id: str, status: TalkingPointStatus
+    ) -> TalkingPoint | None:
+        if self.director is None:
+            return None
+        updated = self.director.set_status(item_id, status)
+        if updated is not None:
+            self.hub.publish("talking_point_status", {"id": updated.id, "status": updated.status})
+        return updated
 
     # ------------------------------------------------------------------ replay (single writer)
 
@@ -143,9 +303,10 @@ class MatchSession:
         return due
 
     def apply(self, event: Event, *, publish: bool) -> list[Moment]:
-        """Apply one event, detect moments and (unless catching up) broadcast both."""
+        """Apply one event, detect moments and cues and (unless catching up) broadcast them,
+        then offer the triggers to the studio: an item never comes before its event."""
         self.state.apply(event)
-        found = self.detector.feed(event, self.state.view())
+        found, triggers = self.feed.feed(event, self.state.view())
         self.moments.extend(found)
         if publish:
             if event.type not in SILENT_EVENTS:
@@ -154,6 +315,9 @@ class MatchSession:
                 self.hub.publish("moment", moment.model_dump(mode="json"))
             if self._snapshot_due(event):
                 self.hub.publish("snapshot", self.snapshot().model_dump(mode="json"))
+            if self.director is not None:
+                for trigger in triggers:
+                    self.director.offer(trigger)
         return found
 
     async def _run(self) -> None:
@@ -196,6 +360,8 @@ class MatchSession:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        if self.director is not None:
+            await self.director.stop()
         if self.status == "running":  # also when the task was cancelled before it ever ran
             self._set_status("stopped")
 
@@ -228,6 +394,11 @@ def public_claim(result: ClaimResult) -> ClaimResult:
     return result.model_copy(update={"trace": None})
 
 
+def public_talking_point(item: TalkingPoint) -> TalkingPoint:
+    """The talking point as broadcast: without the trace."""
+    return item.model_copy(update={"trace": None})
+
+
 class SessionManager:
     """Sessions by match id; generated matches are cached (generation takes ~0.3 s)."""
 
@@ -238,8 +409,10 @@ class SessionManager:
         clock_factory: Callable[[], Clock] = RealClock,
         queue_size: int = DEFAULT_QUEUE_SIZE,
         max_sessions: int = 16,
+        studio: StudioCrew | None = None,
     ) -> None:
         self.service = service
+        self.studio = studio
         self.clock_factory = clock_factory
         self.queue_size = queue_size
         self.max_sessions = max_sessions
@@ -283,6 +456,7 @@ class SessionManager:
                 from_minute=from_minute,
                 clock=self.clock_factory(),
                 queue_size=self.queue_size,
+                studio=self.studio,
             )
             self.sessions[match_id] = session
         if autostart:
