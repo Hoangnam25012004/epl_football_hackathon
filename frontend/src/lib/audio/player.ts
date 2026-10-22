@@ -30,6 +30,15 @@ export type Timers = {
 
 export const START_TIMEOUT_MS = 12_000;
 
+/** `element.play()` as a promise: old browsers (and jsdom) return nothing, some throw. */
+function playing(element: ElementLike): Promise<void> {
+  try {
+    return Promise.resolve(element.play());
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
 /** 50 ms of silence (8 kHz, 16-bit, mono) as a data URI: played in a click to unlock audio. */
 export function silentWav(): string {
   const samples = 400;
@@ -75,7 +84,7 @@ export class AudioPlayer {
     const element = this.element;
     if (element) {
       element.src = silentWav();
-      element.play().catch(() => {
+      playing(element).catch(() => {
         /* the next play() will tell */
       });
     }
@@ -117,7 +126,7 @@ export class AudioPlayer {
     element.volume = 1;
     element.src = this.base + audio.url;
     this.startTimer = this.timers.setTimer(() => this.finish(id, "failed"), START_TIMEOUT_MS);
-    element.play().catch((error: unknown) => {
+    playing(element).catch((error: unknown) => {
       if (this.current?.id !== id) return; // stopped meanwhile
       if (error instanceof DOMException && error.name === "NotAllowedError") {
         this.stop();

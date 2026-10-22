@@ -81,7 +81,7 @@ export function RecapAudio({
     const element = audio.current;
     if (!element) return;
     element.currentTime = 0;
-    void element.play();
+    void Promise.resolve(element.play()).catch(() => {}); // a refusal shows on the player
   };
 
   const stale = revision !== null && recap.revision > revision;
