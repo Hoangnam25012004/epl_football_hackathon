@@ -1182,3 +1182,104 @@ Chạy theo thứ tự. Mỗi pha có điều kiện qua; chưa qua thì sửa r
 | 13 | Narrator | ✅ Agent tất định chạy sau Personalization, ngoài workflow MAF; breaker, cổng giới hạn và trace riêng |
 | 14 | STT | ✅ **P2, thiết kế đủ, làm cuối, cắt đầu tiên:** WAV 16 kHz → REST short audio; chữ chỉ điền vào ô claim, không tự gửi |
 | 15 | Lời chào | ✅ Phát khi bật giọng: công bố giọng AI và dữ liệu tổng hợp, thử loa, mở khoá autoplay |
+
+---
+
+## 19. As-built (23/10/2026)
+
+### 19.1. Đã xây
+
+- **Backend G1–G5 (giọng đọc):**
+  - Hợp đồng chỉ thêm khoá: `Profile.voice`, `CommentaryView.speech`, `RecapView.speech`, `SpeechCue` / `SpeechSegment` / `AudioRef` / `SpeechVoice` / `RecognitionResult`; 4 schema mới trong `packages/schemas`, type frontend sinh lại.
+  - Chuẩn hoá đọc tiếng Việt (`spoken_numbers`, `spoken`, từ điển theo trận) có bộ đọc ngược làm oracle; prosody 9 preset + SSML (chỉ `prosody` + `break`); kịch bản đọc (`narration`); SpeechGuard G1–G7.
+  - `speech/`: port, mock WAV tất định, Azure TTS qua REST (key hoặc Entra `aad#resourceId#token`), `RateGate`, breaker có `trip`, ngân sách ký tự, cache clip LRU (ghi nguyên tử), kho bền `LocalStore` / `BlobStore`, `Narrator` (single-flight, span trong Agent Trace), làm ấm clip (`warm.py`).
+  - API: `GET|HEAD /audio/{clip}` (Range, `immutable`, 503 có lý do), `/speech/voices`, `/speech/greeting`, recap `?voice=`, khối `speech` trong `/healthz`; phiên chỉ gắn `speech` cho message live của hồ sơ có `voice`.
+  - CLI: `pundit speak`, `pundit tts warm`, `pundit recap --audio`. `.env.example` chỉ có tên biến.
+- **Frontend G6–G7:** `lib/audio/` (`scheduler` thuần, `player`, `browser-voice`, `controller`), `useCommentaryAudio`, `onLive` trong `useMatchConnection`, `useSpeechHealth`; `VoiceControl` (bật / tắt, nữ / nam, chip nguồn giọng, bỏ qua, phím V / N), thẻ đang đọc, `RecapAudio` (nghe, tua, nghe lại, giọng trình duyệt), chọn giọng trong `ProfileSetup`, khoá i18n `fan.voice*` / `fan.recap*`.
+- **G8 STT (P2):** `Transcriber` (kiểm WAV, một lần gọi một lúc, 10 lần mỗi phút, bản ghi dưới 300 ms không gọi), `azure_stt.py` (REST short audio), `POST /speech/recognize` (chỉ mount khi `STT_PROVIDER` khác `off`); Studio có `MicButton` (AudioWorklet `public/worklets/pcm-capture.js`, `recorder.ts` tải động), chữ chỉ điền vào ô claim.
+- **Công cụ:** `scripts/smoke_voice.py` (V9), `scripts/tts_review.py` (V10), `scripts/record_ws.py` ghi thêm fixture có giọng `dominant_loser-42.casual-vi-beginner-har-female`.
+- **Commit (local, chưa push):** `docs: Day 5 Vietnamese voice design` · `feat(speech): Vietnamese voice backend (Day 5 G1-G5)` · `feat(fan): Vietnamese voice, recap audio, voice choice (Day 5 G6-G7)` · `feat(studio): speak a claim (speech to text, Day 5 G8)` · `fix(ui): no prefetch on the landing page's match links` · `test: Day 5 voice (smoke V9, perf V8, listening review V10)` · `fix(speech): a Narrator span never starts before the studio job` · `docs: Day 5 voice as-built`.
+
+### 19.2. Khác biệt so với thiết kế và lý do
+
+| # | Chỗ | Thiết kế | As-built | Lý do |
+|---|---|---|---|---|
+| 1 | Số đoạn tối đa của một cue | 16 | `MAX_SPEECH_SEGMENTS = 24` | Recap có mở đầu, đoạn recap, các khoảnh khắc ("Phút X: …") và kết, vượt 16 đoạn |
+| 2 | Độ dài recap | Analyst 1–1,5 phút, casual 40–60 s | Trần 120 s; quá thì bỏ dần khoảnh khắc phụ, mới nhất trước (`fit_recap`). Ước tính cho `dominant_loser-42` casual: H1 51 s, FULL 65 s | Ước tính trên 12 trận trước khi cắt: H1 49–95 s, FULL 64–147 s. Bỏ khoảnh khắc phụ giữ được bàn thắng, thẻ đỏ, VAR |
+| 3 | Giải thích luật trong audio | Tiêu đề + bản ngắn | Chỉ đọc bản ngắn | Bản ngắn đã mở đầu bằng tên luật; đọc thêm tiêu đề thành lặp |
+| 4 | `TTS_MAX_RPM` | 18 / phút | Không đặt thì theo provider: azure 18, mock 60 000 | Cổng an toàn cho F0 làm mock chậm vô ích (`tts warm` mất 28 s, nay 3,1 s cho 210 clip) |
+| 5 | Đường dẫn worklet | `public/audio/pcm-worklet.js` | `public/worklets/pcm-capture.js` | Route `/audio/{clip}` của backend chặn mọi đường `/audio/*` (trả 422) |
+| 6 | STT khi `STT_PROVIDER=off` | `503` | Route không được mount (`404`); `/healthz` báo `stt: off`, nút micro ẩn | Giữ app y như trước khi tắt STT, cùng nguyên tắc với `TTS_PROVIDER=off` |
+| 7 | Bản ghi rất ngắn | — | Dưới 300 ms trả `silence`, không gọi recognizer, không tính vào hạn mức | Một cú bấm nhầm không tốn quota F0 |
+| 8 | Trạng thái micro | Bấm là "đang ghi" | Thêm pha "đang mở micro": chỉ hiện "đang ghi" khi micro đã có mẫu âm thanh (chờ tối đa 4 s) | Đo trên Edge: lần dùng đầu, mẫu đầu tiên tới sau 1,4 s; người nói ngay sẽ mất lời đầu (lỗi do A10 phát hiện, mục 19.4) |
+| 9 | `reset` khi có hello mới | Bỏ mọi mục đang chờ | Giữ lời chào (`greeting`) | Đổi giọng khi đang đọc thì lời chào giọng mới chờ phía sau; hello của kết nối mới không được xoá nó |
+| 10 | A2 (bàn thắng chen ngang) | Backend thật | Project `mock`: tự gửi câu "ít kịch tính" (clip 6 s) rồi bàn thắng sau 1,3 s | Cần thời điểm chính xác; trên backend thật, clip 0,1× quá ngắn nên không bao giờ chen. Luật R2 còn có unit + property test |
+| 11 | A3 (Pause / Resume) | Kiểm hàng đợi lúc dừng | Kiểm tích hợp: `paused` trong `window.punditAudio`, 3 s không có câu mới, Resume đọc tiếp | Trên backend thật không dựng được hàng đợi đầy đúng lúc; luật R9 có unit + property test |
+| 12 | A5 (lỗi TTS) | Backend chạy `MOCK_TTS_FAULTS=error` | `page.route` trả 503 cho mọi clip, cùng đường phía client | Backend E2E dùng chung cho mọi test; lỗi phía server được kiểm ở smoke V9 và test backend |
+| 13 | V9 (smoke) | Khởi động lại server giữa trận với `error:5` | Lượt thứ hai là một trận mới với `MOCK_TTS_FAULTS=error:6`, breaker cooldown 10 s | Phiên nằm trong bộ nhớ, khởi động lại là mất trận. Với ít lỗi hơn số lời gọi đang chạy (vd. `error:3`), một lời gọi thành công đóng breaker ngay, nên không thấy `circuit_open` |
+| 14 | Cờ `--autoplay-policy=no-user-gesture-required` | Có trong E2E | Không dùng | Test qua với chính sách autoplay thật (cú click của Playwright là cử chỉ người dùng), gần trình duyệt thật hơn. Có cờ micro giả cho A10 |
+| 15 | Fixture Ngày 4 ghi lại | Giống hệt khi bỏ khoá mới | Giống hệt, trừ `match.studio.lag_ms_p95` trong hello giữa trận (321,1 → 299,1 ms) | Đó là số đo thời gian thật, đổi sau mỗi lần ghi, không phải do Ngày 5 |
+| 16 | G0: giọng tiếng Việt của Edge | Có HoaiMy / NamMinh Online | Edge dưới Playwright chỉ có 3 giọng SAPI en-US; máy này không có giọng vi | E2E tiêm `speechSynthesis` giả (`tests/voice.ts`). Nghe bằng tai (M1, M2, V10) cần Edge có mạng với giọng Online, hoặc Azure |
+| 17 | Test live Azure (`pytest -m live -k speech`) | ~8 test | Chưa viết | Chưa có key: viết và chạy ở tầng B, khi có Azure |
+
+### 19.3. Kết quả kiểm thử theo §13
+
+| Pha | Kết quả |
+|---|---|
+| **V1. Gate tĩnh** | Backend: `ruff check .`, `ruff format --check .` (223 file), `mypy` (126 file): **sạch**. Frontend: `npm run check` (type sinh từ schema không lệch, eslint, typecheck, prettier): **sạch** |
+| **V2. Hồi quy backend** | Lần 1, `pytest -m "not live" --cov=pundit` (gồm slow; test perf tự bỏ qua khi đo coverage): 2024 passed, 12 skipped, **1 failed**: `test_voices_greeting_health_and_trace` hỏng ngẫu nhiên do làm tròn (mục 19.4 dòng 12). Sau khi sửa: `pytest -m "not live"` (gồm slow, perf cả của Ngày 5, Blob với Azurite): **2040 passed**, 1 skipped (test chỉ chạy khi chưa cài azure-identity), 0 failed, trong 8 phút 25 giây. `TTS_PROVIDER=off`, `-m "not live and not slow and not perf"`: **1973 passed**, 1 skipped. Coverage tổng **95 %** (ngưỡng 93 %); module giọng đọc (`speech/*`, `spoken*`, `ssml`, `prosody`, `narration`, `speech_cue`, `speech_guard`, `voices`, `api/audio`) khoảng **95 %** số dòng; thấp nhất: narrator 89 %, speech_guard 87 % (ngưỡng 90 % cho cả nhóm) |
+| **V3. Lõi tất định** | Quét chuẩn hoá + SpeechGuard trên 4 kịch bản × 3 seed (mọi câu `speak` của cả hai giọng, câu mở đầu theo CLB, bản ngắn của luật, recap, lời chào): **0 trượt guard, 0 chữ số sót, mọi số khứ hồi đúng**. Property: `parse_vi_number(vi_cardinal(n)) == n` với mọi n ≤ 999 999 999; SSML luôn parse được với chữ Unicode ngẫu nhiên |
+| **V4. Dịch vụ + ma trận lỗi** | Narrator, gate, breaker, cache, kho bền, Azure qua `httpx.MockTransport` (mọi mã 400 / 401 làm mới token / 403 / 415 / 429 + `Retry-After` / 5xx, timeout, `BadAudio`): xanh. `BlobStore` chạy thật với **Azurite** (put / get / exists, `overwrite=False`, content type) |
+| **V5. API / WS / hợp đồng** | Test API / WS / CLI xanh. Fixture Ngày 4 ghi lại: giống hệt khi bỏ `speech` và `profile.voice` (trừ mục 19.2 dòng 15). Fixture mới có giọng: `n` liên tục, 25 câu `speak` đều có clip, `hello` không đọc, recap H1 / FULL có audio; hồ sơ không có giọng không bao giờ nhận `speech`. Mọi message hợp lệ với schema |
+| **V6. Frontend** | Vitest **146 passed** (14 file). Dòng phủ `lib/audio`: **98,5 %** (scheduler 100 %, controller 98,7 %, recorder 100 %, browser-voice 97,3 %, player 95,5 %). Property I1–I8 (400 chuỗi ngẫu nhiên mỗi lần chạy) bắt được cả 4 lỗi cài thử: hai giọng cùng lúc, chen ngang lúc dừng, không bỏ câu quá hạn, bỏ bàn thắng khi đầy hàng đợi |
+| **V7. E2E** | Playwright **35/35**: Ngày 4 (23 + E1b mới) và Ngày 5 A1–A11 (A1, A3–A8, A10, A11 trên backend thật với mock TTS 0,1×; A2, A9 ở project `mock`). Không lỗi console, `maxConcurrent` luôn 1 |
+| **V8. Hiệu năng** | Replay 1000x có 3 hồ sơ nghe (mọi clip đều tổng hợp): **7,90 s so với 7,89 s** khi tắt giọng (+0,1 %, ngưỡng 20 %). Câu → clip sẵn sàng ở 200x, mock 300 ms: **p95 328 ms** (min 285, max 585) trên 62 clip, nên event → clip < 300 ms (lag studio Ngày 3) + 328 ms, dưới ngưỡng 1,5 s. Cache: số file đúng bằng số clip đã làm |
+| **V9. Smoke giọng đọc** | `smoke_voice.py --speed 60`: **PASSED** cả hai lượt. Sạch: 50 clip đều 200, mỗi clip tổng hợp một lần, message → clip p95 453 ms, recap H1 / FULL × 2 giọng có trong kho bền, hồ sơ EN không có audio, đúng giọng theo hồ sơ. Có lỗi (`error:6`): 6 × 503 `unavailable`, breaker mở (câu mang note `circuit_open` cho giọng trình duyệt) rồi đóng, các clip còn lại 200, recap vẫn có audio. Không lỗi trong log, không task treo |
+| **V10. Nghe duyệt** | `tts_review.py` sinh `backend/review/index.html` (`dominant_loser-42`, giọng nữ): 106 dòng, 64 clip, **0 câu bị SpeechGuard từ chối**, không chữ số nào trong câu đọc. **Phần nghe bằng tai chưa làm:** máy này không có giọng tiếng Việt (mục 19.2 dòng 16) |
+| **V11. Ghi kết quả** | Mục này; `checklist.md`; `claude.md`; commit local (chưa push) |
+
+Nghiệm thu thủ công M1–M10 (§13) chưa làm vì cần nghe được tiếng Việt: Edge có giọng Online (cần mạng) với `TTS_PROVIDER=browser`, hoặc key Azure. Các hành vi kiểm được bằng máy của M3–M5, M7–M9 đã có E2E tương ứng (A6, A3, A8, A9, A10, A11).
+
+### 19.4. Lỗi tìm thấy khi kiểm thử và cách sửa
+
+| # | Lỗi | Tìm bằng | Sửa |
+|---|---|---|---|
+| 1 | Span của Narrator trong Agent Trace bắt đầu ở 0 ms: director lưu trace sau khi đã publish | Test API trace | Lưu trace ngay khi có output, rồi mới publish |
+| 2 | Mock bị cổng F0 (18 / phút) làm chậm | `pundit tts warm` mất 28 s | Hạn mức mặc định theo provider (mục 19.2 dòng 4) |
+| 3 | Chuẩn hoá: lệch chỉ số cặp số sau khi lọc, "âm" nằm ngoài khoảng số, viết hoa đầu câu, ranh giới từ của "phút" / số thứ tự | Bảng vàng + property | Duyệt danh sách gốc, gộp "âm" vào phần đọc của số, luật viết hoa riêng |
+| 4 | Hook đọc `ref` trong render; `setState` trong effect để reset recap | eslint (React Compiler) | Controller giữ bằng `useState`; recap reset bằng `key` theo phạm vi / ngôn ngữ / chế độ / giọng |
+| 5 | `destroy()` xoá listener: StrictMode chạy cleanup một lần khi mount thì controller chết | Đọc lại cleanup | `release()`: tắt tiếng, dừng ticker, controller vẫn dùng được |
+| 6 | Kết nối lại xoá lời chào đang chờ | Viết test R11 | `reset` giữ mục `greeting` |
+| 7 | Micro báo "đang ghi" trước khi có tiếng: lần dùng đầu mất 1,4 s lời nói | E2E A10 (bản ghi chỉ 192 ms cho 1,5 s nói) | Pha "đang mở micro"; `Recorder.start` chỉ xong khi có mẫu đầu tiên |
+| 8 | Bấm Esc hoặc rời trang khi micro đang mở: micro mở xong vẫn chạy | Component test | Mỗi lần mở có số thứ tự; mở xong mà đã bị huỷ thì đóng ngay |
+| 9 | Trang chọn trận log 2 lỗi 404 cho mỗi trận đang có (prefetch của Next 16 static export tìm `__next.studio.__PAGE__.txt`, file nằm ở `__next.studio/__PAGE__.txt`). Lỗi có từ Ngày 4, chỉ lộ khi server đã có trận | E1 trên server dùng lại | `prefetch={false}` cho link của trận; thêm E1b tạo trận trước |
+| 10 | `play()` trả `undefined` (trình duyệt cũ, jsdom) làm `.catch` ném lỗi; "Nghe lại" bỏ lửng promise bị từ chối | Test hook | Bọc `play()` thành promise; bắt lỗi khi nghe lại |
+| 11 | Test ClaimBox giả định fetch đầu tiên là `/claims/verify` (nay nút micro hỏi `/healthz` trước) | Vitest | Tìm lời gọi theo URL |
+| 12 | Span của Narrator có thể bắt đầu trước lúc job studio kết thúc 0,2 µs: `start_ms` làm tròn xuống ở 3 chữ số (45,2902 thành 45,290), nên test trace hỏng hay qua tuỳ số đo | Hồi quy V2 | Làm tròn lên; thêm test với 4 giá trị biên |
+
+### 19.5. Cách chạy
+
+```bash
+cd frontend && npm ci && npm run build
+cd ../backend
+uv run pundit serve --ui ../frontend/out                         # giọng mock (mặc định)
+TTS_PROVIDER=browser uv run pundit serve --ui ../frontend/out    # nghe tiếng Việt bằng giọng của Edge
+STT_PROVIDER=mock uv run pundit serve --ui ../frontend/out       # nút micro trong Studio (chữ mẫu)
+uv run pundit speak --text "Phút 27, M. Ribas ghi bàn" --scenario dominant_loser --ssml-only
+uv run pundit tts warm --scenario dominant_loser --seed 42       # làm ấm clip vào kho bền
+uv run pundit recap --scenario dominant_loser --seed 42 --scope FULL --audio recap.wav
+uv run python scripts/smoke_voice.py --speed 60                  # V9
+uv run python scripts/tts_review.py --scenario dominant_loser --seed 42   # V10 -> review/index.html
+npx azurite-blob --silent --location <thư mục>                   # rồi: uv run pytest tests/speech -k azurite
+cd ../frontend && npx playwright test                            # e2e + mock (A1–A11)
+```
+
+- Backend cho E2E cần `TTS_PROVIDER=mock MOCK_TTS_TIME_SCALE=0.1 MOCK_TTS_LATENCY_MS=100 STT_PROVIDER=mock` (`webServer.env` trong `playwright.config.ts` đặt sẵn; tự bật server thì đặt các biến này).
+- Lên Azure: `TTS_PROVIDER=azure`, `SPEECH_ENDPOINT` + `SPEECH_RESOURCE_ID` (Managed Identity, vai trò Cognitive Services Speech User), `AUDIO_STORE=blob` + `AUDIO_BLOB_ACCOUNT_URL`; `STT_PROVIDER=azure` nếu bật micro.
+
+### 19.6. Việc còn lại
+
+- **Tầng B (khi có key Azure):** spike `/voices/list` (hai giọng vi-VN, `WordsPerMinute`), đọc 9 preset × 2 giọng, hiệu chỉnh `estimate_ms`, viết và chạy test live, smoke `--provider azure`.
+- **Nghe bằng tai:** V10 và M1–M10 (Edge có giọng Online, hoặc Azure). Mỗi lỗi nghe ra thành một luật hoặc alias kèm test.
+- **Triển khai (phần còn lại của Ngày 5):** Dockerfile một image, Bicep / `azd` (Speech, Storage có container `audio`, Key Vault, App Insights), Managed Identity; `pundit tts warm` trước giờ chấm.
+- **Ngày 6:** đo event → âm thanh trên bản deploy (p95 < 5 s), tỷ lệ clip `throttled` / `circuit_open`.

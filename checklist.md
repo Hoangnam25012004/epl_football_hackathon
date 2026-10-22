@@ -176,11 +176,13 @@
 > Phần giọng đọc: thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day5-design.md](docs/day5-design.md). Chưa có Azure nên làm **mock-first**: WAV tất định cho dev / CI, giọng của trình duyệt để nghe tiếng Việt; Azure Speech gắn sau bằng cấu hình. Phần triển khai Azure có tài liệu riêng.
 
 **Giọng đọc tiếng Việt**
-- [ ] **P0** Tích hợp Azure AI Speech TTS cho bình luận real-time (stream audio về Fan VN Player)
-- [ ] **P0** SSML: nhấn giọng / tăng tốc độ khi có bàn thắng hoặc tình huống nguy hiểm
-- [ ] **P0** Recap audio (1–2 phút) lưu vào Blob Storage, có nút nghe lại
-- [ ] **P1** Chọn giọng nam / nữ (`vi-VN-NamMinhNeural` / `vi-VN-HoaiMyNeural`)
-- [ ] **P2** Speech-to-Text: bình luận viên nói claim để kiểm chứng
+- [x] **P0** Tích hợp Azure AI Speech TTS cho bình luận real-time (stream audio về Fan VN Player): mỗi câu một clip qua `/audio`, Fan đọc lần lượt, bàn thắng chen ngang; adapter Azure REST + Managed Identity xong, chạy bằng mock và giọng trình duyệt, **Azure: chờ key**
+- [x] **P0** SSML: nhấn giọng / tăng tốc độ khi có bàn thắng hoặc tình huống nguy hiểm (9 preset `prosody` + `break`, câu cảm thán đầu như "Vào!" nhanh và cao hơn; giọng vi-VN không có `emphasis`)
+- [x] **P0** Recap audio (1–2 phút) lưu vào Blob Storage, có nút nghe lại (kho bền local ngay bây giờ; `BlobStore` đã chạy với Azurite; tua được, nghe lại được)
+- [x] **P1** Chọn giọng nam / nữ (`vi-VN-NamMinhNeural` / `vi-VN-HoaiMyNeural`)
+- [x] **P2** Speech-to-Text: bình luận viên nói claim để kiểm chứng (nút micro trong Studio, chữ chỉ điền vào ô claim, không tự gửi; mock + adapter Azure REST)
+
+- Kết quả kiểm thử, khác biệt so với thiết kế và việc còn lại (tầng B Azure, nghe bằng tai): [docs/day5-design.md](docs/day5-design.md) §19.
 
 **Triển khai Azure**
 - [ ] **P0** Dockerfile cho backend + frontend
