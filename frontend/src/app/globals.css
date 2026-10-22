@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* Design tokens (docs/day4-design.md section 4.9). Pages pick a theme with a class on <body>. */
+:root {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --panel-2: #eef1f5;
+  --border: #d9dee6;
+  --text: #121821;
+  --muted: #5b6676;
+  --accent: #1f6feb;
+  --true: #1a7f37;
+  --partly: #9a6700;
+  --false: #cf222e;
+  --unknown: #6e7781;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1f2630;
+    --border: #2d3540;
+    --text: #e6edf3;
+    --muted: #9aa5b1;
+    --accent: #4493f8;
+    --true: #3fb950;
+    --partly: #d29922;
+    --false: #f85149;
+    --unknown: #8b949e;
+  }
+}
+
+/* Studio: always dark, a broadcast control room that records well */
+.theme-studio {
+  --bg: #0b0f14;
+  --panel: #121821;
+  --panel-2: #1a222d;
+  --border: #263241;
+  --text: #e6edf3;
+  --muted: #94a3b8;
+  --accent: #4493f8;
+  --true: #3fb950;
+  --partly: #d29922;
+  --false: #f85149;
+  --unknown: #8b949e;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-verdict-true: var(--true);
+  --color-verdict-partly: var(--partly);
+  --color-verdict-false: var(--false);
+  --color-verdict-unknown: var(--unknown);
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* The overlay is composited by OBS: nothing but the lower-third may paint (section 6.1) */
+html.overlay-page,
+html.overlay-page body {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes lt-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lt-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lt-enter {
+  animation: lt-in 450ms ease-out both;
+}
+
+.lt-exit {
+  animation: lt-out 300ms ease-in both;
+}
+
+.item-enter {
+  animation: fade-in 300ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-enter,
+  .item-enter {
+    animation: fade-in 200ms linear both;
+  }
+  .lt-exit {
+    animation: fade-in 200ms linear reverse both;
+  }
+}
