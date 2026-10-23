@@ -27,6 +27,27 @@ jobs:
         run: uv run pytest -m "not slow and not perf and not live" --cov=pundit --cov-fail-under=85
       - name: time budgets (no coverage)
         run: uv run pytest -m perf
+      - name: claim checker eval gate (mock)
+        run: uv run pundit eval --min-accuracy 0.85
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: secrets in the whole history and the working tree
+        run: uv run --no-project python tools/security/scan_secrets.py --history --worktree
+      - name: Official Rules (no real names, no logos)
+        run: uv run --no-project python tools/security/scan_compliance.py
+      - name: scanner tests
+        run: uv run --locked --project backend pytest tools/security
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   frontend:
     runs-on: ubuntu-latest

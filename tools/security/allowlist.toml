@@ -1,0 +1,17 @@
+# Findings of tools/security/scan_secrets.py that are not secrets.
+#
+# Each entry: the rule, a glob of the path, the sha256 fingerprint of the matched text (the
+# scanner prints its first 16 characters; 16 to 64 hex characters here) and a reason. An entry
+# without a reason, or with a shorter fingerprint, stops the scan with an error.
+
+[[allow]]
+rule = "generic-assignment"
+path = "backend/tests/llm/test_maf_backend.py"
+fingerprint = "ae77ce9bac3057a1"
+reason = "Placeholder key of an offline unit test (sk-offline-test-key-123); no service accepts it."
+
+[[allow]]
+rule = "generic-assignment"
+path = "backend/tests/llm/test_maf_backend.py"
+fingerprint = "e663cf29877ed940"
+reason = "Earlier placeholder of the same offline test (ghp_offline_test_token_123), not a GitHub token."

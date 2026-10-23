@@ -99,7 +99,7 @@ RESTART_WAIT_MS: dict[PlayType, tuple[int, int]] = {
 }
 PHYSICAL_EVERY_MS = 5 * MS_PER_MINUTE
 
-# Behaviour parameters, calibrated against EPL-like ranges (see tests/scenario/test_realism.py).
+# Behaviour parameters, calibrated to typical top-flight ranges (tests/scenario/test_realism.py).
 PRESS_BASE, PRESS_FACTOR = 0.15, 0.45  # chance of a pressure event before an action
 TACKLE_BASE, TACKLE_FACTOR, TACKLE_WIN = 0.05, 0.13, 0.55
 INTERCEPTION_SHARE = 0.4  # failed passes read cleanly; the rest become loose-ball recoveries

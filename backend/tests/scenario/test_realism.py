@@ -1,7 +1,7 @@
 """Balanced matches look like real football (design section 12.5).
 
-Per-team medians over 16 seeds must fall in EPL-like bands. These bands also document the
-generator calibration (pundit.engine.generator behaviour parameters).
+Per-team medians over 16 seeds must fall in bands typical of a top-flight league. These bands
+also document the generator calibration (pundit.engine.generator behaviour parameters).
 """
 
 import statistics

@@ -1,0 +1,430 @@
+# Real names that must never appear in the product. The Official Rules allow synthetic data only:
+# no real Premier League club, player or data. This is a list of names to keep out, read by
+# tools/security/scan_compliance.py; nothing else uses it.
+#
+# One name per line under a [section]. Accents and punctuation do not matter (Ødegaard = Odegaard,
+# St James' Park = St James Park); case does not either, except in [short], whose short names and
+# nicknames are also ordinary words when written in lower case.
+#
+# [brand] names are allowed only inside a [disclaimer] phrase. A surname of [player], [manager] or
+# [referee] that is also part of a fictional name in the rosters gives a warning to look at, not an
+# error.
+
+[brand]
+Premier League
+Barclays Premier League
+English Premier League
+
+[disclaimer]
+Not affiliated with the Premier League
+no real Premier League data
+không có dữ liệu thật của Premier League
+
+[club]
+AFC Bournemouth
+Arsenal
+Aston Villa
+Blackburn Rovers
+Blackpool
+Bolton Wanderers
+Bournemouth
+Brentford
+Brighton
+Brighton & Hove Albion
+Burnley
+Cardiff City
+Chelsea
+Crystal Palace
+Everton
+Fulham
+Huddersfield Town
+Hull City
+Ipswich Town
+Leeds United
+Leicester City
+Liverpool
+Luton Town
+Manchester
+Manchester City
+Manchester United
+Middlesbrough
+Newcastle
+Newcastle United
+Norwich City
+Nottingham Forest
+Queens Park Rangers
+Reading FC
+Sheffield United
+Southampton
+Stoke City
+Sunderland
+Swansea City
+Tottenham
+Tottenham Hotspur
+Watford
+West Bromwich Albion
+West Ham
+West Ham United
+Wigan Athletic
+Wolverhampton
+Wolverhampton Wanderers
+
+[short]
+EPL
+Man City
+Man United
+Man Utd
+Spurs
+Wolves
+Gunners
+Toffees
+Magpies
+Hammers
+Baggies
+Villans
+Cottagers
+Clarets
+Hatters
+Tractor Boys
+QPR
+WBA
+
+[stadium]
+Amex Stadium
+American Express Stadium
+Anfield
+bet365 Stadium
+Bloomfield Road
+Boleyn Ground
+Bramall Lane
+Bramley-Moore Dock
+Brentford Community Stadium
+Britannia Stadium
+Cardiff City Stadium
+Carrow Road
+City Ground
+Craven Cottage
+Dean Court
+DW Stadium
+Elland Road
+Emirates Stadium
+Etihad
+Etihad Stadium
+Ewood Park
+Falmer Stadium
+Goodison Park
+Griffin Park
+Gtech Community Stadium
+Highbury
+Hill Dickinson Stadium
+John Smith's Stadium
+KCOM Stadium
+Kenilworth Road
+King Power Stadium
+Liberty Stadium
+Loftus Road
+London Stadium
+Madejski Stadium
+MKM Stadium
+Molineux
+Old Trafford
+Portman Road
+Riverside Stadium
+Selhurst Park
+St James' Park
+St Mary's Stadium
+Stadium of Light
+Stamford Bridge
+Swansea.com Stadium
+The Hawthorns
+Tottenham Hotspur Stadium
+Turf Moor
+Upton Park
+Vicarage Road
+Villa Park
+Vitality Stadium
+White Hart Lane
+
+[player]
+Abdoulaye Doucouré
+Aleksandar Mitrović
+Alan Shearer
+Alejandro Garnacho
+Alexander Isak
+Alexis Mac Allister
+Alexis Sánchez
+Alisson
+Alisson Becker
+Andrew Robertson
+Andy Cole
+André Onana
+Ángel Di María
+Antoine Semenyo
+Ashley Cole
+Bernardo Silva
+Bruno Fernandes
+Bruno Guimarães
+Bryan Mbeumo
+Bukayo Saka
+Callum Wilson
+Carlos Tevez
+Casemiro
+Cesc Fàbregas
+Chris Wood
+Christian Benteke
+Christian Eriksen
+Christian Pulisic
+Claude Makélélé
+Cody Gakpo
+Cole Palmer
+Cristian Romero
+Cristiano Ronaldo
+Darwin Núñez
+David Beckham
+David de Gea
+David Raya
+David Seaman
+David Silva
+Declan Rice
+Dejan Kulusevski
+Dele Alli
+Dennis Bergkamp
+Didier Drogba
+Dimitar Berbatov
+Diogo Jota
+Dominic Calvert-Lewin
+Dominic Solanke
+Dominik Szoboszlai
+Dwight Yorke
+Eberechi Eze
+Eden Hazard
+Ederson
+Edin Džeko
+Edwin van der Sar
+Emile Heskey
+Emile Smith Rowe
+Emiliano Martínez
+Emmanuel Petit
+Enzo Fernández
+Eric Cantona
+Erling Haaland
+Evan Ferguson
+Fabinho
+Fernandinho
+Fernando Torres
+Frank Lampard
+Freddie Ljungberg
+Gabriel Jesus
+Gabriel Magalhães
+Gabriel Martinelli
+Gareth Bale
+Gary Lineker
+Gary Neville
+Gianfranco Zola
+Granit Xhaka
+Guglielmo Vicario
+Harry Kane
+Harry Maguire
+Heung-min Son
+Son Heung-min
+Hugo Lloris
+Ian Wright
+Ibrahima Konaté
+İlkay Gündoğan
+Ivan Toney
+Jack Grealish
+James Maddison
+James Tarkowski
+James Ward-Prowse
+Jamie Carragher
+Jamie Vardy
+Jarrod Bowen
+Jean-Philippe Mateta
+Jens Lehmann
+Jermain Defoe
+Jérémy Doku
+Ji-sung Park
+Park Ji-sung
+Jimmy Floyd Hasselbaink
+João Pedro
+Joe Hart
+John Stones
+John Terry
+Jordan Henderson
+Jordan Pickford
+Jorginho
+Joško Gvardiol
+Juan Mata
+Julián Álvarez
+Jurriën Timber
+Kai Havertz
+Kalvin Phillips
+Kaoru Mitoma
+Kasper Schmeichel
+Kevin De Bruyne
+Kevin Phillips
+Kieran Trippier
+Kobbie Mainoo
+Kyle Walker
+Leandro Trossard
+Leighton Baines
+Les Ferdinand
+Levi Colwill
+Lisandro Martínez
+Lucas Paquetá
+Luis Díaz
+Luis Suárez
+Luke Shaw
+Marc Guéhi
+Marc Overmars
+Marcus Rashford
+Martin Ødegaard
+Mason Mount
+Matheus Cunha
+Matt Le Tissier
+Mesut Özil
+Michael Carrick
+Michael Essien
+Michael Olise
+Michael Owen
+Michail Antonio
+Micky van de Ven
+Miguel Almirón
+Mohamed Salah
+Mohammed Kudus
+Moisés Caicedo
+Morgan Gibbs-White
+N'Golo Kanté
+Nemanja Vidić
+Nick Pope
+Nicolas Anelka
+Nicolas Jackson
+Noni Madueke
+Olivier Giroud
+Ole Gunnar Solskjær
+Ollie Watkins
+Pascal Groß
+Patrick Bamford
+Patrick Vieira
+Paul Pogba
+Paul Scholes
+Pedro Neto
+Pedro Porro
+Peter Crouch
+Peter Schmeichel
+Petr Čech
+Phil Foden
+Philippe Coutinho
+Pierre-Emerick Aubameyang
+Raheem Sterling
+Raphinha
+Rasmus Højlund
+Raúl Jiménez
+Reece James
+Riyad Mahrez
+Richarlison
+Rio Ferdinand
+Robbie Fowler
+Robert Pires
+Roberto Firmino
+Robin van Persie
+Rodri
+Romelu Lukaku
+Roy Keane
+Rúben Dias
+Rúben Neves
+Ruud van Nistelrooy
+Ryan Giggs
+Sadio Mané
+Sandro Tonali
+Santi Cazorla
+Sergio Agüero
+Sol Campbell
+Steven Gerrard
+Sven Botman
+Taiwo Awoniyi
+Teddy Sheringham
+Thierry Henry
+Thiago Silva
+Thomas Partey
+Tim Cahill
+Tomáš Souček
+Tony Adams
+Trent Alexander-Arnold
+Vincent Kompany
+Virgil van Dijk
+Wayne Rooney
+Wesley Fofana
+Wilfried Ndidi
+Wilfried Zaha
+William Saliba
+Willian
+Xabi Alonso
+Yaya Touré
+Yoane Wissa
+Youri Tielemans
+Yves Bissouma
+Zlatan Ibrahimović
+
+[manager]
+Alex Ferguson
+Andoni Iraola
+Ange Postecoglou
+Antonio Conte
+Arne Slot
+Arsène Wenger
+Brendan Rodgers
+Carlo Ancelotti
+Claudio Ranieri
+David Moyes
+Eddie Howe
+Enzo Maresca
+Erik ten Hag
+Fabian Hürzeler
+Graham Potter
+José Mourinho
+Jürgen Klopp
+Kieran McKenna
+Marco Silva
+Mauricio Pochettino
+Mikel Arteta
+Nuno Espírito Santo
+Oliver Glasner
+Pep Guardiola
+Rafael Benítez
+Roberto De Zerbi
+Rúben Amorim
+Sean Dyche
+Thomas Frank
+Unai Emery
+
+[referee]
+Andre Marriner
+Andy Madley
+Anthony Taylor
+Chris Kavanagh
+Craig Pawson
+Darren England
+David Coote
+Howard Webb
+Jarred Gillett
+John Brooks
+Jon Moss
+Kevin Friend
+Lee Mason
+Mark Clattenburg
+Martin Atkinson
+Michael Oliver
+Michael Salisbury
+Mike Dean
+Paul Tierney
+Peter Bankes
+Phil Dowd
+Rebecca Welch
+Robert Jones
+Sam Barrott
+Simon Hooper
+Stuart Attwell
+Thomas Bramall
+Tim Robinson
+Tony Harrington
