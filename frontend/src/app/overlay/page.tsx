@@ -74,7 +74,12 @@ function Overlay() {
         dangerouslySetInnerHTML={{ __html: json }}
       />
       {debug ? (
-        <pre className="fixed right-2 top-2 max-h-[40vh] max-w-[40vw] overflow-auto rounded bg-black/80 p-2 text-[10px] text-green-300">
+        // focusable: it scrolls, and the keyboard must reach it too (axe, Day 6)
+        <pre
+          tabIndex={0}
+          aria-label="On-air state (debug)"
+          className="fixed right-2 top-2 max-h-[40vh] max-w-[40vw] overflow-auto rounded bg-black/80 p-2 text-[10px] text-green-300"
+        >
           {connection.socketState.status} · {JSON.stringify(published, null, 1)}
         </pre>
       ) : null}

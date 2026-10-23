@@ -10,7 +10,8 @@ const font = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "Pundit Copilot",
+  // a route names itself: "Studio · Pundit Copilot" (docs/day6-design.md section 8.5)
+  title: { default: "Pundit Copilot", template: "%s · Pundit Copilot" },
   description: "AI co-pilot for commentators and fans. Synthetic data only.",
 };
 

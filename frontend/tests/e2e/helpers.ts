@@ -48,6 +48,14 @@ export async function stopMatch(request: APIRequestContext, matchId: string): Pr
   await request.post(`/matches/${matchId}/stop`);
 }
 
+/** Day 6: every scenario and seed, and the running matches, are under the landing page's
+ * "Advanced" section, closed at first (docs/day6-design.md section 8.5). */
+export async function openAdvanced(page: Page): Promise<void> {
+  const advanced = page.getByTestId("advanced");
+  if ((await advanced.getAttribute("open")) === null) await advanced.locator("summary").click();
+  await expect(advanced).toHaveAttribute("open", "");
+}
+
 /** A saved fan profile, so the fan page connects without the setup screen. */
 export async function storeProfile(page: Page, profile: Partial<ViewerProfile>): Promise<void> {
   const full: ViewerProfile = {

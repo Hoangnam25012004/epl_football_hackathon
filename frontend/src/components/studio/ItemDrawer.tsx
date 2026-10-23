@@ -81,6 +81,7 @@ function DrawerBody({ matchId, target, homeId, scenario, players }: BodyProps) {
   const [tab, setTab] = useState<Tab>("why");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [events, setEvents] = useState<{ found: MatchEvent[]; missing: number } | null>(null);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ function DrawerBody({ matchId, target, homeId, scenario, players }: BodyProps) {
     return () => {
       alive = false;
     };
-  }, [target, matchId]);
+  }, [target, matchId, attempt]);
 
   const evidence = useMemo(() => (loaded ? evidenceOf(loaded) : []), [loaded]);
   useEffect(() => {
@@ -134,9 +135,21 @@ function DrawerBody({ matchId, target, homeId, scenario, players }: BodyProps) {
         ]}
       />
       {error ? (
-        <p className="p-4 text-sm text-verdict-false">
-          {t(`err.${error.code}`)} {error.message}
-        </p>
+        <div className="flex flex-col items-start gap-2 p-4 text-sm" data-testid="load-failed">
+          <p className="text-verdict-false">
+            {t(`err.${error.code}`)} {error.message}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setAttempt((n) => n + 1);
+            }}
+            className="rounded border border-line px-3 py-1 hover:bg-panel-2"
+          >
+            {t("common.retry")}
+          </button>
+        </div>
       ) : null}
       {!loaded && !error ? <EmptyState>{t("drawer.loading")}</EmptyState> : null}
       {loaded && tab === "why" ? <Why loaded={loaded} /> : null}

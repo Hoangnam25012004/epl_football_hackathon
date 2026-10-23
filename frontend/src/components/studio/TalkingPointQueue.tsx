@@ -84,7 +84,9 @@ export function TalkingPointQueue({
         />
       </div>
       <ul className="flex-1 overflow-auto p-2" data-testid="talking-points">
-        {shown.length === 0 ? <EmptyState>{t("studio.tpEmpty")}</EmptyState> : null}
+        {shown.length === 0 ? (
+          <EmptyState>{t(tab === "new" ? "studio.tpWaiting" : "studio.tpEmpty")}</EmptyState>
+        ) : null}
         {shown.map((point) => {
           const status = statusOf(point);
           const sending = point.id in pending;

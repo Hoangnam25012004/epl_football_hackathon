@@ -1,7 +1,8 @@
 // Day 6 landing page (docs/day6-design.md sections 6.5 and 8.5): "Start my demo match" makes a
 // private session and opens the studio; refusals say when to try again; "my matches" forgets a
-// session the server removed; the private chip shows on a private session only.
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+// session the server removed; the three steps open one demo match; the MCP address; the project
+// links; every scenario under "Advanced"; the private chip shows on a private session only.
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LandingPage from "@/app/page";
 import { PrivateChip } from "@/components/common/PrivateChip";
@@ -37,7 +38,10 @@ function info(id: string, extra: Record<string, unknown> = {}) {
 
 type Answer = { status: number; body: unknown };
 
-function serve(post: Answer) {
+const MCP = { enabled: true, status: "ok", path: "/mcp", transport: "streamable-http" };
+let started: string[] = [];
+
+function serve(post: Answer, health: Record<string, unknown> = { mcp: MCP }) {
   const posted: unknown[] = [];
   const impl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
@@ -46,9 +50,13 @@ function serve(post: Answer) {
       posted.push(JSON.parse(String(init.body)));
       return json(post.status, post.body);
     }
+    if (init?.method === "POST" && url.pathname === `/matches/${MINE}/start`) {
+      started.push(MINE);
+      return json(200, info(MINE, { private: true, status: "running" }));
+    }
     if (url.pathname === "/healthz") {
       return json(200, { status: "ok", llm_provider: "mock", model: "mock", degraded: [],
-                         sessions: 0, synthetic: true }); // prettier-ignore
+                         sessions: 0, synthetic: true, ...health }); // prettier-ignore
     }
     if (url.pathname === "/matches") return json(200, []);
     if (url.pathname === "/scenarios") return json(200, []);
@@ -62,6 +70,7 @@ function serve(post: Answer) {
 
 beforeEach(() => {
   push.mockReset();
+  started = [];
   window.localStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -101,6 +110,79 @@ describe("landing page", () => {
     expect(mine).toHaveTextContent(MINE);
     expect(mine).not.toHaveTextContent(GONE);
     await waitFor(() => expect(mySessions().map((s) => s.id)).toEqual([MINE]));
+  });
+
+  it("the steps open one demo match: made by the first, started for the fan by the second", async () => {
+    const posted = serve({ status: 200, body: info(MINE, { private: true }) });
+    renderWith(<LandingPage />);
+    await act(async () => fireEvent.click(await screen.findByTestId("step-open-studio")));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/studio/?match=${MINE}`));
+    expect(posted).toEqual([expect.objectContaining({ private: true, autostart: false })]);
+    expect(started).toEqual([]); // the studio has its own play button
+
+    await act(async () => fireEvent.click(screen.getByTestId("step-open-fan")));
+    await waitFor(() => expect(push).toHaveBeenLastCalledWith(`/fan/?match=${MINE}`));
+    expect(posted).toHaveLength(1); // the same match, not another one
+    expect(started).toEqual([MINE]); // the fan player has no play button
+
+    await act(async () => fireEvent.click(screen.getByTestId("step-open-overlay")));
+    await waitFor(() =>
+      expect(push).toHaveBeenLastCalledWith(`/overlay/?match=${MINE}&lang=en&debug=1`),
+    );
+    expect(started).toEqual([MINE]); // already running
+  });
+
+  it("a step with no demo match yet makes one that plays at once for the fan", async () => {
+    const posted = serve({ status: 200, body: info(MINE, { private: true, status: "running" }) });
+    renderWith(<LandingPage />);
+    await act(async () => fireEvent.click(await screen.findByTestId("step-open-fan")));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/fan/?match=${MINE}`));
+    expect(posted).toEqual([expect.objectContaining({ private: true, autostart: true })]);
+  });
+
+  it("step 3 shows this server's MCP address, ready to copy", async () => {
+    serve({ status: 200, body: info(MINE) });
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(window.navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    renderWith(<LandingPage />);
+    const address = await screen.findByTestId("mcp-url");
+    const url = `${window.location.origin}/mcp`;
+    expect(address).toHaveTextContent(url);
+    await act(async () => fireEvent.click(within(address).getByRole("button")));
+    expect(writeText).toHaveBeenCalledWith(url);
+    expect(address).toHaveTextContent("Copied");
+  });
+
+  it("without MCP, step 3 says so", async () => {
+    serve({ status: 200, body: info(MINE) }, { mcp: null });
+    renderWith(<LandingPage />);
+    expect(await screen.findByTestId("mcp-off")).toHaveTextContent("MCP is turned off");
+    expect(screen.queryByTestId("mcp-url")).toBeNull();
+  });
+
+  it("what to try, the project links and every scenario under Advanced", async () => {
+    serve({ status: 200, body: info(MINE) });
+    renderWith(<LandingPage />);
+    expect(await screen.findByTestId("intro")).toHaveTextContent("Vietnamese commentary");
+    expect(screen.getByTestId("what-to-try").querySelectorAll("li")).toHaveLength(5);
+    // no address at build time: no dead link, the words say it comes later
+    const links = screen.getByTestId("project-links");
+    expect(links).toHaveTextContent("Source code: coming soon");
+    expect(links).toHaveTextContent("Demo video: coming soon");
+    expect(links.querySelector("a")).toBeNull();
+    const advanced = screen.getByTestId("advanced");
+    expect(advanced).not.toHaveAttribute("open");
+    expect(advanced).toHaveTextContent("Choose a match");
+  });
+
+  it("is in Vietnamese for a viewer who chose it", async () => {
+    serve({ status: 200, body: info(MINE) });
+    renderWith(<LandingPage />, "vi");
+    expect(await screen.findByTestId("intro")).toHaveTextContent("bình luận tiếng Việt");
+    expect(screen.getByTestId("step-open-studio")).toHaveTextContent("Mở Studio");
   });
 });
 

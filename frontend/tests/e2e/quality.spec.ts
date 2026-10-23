@@ -1,7 +1,14 @@
 // F6 (docs/day4-design.md section 12): axe on the five pages (0 serious / critical) and a
 // see-through overlay: outside the lower-third every sampled pixel has alpha 0.
 import { expect, test } from "@playwright/test";
-import { createMatch, expectSynthetic, seriousA11y, storeProfile, waitStatus } from "./helpers";
+import {
+  createMatch,
+  expectSynthetic,
+  openAdvanced,
+  seriousA11y,
+  storeProfile,
+  waitStatus,
+} from "./helpers";
 
 test("F6 every page passes axe (WCAG 2 A/AA, no serious or critical violation)", async ({
   page,
@@ -20,6 +27,7 @@ test("F6 every page passes axe (WCAG 2 A/AA, no serious or critical violation)",
   for (const [name, path, ready] of pages) {
     await page.goto(path);
     await expectSynthetic(page);
+    if (name === "landing") await openAdvanced(page); // axe reads the scenario cards too
     await expect(page.getByTestId(ready).first()).toBeVisible();
     found[name] = await seriousA11y(page);
   }

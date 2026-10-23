@@ -94,6 +94,6 @@ test("CH3 the landing page and /healthz say in words that the LLM is paused", as
   await expect(page.getByTestId("server-health")).toContainText(
     /LLM paused \(circuit open\)|tạm ngưng LLM/,
   );
-  await expect(page.getByTestId("scenario-dominant_loser")).toBeVisible();
+  await expect(page.getByTestId("start-my-demo")).toBeEnabled();
   expect(errors).toEqual([]);
 });

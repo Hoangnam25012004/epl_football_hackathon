@@ -3,7 +3,7 @@
 // Match stats from the Stats Tools (docs/day4-design.md sections 3.4, 5.8): the bars use the
 // server's values, the words its displays. Refreshed with the snapshots, at most every 2 s.
 import { useEffect, useState } from "react";
-import { EmptyState, Segmented } from "@/components/common/ui";
+import { EmptyState, LoadFailed, Segmented } from "@/components/common/ui";
 import { api } from "@/lib/api";
 import { safeColor } from "@/lib/color";
 import type { ScenarioInfo, StatsPanel as Panel } from "@/lib/contracts";
@@ -26,17 +26,21 @@ export function StatsPanel({
   const { t, lang } = useT();
   const [period, setPeriod] = useState<Period>("FULL");
   const [panel, setPanel] = useState<Panel | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const refresh = useThrottled(version, REFRESH_MS);
   useEffect(() => {
     let alive = true;
     void api.stats(matchId, period).then((result) => {
-      if (alive && result.ok) setPanel(result.data);
+      if (!alive) return;
+      setFailed(!result.ok); // a failed refresh keeps the last numbers
+      if (result.ok) setPanel(result.data);
     });
     return () => {
       alive = false;
     };
-  }, [matchId, period, refresh]);
+  }, [matchId, period, refresh, attempt]);
 
   const home = teamCard(scenario, panel?.home);
   const away = teamCard(scenario, panel?.away);
@@ -52,7 +56,9 @@ export function StatsPanel({
           { value: "H2", label: "H2" },
         ]}
       />
-      {!panel ? <EmptyState>{t("common.loading")}</EmptyState> : null}
+      {!panel && failed ? <LoadFailed onRetry={() => setAttempt((n) => n + 1)} /> : null}
+      {!panel && !failed ? <EmptyState>{t("common.loading")}</EmptyState> : null}
+      {panel?.rows.length === 0 ? <EmptyState>{t("studio.notEnoughData")}</EmptyState> : null}
       <table className="w-full text-xs">
         <tbody>
           {panel?.rows.map((row) => {

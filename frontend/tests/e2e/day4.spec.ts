@@ -6,6 +6,7 @@ import {
   createMatch,
   expectSynthetic,
   matchInfo,
+  openAdvanced,
   socketStats,
   stopMatch,
   storeProfile,
@@ -20,6 +21,7 @@ test("E1 landing → studio: scoreboard, controls, synthetic label, no console e
   const errors = watchErrors(page);
   await page.goto("/");
   await expectSynthetic(page);
+  await openAdvanced(page);
   await expect(page.getByTestId("scenario-dominant_loser")).toBeVisible();
   await page.getByTestId("open-studio-dominant_loser").click();
   await expect(page).toHaveURL(/\/studio\/\?match=dominant_loser-42$/);
@@ -38,6 +40,7 @@ test("E1b the landing page lists running matches without a console error (no 404
   const matchId = await createMatch(request, { seed: 59, speed: 20 });
   const errors = watchErrors(page);
   await page.goto("/");
+  await openAdvanced(page);
   const row = page.getByText(matchId, { exact: true });
   await expect(row).toBeVisible();
   await row.scrollIntoViewIfNeeded();

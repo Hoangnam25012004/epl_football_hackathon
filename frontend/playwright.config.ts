@@ -82,6 +82,20 @@ export default defineConfig({
         viewport: { width: 1600, height: 950 },
       },
     },
+    // Day 6 screenshots (docs/day6-design.md 8.3): only with SHOTS=1 --project=shots
+    ...(process.env.SHOTS
+      ? [
+          {
+            name: "shots",
+            testDir: "tests/shots",
+            use: {
+              ...devices["Desktop Chrome"],
+              baseURL: `http://127.0.0.1:${MOCK_PORT}`,
+              ...(channel ? { channel } : {}),
+            },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {

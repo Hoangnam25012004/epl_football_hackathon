@@ -1,11 +1,11 @@
 "use client";
 
-// "/": pick a scenario and a seed, open the studio, the fan player, the overlay or the comparison
-// (docs/day4-design.md section 9). Day 6 (docs/day6-design.md section 6.5): start a private demo
-// match of one's own, find "my matches" again.
+// "/": the way in for judges and fans (docs/day6-design.md section 8.5): what the app does, one
+// button for a private demo match (section 6.5), three steps with a link each, what to try and
+// "my matches"; every scenario and seed under "Advanced" (docs/day4-design.md section 9).
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { PageShell } from "@/components/common/PageShell";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
 import { useToast } from "@/components/common/Toast";
@@ -13,14 +13,26 @@ import { Chip, LangToggle, TeamChip } from "@/components/common/ui";
 import { api, type ApiError } from "@/lib/api";
 import type { CreateMatch, Health, MatchInfo, ScenarioInfo } from "@/lib/contracts";
 import { hasKey, useT } from "@/lib/i18n";
+import { REPO_URL, VIDEO_URL } from "@/lib/links";
 import { forgetSession, mySessions, rememberSession } from "@/lib/sessions";
 import { useScenarios } from "@/hooks/useScenarios";
 
 type CreateBody = Partial<CreateMatch> & { scenario: CreateMatch["scenario"] };
+type DemoPage = "studio" | "fan" | "overlay";
+
+// The demo match: "Dominated but lost" at 20x, a private session of the viewer's own
+const DEMO: CreateBody = { scenario: "dominant_loser", seed: 42, speed: 20, private: true };
+const TRY = [
+  "landing.try1",
+  "landing.try2",
+  "landing.try3",
+  "landing.try4",
+  "landing.try5",
+] as const;
 
 export default function LandingPage() {
   return (
-    <PageShell defaultLang="en">
+    <PageShell defaultLang="browser">
       <Landing />
     </PageShell>
   );
@@ -52,31 +64,43 @@ function refusal(error: ApiError, t: ReturnType<typeof useT>["t"]): string {
   return t("landing.createFailed", { message: error.message });
 }
 
+function demoUrl(page: DemoPage, id: string, lang: "en" | "vi"): string {
+  // a judge opens the overlay in a browser: `debug` shows it over a backdrop
+  return page === "overlay"
+    ? `/overlay/?match=${id}&lang=${lang}&debug=1`
+    : `/${page}/?match=${id}`;
+}
+
 function Landing() {
   const { t, lang } = useT();
   const router = useRouter();
-  const create = useCreate();
+  const createMatch = useCreate();
   const scenarios = useScenarios();
   const [sessions, setSessions] = useState<MatchInfo[] | null>(null);
   const [mine, setMine] = useState<MatchInfo[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
-  const [starting, setStarting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
     const refresh = async () => {
       const [matches, server] = await Promise.all([api.matches(), api.health()]);
       // my private sessions: still there, or forgotten once the server removed them
-      const remembered = await Promise.all(mySessions().map((s) => api.match(s.id)));
+      const asked = mySessions().map((s) => s.id);
+      const remembered = await Promise.all(asked.map((id) => api.match(id)));
       if (!alive) return;
       if (matches.ok) setSessions(matches.data);
       if (server.ok) setHealth(server.data);
       const kept: MatchInfo[] = [];
       remembered.forEach((result, index) => {
         if (result.ok) kept.push(result.data.info);
-        else if (result.error.code === "not_found") forgetSession(mySessions()[index]?.id ?? "");
+        else if (result.error.code === "not_found") forgetSession(asked[index] ?? "");
       });
-      setMine(kept);
+      // a session made while this refresh was on its way is kept, not dropped
+      const since = mySessions()
+        .map((s) => s.id)
+        .filter((id) => !asked.includes(id));
+      setMine((current) => [...current.filter((m) => since.includes(m.match_id)), ...kept]);
     };
     void refresh();
     const timer = setInterval(refresh, 5000);
@@ -86,25 +110,51 @@ function Landing() {
     };
   }, []);
 
+  /** A new private session is one of "my matches" at once, not at the next refresh: a second
+   * step must open the same match, not make another. */
+  const create = useCallback(
+    async (body: CreateBody) => {
+      const info = await createMatch(body);
+      if (info?.private)
+        setMine((list) => [info, ...list.filter((m) => m.match_id !== info.match_id)]);
+      return info;
+    },
+    [createMatch],
+  );
+
+  /** "Start my demo match": always a new private session, opened paused in the studio. */
   const startDemo = async () => {
-    setStarting(true);
-    const info = await create({
-      scenario: "dominant_loser",
-      seed: 42,
-      speed: 20,
-      private: true,
-      autostart: false,
-    });
-    setStarting(false);
-    if (info) router.push(`/studio/?match=${info.match_id}`);
+    setBusy(true);
+    const info = await create({ ...DEMO, autostart: false });
+    setBusy(false);
+    if (info) router.push(demoUrl("studio", info.match_id, lang));
+  };
+
+  /** A step's page for the viewer's demo match: the newest of "my matches", or a new one. The
+   * fan player and the overlay have no play button, so there the match is started. */
+  const openStep = async (page: DemoPage) => {
+    setBusy(true);
+    let info: MatchInfo | null = mine[0] ?? null;
+    if (!info) {
+      info = await create({ ...DEMO, autostart: page !== "studio" });
+    } else if (page !== "studio" && info.status === "created") {
+      const started = await api.start(info.match_id);
+      if (started.ok) {
+        const running = started.data;
+        info = running;
+        setMine((list) => list.map((m) => (m.match_id === running.match_id ? running : m)));
+      }
+    }
+    setBusy(false);
+    if (info) router.push(demoUrl(page, info.match_id, lang));
   };
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex max-w-2xl flex-col gap-1">
           <h1 className="text-2xl font-extrabold">{t("app.name")}</h1>
-          <p className="text-sm text-muted">{t("app.tagline")}</p>
+          <p data-testid="intro">{t("landing.intro")}</p>
         </div>
         <div className="flex items-center gap-2">
           <SyntheticBadge />
@@ -121,7 +171,7 @@ function Landing() {
         <button
           type="button"
           data-testid="start-my-demo"
-          disabled={starting}
+          disabled={busy}
           onClick={() => void startDemo()}
           className="rounded bg-accent-fill px-4 py-2 font-bold text-white disabled:opacity-50"
         >
@@ -129,50 +179,212 @@ function Landing() {
         </button>
         <p className="text-sm text-muted">{t("landing.startDemoHint")}</p>
       </section>
-      {health ? (
-        <div
-          data-testid="server-health"
-          className="flex flex-wrap items-center gap-2 text-xs text-muted"
-        >
-          <span>{t("landing.server")}:</span>
-          <Chip tone="accent">
-            {t("landing.llm", { provider: health.llm_provider, model: health.model })}
-          </Chip>
-          {health.degraded.map((flag) => {
-            // in words ("LLM paused (circuit open)"); an unknown flag as the server wrote it
-            const key = `degraded.${flag}`;
-            return (
-              <Chip key={flag} tone="warn">
-                {hasKey(key) ? t(key) : flag}
-              </Chip>
-            );
-          })}
-        </div>
-      ) : null}
+      {health ? <ServerHealth health={health} /> : null}
+      <section data-testid="demo-steps" className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">{t("landing.stepsTitle")}</h2>
+        <ol className="grid gap-3 md:grid-cols-3">
+          <Step
+            n={1}
+            page="studio"
+            title={t("landing.step1Title")}
+            text={t("landing.step1Text")}
+            go={t("landing.step1Go")}
+            busy={busy}
+            onOpen={openStep}
+          />
+          <Step
+            n={2}
+            page="fan"
+            title={t("landing.step2Title")}
+            text={t("landing.step2Text")}
+            go={t("landing.step2Go")}
+            busy={busy}
+            onOpen={openStep}
+          />
+          <Step
+            n={3}
+            page="overlay"
+            title={t("landing.step3Title")}
+            text={t("landing.step3Text")}
+            go={t("landing.step3Go")}
+            busy={busy}
+            onOpen={openStep}
+          >
+            <McpAddress health={health} />
+          </Step>
+        </ol>
+      </section>
+      <section data-testid="what-to-try" className="flex flex-col gap-2">
+        <h2 className="text-lg font-bold">{t("landing.tryTitle")}</h2>
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+          {TRY.map((key) => (
+            <li key={key}>{t(key)}</li>
+          ))}
+        </ul>
+      </section>
       {mine.length ? (
         <section className="flex flex-col gap-2" data-testid="my-sessions">
           <h2 className="text-lg font-bold">{t("landing.mySessions")}</h2>
           <SessionList sessions={mine} lang={lang} />
         </section>
       ) : null}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold">{t("landing.title")}</h2>
-        <p className="text-sm text-muted">{t("landing.subtitle")}</p>
-        <div className="grid gap-3 md:grid-cols-2">
-          {(scenarios ?? []).map((scenario) => (
-            <ScenarioCard key={scenario.key} scenario={scenario} lang={lang} create={create} />
-          ))}
+      <details data-testid="advanced" className="rounded-lg border border-line bg-panel p-4">
+        <summary className="cursor-pointer text-lg font-bold">{t("landing.advanced")}</summary>
+        <div className="mt-4 flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-bold">{t("landing.title")}</h2>
+            <p className="text-sm text-muted">{t("landing.subtitle")}</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              {(scenarios ?? []).map((scenario) => (
+                <ScenarioCard key={scenario.key} scenario={scenario} lang={lang} create={create} />
+              ))}
+            </div>
+            {scenarios === null ? (
+              <p className="text-sm text-muted">{t("common.loading")}</p>
+            ) : null}
+          </section>
+          <section className="flex flex-col gap-2">
+            <h2 className="text-lg font-bold">{t("landing.sessions")}</h2>
+            {sessions && sessions.length === 0 ? (
+              <p className="text-sm text-muted">{t("landing.noSessions")}</p>
+            ) : null}
+            <SessionList sessions={sessions ?? []} lang={lang} />
+          </section>
         </div>
-        {scenarios === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : null}
-      </section>
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-bold">{t("landing.sessions")}</h2>
-        {sessions && sessions.length === 0 ? (
-          <p className="text-sm text-muted">{t("landing.noSessions")}</p>
-        ) : null}
-        <SessionList sessions={sessions ?? []} lang={lang} />
-      </section>
+      </details>
+      <footer
+        data-testid="project-links"
+        className="flex flex-wrap gap-4 border-t border-line pt-4 text-sm"
+      >
+        <ProjectLink label={t("landing.source")} url={REPO_URL} />
+        <ProjectLink label={t("landing.video")} url={VIDEO_URL} />
+      </footer>
     </main>
+  );
+}
+
+function ServerHealth({ health }: { health: Health }) {
+  const { t } = useT();
+  return (
+    <div
+      data-testid="server-health"
+      className="flex flex-wrap items-center gap-2 text-xs text-muted"
+    >
+      <span>{t("landing.server")}:</span>
+      <Chip tone="accent">
+        {t("landing.llm", { provider: health.llm_provider, model: health.model })}
+      </Chip>
+      {health.degraded.map((flag) => {
+        // in words ("LLM paused (circuit open)"); an unknown flag as the server wrote it
+        const key = `degraded.${flag}`;
+        return (
+          <Chip key={flag} tone="warn">
+            {hasKey(key) ? t(key) : flag}
+          </Chip>
+        );
+      })}
+    </div>
+  );
+}
+
+function Step({
+  n,
+  page,
+  title,
+  text,
+  go,
+  busy,
+  onOpen,
+  children,
+}: {
+  n: number;
+  page: DemoPage;
+  title: string;
+  text: string;
+  go: string;
+  busy: boolean;
+  onOpen: (page: DemoPage) => Promise<void>;
+  children?: ReactNode;
+}) {
+  return (
+    <li
+      data-testid={`step-${page}`}
+      className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-4"
+    >
+      <h3 className="flex items-center gap-2 font-semibold">
+        <span
+          aria-hidden
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-fill text-xs font-bold text-white"
+        >
+          {n}
+        </span>
+        {title}
+      </h3>
+      <p className="text-sm text-muted">{text}</p>
+      {children}
+      <button
+        type="button"
+        data-testid={`step-open-${page}`}
+        disabled={busy}
+        onClick={() => void onOpen(page)}
+        className="mt-auto self-start rounded border border-line px-3 py-1.5 text-sm font-semibold text-accent hover:bg-panel-2 disabled:opacity-50"
+      >
+        {go} →
+      </button>
+    </li>
+  );
+}
+
+/** The MCP endpoint of this server, to paste into an AI assistant (docs/mcp.md). */
+function McpAddress({ health }: { health: Health | null }) {
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+  const mcp = health?.mcp;
+  if (!health) return null;
+  if (!mcp?.enabled || mcp.status !== "ok") {
+    return (
+      <p data-testid="mcp-off" className="text-xs text-muted">
+        {t("landing.mcpOff")}
+      </p>
+    );
+  }
+  const url = `${window.location.origin}${mcp.path}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* no clipboard (an insecure origin): the address can still be selected */
+    }
+  };
+  return (
+    <div data-testid="mcp-url" className="flex items-center gap-2 text-xs">
+      <code className="min-w-0 flex-1 rounded bg-bg px-2 py-1 break-all">{url}</code>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        className="rounded border border-line px-2 py-1 hover:bg-panel-2"
+      >
+        {copied ? t("landing.copied") : t("landing.copy")}
+      </button>
+    </div>
+  );
+}
+
+function ProjectLink({ label, url }: { label: string; url: string }) {
+  const { t } = useT();
+  if (!url) {
+    return (
+      <span className="text-muted">
+        {label}: {t("landing.soon")}
+      </span>
+    );
+  }
+  return (
+    <a className="text-accent underline" href={url} target="_blank" rel="noreferrer">
+      {label} ↗
+    </a>
   );
 }
 
@@ -256,7 +468,7 @@ function ScenarioCard({
   return (
     <article
       data-testid={`scenario-${scenario.key}`}
-      className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-4"
+      className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4"
     >
       <div className="flex items-center gap-2">
         <TeamChip name={scenario.home.short_name} color={scenario.home.primary_color} />

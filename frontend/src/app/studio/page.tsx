@@ -16,6 +16,7 @@ import { LangToggle, Panel } from "@/components/common/ui";
 import { ClaimBox } from "@/components/studio/ClaimBox";
 import { CommentaryPreview } from "@/components/studio/CommentaryPreview";
 import { EventFeed } from "@/components/studio/EventFeed";
+import { HelpButton } from "@/components/studio/HelpDrawer";
 import { ItemDrawer, type DrawerTarget } from "@/components/studio/ItemDrawer";
 import { LowerThirdMonitor } from "@/components/studio/LowerThirdMonitor";
 import { MomentumTimeline } from "@/components/studio/MomentumTimeline";
@@ -86,7 +87,7 @@ function Studio() {
           scenario={scenario}
         />
         <ReplayControls matchId={matchId} status={status} speed={speed} />
-        <nav className="ml-auto flex items-center gap-3 text-xs">
+        <nav className="ml-auto flex flex-wrap items-center gap-3 text-xs">
           <a
             className="underline"
             href={`/overlay/?match=${matchId}&lang=${lang}`}
@@ -106,14 +107,22 @@ function Studio() {
           >
             {t("landing.compare")} ↗
           </a>
+          <HelpButton />
           <LangToggle />
           <PrivateChip matchId={matchId} />
           <SyntheticBadge />
         </nav>
       </header>
       <ConnectionBanner state={connection.socketState} onCreate={() => void createThisMatch()} />
+      {/* Three columns from xl (1280 px) fill the screen and scroll inside their panels. Below,
+          one column: each panel has its own height (capped, scrolling inside) and the page
+          scrolls; shrinking the rows to the screen made the panels overlap (Day 6 bug bash). */}
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-auto p-2 xl:grid-cols-[minmax(260px,1fr)_minmax(420px,1.8fr)_minmax(320px,1.2fr)] xl:overflow-hidden">
-        <Panel title={t("studio.events")} testId="panel-events" className="min-h-80">
+        <Panel
+          title={t("studio.events")}
+          testId="panel-events"
+          className="h-[65vh] min-h-80 xl:h-auto"
+        >
           <EventFeed
             matchId={matchId}
             live={events}
@@ -122,8 +131,12 @@ function Studio() {
             players={players}
           />
         </Panel>
-        <div className="flex min-h-0 flex-col gap-2">
-          <Panel title={t("studio.claim")} testId="panel-claims" className="max-h-[45%] min-h-56">
+        <div className="flex flex-col gap-2 xl:min-h-0">
+          <Panel
+            title={t("studio.claim")}
+            testId="panel-claims"
+            className="min-h-56 xl:max-h-[45%]"
+          >
             <ClaimBox
               matchId={matchId}
               examples={examples}
@@ -134,7 +147,7 @@ function Studio() {
           <Panel
             title={t("studio.talkingPoints")}
             testId="panel-talking-points"
-            className="min-h-64 flex-1"
+            className="max-h-[75vh] min-h-64 xl:max-h-none xl:flex-1"
           >
             <TalkingPointQueue
               matchId={matchId}
@@ -147,7 +160,7 @@ function Studio() {
           <Panel
             title={t("studio.commentary")}
             testId="panel-commentary"
-            className="max-h-[30%] min-h-40"
+            className="max-h-[50vh] min-h-40 xl:max-h-[30%]"
           >
             <CommentaryPreview
               items={items(commentary)}
@@ -155,7 +168,7 @@ function Studio() {
             />
           </Panel>
         </div>
-        <div className="flex min-h-0 flex-col gap-2 overflow-auto">
+        <div className="flex flex-col gap-2 xl:min-h-0 xl:overflow-auto">
           <Panel title={t("studio.lowerThirds")} testId="panel-lower-thirds">
             <LowerThirdMonitor matchId={matchId} main={connection} uiLang={lang} />
           </Panel>

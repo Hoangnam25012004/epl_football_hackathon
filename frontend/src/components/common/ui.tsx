@@ -54,6 +54,24 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="p-4 text-center text-sm text-muted">{children}</p>;
 }
 
+/** A panel whose data did not come (Day 6 states, docs/day6-design.md 8.4): say so, offer a
+ * retry. A finished match sends no more snapshots, so nothing else would load it again. */
+export function LoadFailed({ onRetry }: { onRetry: () => void }) {
+  const { t } = useT();
+  return (
+    <div data-testid="load-failed" className="flex flex-col items-center gap-2 p-4 text-sm">
+      <p className="text-muted">{t("common.loadFailed")}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded border border-line px-3 py-1 hover:bg-panel-2"
+      >
+        {t("common.retry")}
+      </button>
+    </div>
+  );
+}
+
 export function TeamChip({
   name,
   color,

@@ -3,7 +3,7 @@
 // Momentum per played minute (docs/day4-design.md sections 3.3, 5.8): the server's values drawn
 // as an area (home above the line), with its markers (goals, VAR, red cards, half-time).
 import { useEffect, useId, useState } from "react";
-import { EmptyState } from "@/components/common/ui";
+import { EmptyState, LoadFailed } from "@/components/common/ui";
 import { api } from "@/lib/api";
 import { safeColor } from "@/lib/color";
 import type { ScenarioInfo, TimelineView } from "@/lib/contracts";
@@ -34,21 +34,26 @@ export function MomentumTimeline({
   const { t, lang } = useT();
   const [view, setView] = useState<TimelineView | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const clip = useId(); // unique clip ids: two charts on a page never share them
 
   const refresh = useThrottled(version, REFRESH_MS);
   useEffect(() => {
     let alive = true;
     void api.timeline(matchId).then((result) => {
-      if (alive && result.ok) setView(result.data);
+      if (!alive) return;
+      setFailed(!result.ok); // a failed refresh keeps the last chart
+      if (result.ok) setView(result.data);
     });
     return () => {
       alive = false;
     };
-  }, [matchId, refresh]);
+  }, [matchId, refresh, attempt]);
 
+  if (!view && failed) return <LoadFailed onRetry={() => setAttempt((n) => n + 1)} />;
   if (!view || view.points.length === 0) {
-    return <EmptyState>{view ? t("studio.noEvents") : t("common.loading")}</EmptyState>;
+    return <EmptyState>{view ? t("studio.notEnoughData") : t("common.loading")}</EmptyState>;
   }
   const lastMinute = Math.max(95, view.points[view.points.length - 1]?.minute ?? 95);
   const x = (minute: number) => (minute / lastMinute) * WIDTH;
