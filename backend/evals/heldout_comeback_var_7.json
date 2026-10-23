@@ -1,0 +1,135 @@
+{
+  "name": "comeback_var-7 held-out phrasings (Day 6; never used to tune the parser)",
+  "heldout": true,
+  "match": {
+    "scenario": "comeback_var",
+    "seed": 7
+  },
+  "claims": [
+    {
+      "id": "ch01",
+      "text": "Ironvale lật ngược thế cờ sau giờ nghỉ",
+      "expected": "TRUE",
+      "category": "narrative",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "score:ironvale_united:H2": "3",
+        "score:saltmarsh_rovers:H2": "1",
+        "score:ironvale_united:FULL": "3",
+        "score:saltmarsh_rovers:FULL": "2"
+      },
+      "note": "0-1 at half-time, 3-1 in the second half, 3-2 at full time"
+    },
+    {
+      "id": "ch02",
+      "text": "Saltmarsh bị VAR từ chối một bàn thắng",
+      "expected": "TRUE",
+      "category": "var",
+      "checks": {
+        "var_overturns:saltmarsh_rovers:FULL": "1"
+      },
+      "note": "35' goal overturned for offside"
+    },
+    {
+      "id": "ch03",
+      "text": "Demirel lập cú đúp",
+      "expected": "TRUE",
+      "category": "player",
+      "checks": {
+        "score:ironvale_united-11:FULL": "2"
+      },
+      "note": "a brace: 81' and 90+2'"
+    },
+    {
+      "id": "ch04",
+      "text": "Ironvale dứt điểm gấp tám lần Saltmarsh trong hiệp hai",
+      "expected": "TRUE",
+      "category": "shots",
+      "tags": [
+        "window:H2",
+        "comparative",
+        "number_words"
+      ],
+      "checks": {
+        "shots:ironvale_united:H2": "16",
+        "shots:saltmarsh_rovers:H2": "2"
+      },
+      "note": "16 to 2 = 8 times"
+    },
+    {
+      "id": "ch05",
+      "text": "Saltmarsh were the side picking up the bookings",
+      "expected": "FALSE",
+      "category": "discipline",
+      "checks": {
+        "cards:saltmarsh_rovers:FULL": "0",
+        "cards:ironvale_united:FULL": "3"
+      },
+      "note": "cards 0 to 3: Ironvale were booked"
+    },
+    {
+      "id": "ch06",
+      "text": "Ironvale won despite having less of the ball",
+      "expected": "PARTLY_TRUE",
+      "category": "multi",
+      "tags": [
+        "comparative"
+      ],
+      "checks": {
+        "score:ironvale_united:FULL": "3",
+        "score:saltmarsh_rovers:FULL": "2",
+        "possession:ironvale_united:FULL": "52%",
+        "possession:saltmarsh_rovers:FULL": "48%"
+      },
+      "note": "won 3-2; but 52% of the ball"
+    },
+    {
+      "id": "ch07",
+      "text": "Saltmarsh saw more of the ball in the last fifteen minutes",
+      "expected": "TRUE",
+      "category": "possession",
+      "tags": [
+        "window:last",
+        "comparative",
+        "number_words"
+      ],
+      "checks": {
+        "possession:saltmarsh_rovers:last15": "60%",
+        "possession:ironvale_united:last15": "40%"
+      },
+      "note": "60% to 40%"
+    },
+    {
+      "id": "ch08",
+      "text": "Ironvale didn't win a single corner before half-time",
+      "expected": "FALSE",
+      "category": "set_piece",
+      "tags": [
+        "window:H1",
+        "negation"
+      ],
+      "checks": {
+        "corners:ironvale_united:H1": "1"
+      },
+      "note": "1 corner"
+    },
+    {
+      "id": "ch09",
+      "text": "Ironvale vẫn đang bị dẫn một bàn",
+      "expected": "TRUE",
+      "at": "75'",
+      "category": "result",
+      "tags": [
+        "as_of",
+        "number_words"
+      ],
+      "checks": {
+        "score:ironvale_united:FULL": "1",
+        "score:saltmarsh_rovers:FULL": "2"
+      },
+      "note": "1-2 at 75'"
+    }
+  ]
+}

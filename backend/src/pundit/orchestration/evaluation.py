@@ -11,14 +11,16 @@ import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pundit.agents.contracts import ClaimRequest, ClaimResult, ReasonCode, Verdict
 from pundit.domain.events import Event
 from pundit.domain.matchtime import MS_PER_MINUTE, parse_display_minute
 from pundit.engine.generator import generate
 from pundit.engine.match import GeneratedMatch
+from pundit.orchestration.eval_checks import CheckKey
 from pundit.orchestration.service import ClaimService, StaticSource
 
 LLM_AGENTS = frozenset({"ClaimAnalyst", "Explainer"})
@@ -39,6 +41,17 @@ def llm_failures_of(result: ClaimResult) -> set[str]:
     return found
 
 
+CATEGORIES = (
+    "possession", "shots", "xg", "result", "discipline", "set_piece", "var", "player",
+    "dominance", "narrative", "multi", "robust", "unsupported", "entity", "future", "injection",
+)  # fmt: skip
+TAGS = (
+    "window:H1", "window:H2", "window:last", "window:from", "window:until", "window:range",
+    "as_of", "comparative", "negation", "superlative", "no_diacritics", "typo", "code_switch",
+    "number_words",
+)  # fmt: skip
+
+
 class EvalCase(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -49,6 +62,23 @@ class EvalCase(BaseModel):
     expect_reason: ReasonCode | None = None
     expect_display: dict[str, str] = Field(default_factory=dict)  # fact key -> display
     note: str = ""
+    # Day 6 (docs/day6-design.md 4.2-4.4); the Day 2 files have none of them
+    category: str = ""
+    tags: tuple[str, ...] = ()
+    # the numbers the label was written from (eval_checks): key -> display, recomputed from
+    # the Stats Tools by the harness, never taken from the verifier's facts
+    checks: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check_case(self) -> Self:
+        if self.category and self.category not in CATEGORIES:
+            raise ValueError(f"{self.id}: unknown category {self.category!r}")
+        unknown = sorted(set(self.tags) - set(TAGS))
+        if unknown:
+            raise ValueError(f"{self.id}: unknown tags {unknown}")
+        for key in self.checks:
+            CheckKey.parse(key)
+        return self
 
 
 class EvalMatch(BaseModel):
@@ -58,6 +88,16 @@ class EvalMatch(BaseModel):
     seed: int
 
 
+class Review(BaseModel):
+    """Who reviewed the labels, and when (the gate of G3)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    by: str
+    date: str  # ISO date
+    note: str = ""
+
+
 class EvalFile(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -65,6 +105,15 @@ class EvalFile(BaseModel):
     heldout: bool = False
     match: EvalMatch
     claims: tuple[EvalCase, ...]
+    frozen_at: str | None = None  # held-out files: committed before any parser change of Day 6
+    reviewed: Review | None = None  # None: the labels are pending review
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> Self:
+        ids = [case.id for case in self.claims]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{self.name}: duplicate claim ids")
+        return self
 
 
 def load_eval(path: Path) -> EvalFile:

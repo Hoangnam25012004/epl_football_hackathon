@@ -1,0 +1,145 @@
+{
+  "name": "red_card_swing-7 held-out phrasings (Day 6; never used to tune the parser)",
+  "heldout": true,
+  "match": {
+    "scenario": "red_card_swing",
+    "seed": 7
+  },
+  "claims": [
+    {
+      "id": "rh01",
+      "text": "Mười người Kestrel không giữ nổi lợi thế",
+      "expected": "TRUE",
+      "category": "narrative",
+      "checks": {
+        "red_cards:kestrel_athletic:FULL": "1",
+        "score:kestrel_athletic:FULL": "1",
+        "score:harbor_lions:FULL": "2"
+      },
+      "note": "sent off at 52' when 1-0 up; lost 1-2"
+    },
+    {
+      "id": "rh02",
+      "text": "Kestrel phải chơi thiếu người từ đầu hiệp hai",
+      "expected": "TRUE",
+      "category": "discipline",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "red_cards:kestrel_athletic:H2": "1"
+      },
+      "note": "red card at 52'"
+    },
+    {
+      "id": "rh03",
+      "text": "Harbor vây hãm khung thành Kestrel suốt hiệp hai",
+      "expected": "TRUE",
+      "category": "dominance",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "possession:harbor_lions:H2": "50%",
+        "possession:kestrel_athletic:H2": "50%",
+        "shots:harbor_lions:H2": "26",
+        "shots:kestrel_athletic:H2": "5",
+        "xg:harbor_lions:H2": "5.15",
+        "xg:kestrel_athletic:H2": "0.94",
+        "momentum:harbor_lions:H2": "0.65",
+        "momentum:kestrel_athletic:H2": "-0.65"
+      },
+      "note": "rubric 3/4: shots 26-5, xG 5.15-0.94, momentum 0.65"
+    },
+    {
+      "id": "rh04",
+      "text": "Harbor didn't manage a single shot on target before the break",
+      "expected": "TRUE",
+      "category": "shots",
+      "tags": [
+        "window:H1",
+        "negation"
+      ],
+      "checks": {
+        "shots_on_target:harbor_lions:H1": "0"
+      },
+      "note": "0 on target in the first half"
+    },
+    {
+      "id": "rh05",
+      "text": "Kestrel were well on top in the opening half hour",
+      "expected": "TRUE",
+      "category": "dominance",
+      "tags": [
+        "window:until"
+      ],
+      "checks": {
+        "possession:kestrel_athletic:-30": "50%",
+        "possession:harbor_lions:-30": "50%",
+        "shots:kestrel_athletic:-30": "11",
+        "shots:harbor_lions:-30": "0",
+        "xg:kestrel_athletic:-30": "2.38",
+        "xg:harbor_lions:-30": "0.00",
+        "momentum:kestrel_athletic:-30": "0.73",
+        "momentum:harbor_lions:-30": "-0.73"
+      },
+      "note": "rubric 3/4 before 30': shots 11-0, xG 2.38-0.00, momentum 0.73"
+    },
+    {
+      "id": "rh06",
+      "text": "Calder pulled Harbor level",
+      "expected": "TRUE",
+      "category": "player",
+      "checks": {
+        "score:harbor_lions-09:FULL": "1"
+      },
+      "note": "63': 1-1"
+    },
+    {
+      "id": "rh07",
+      "text": "Harbor forced far more corners after the interval",
+      "expected": "TRUE",
+      "category": "set_piece",
+      "tags": [
+        "window:H2",
+        "comparative"
+      ],
+      "checks": {
+        "corners:harbor_lions:H2": "11",
+        "corners:kestrel_athletic:H2": "1"
+      },
+      "note": "11 to 1"
+    },
+    {
+      "id": "rh08",
+      "text": "Hai đội đang hoà 1-1",
+      "expected": "TRUE",
+      "at": "70'",
+      "category": "result",
+      "tags": [
+        "as_of"
+      ],
+      "checks": {
+        "score:harbor_lions:FULL": "1",
+        "score:kestrel_athletic:FULL": "1"
+      },
+      "note": "1-1 at 70'"
+    },
+    {
+      "id": "rh09",
+      "text": "Harbor thắng dù sút ít hơn Kestrel",
+      "expected": "PARTLY_TRUE",
+      "category": "multi",
+      "tags": [
+        "comparative"
+      ],
+      "checks": {
+        "score:harbor_lions:FULL": "2",
+        "score:kestrel_athletic:FULL": "1",
+        "shots:harbor_lions:FULL": "28",
+        "shots:kestrel_athletic:FULL": "21"
+      },
+      "note": "won 2-1; but 28 shots to 21"
+    }
+  ]
+}
