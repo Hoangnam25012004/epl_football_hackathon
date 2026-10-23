@@ -199,6 +199,8 @@
 
 ## Ngày 6 — 26/10: Eval, tối ưu độ trễ, sửa lỗi, đánh bóng UI
 
+> Phần làm được khi chưa có Azure (MCP server, eval 100 claim, thử fallback, phiên riêng cho từng người xem, quét secret / tuân thủ, sửa lỗi và hướng dẫn demo): thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day6-design.md](docs/day6-design.md). Phần đo trên bản deploy chờ Azure.
+
 **Eval**
 - [ ] **P0** Mở rộng bộ eval lên 50–100 claim (cả 2–3 kịch bản)
 - [ ] **P0** Đo: tỷ lệ verdict đúng, tỷ lệ số liệu bịa (mục tiêu **0%**)
