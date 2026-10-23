@@ -28,5 +28,5 @@ htmlcov/
 # Day 5: local audio store (docs/day5-design.md section 8.8)
 .data/
 
-# Day 5: the listening review (backend/scripts/tts_review.py)
-review/
+# Day 5: the listening review (backend/scripts/tts_review.py --out review, run from backend/)
+/backend/review/

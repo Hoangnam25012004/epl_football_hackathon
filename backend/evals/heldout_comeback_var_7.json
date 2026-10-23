@@ -1,6 +1,7 @@
 {
   "name": "comeback_var-7 held-out phrasings (Day 6; never used to tune the parser)",
   "heldout": true,
+  "frozen_at": "5a56b3c7593621d8d6ccb3e356df5ca243887dd3",
   "match": {
     "scenario": "comeback_var",
     "seed": 7

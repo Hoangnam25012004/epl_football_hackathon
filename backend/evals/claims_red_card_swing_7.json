@@ -1,0 +1,299 @@
+{
+  "name": "red_card_swing-7 labelled claims (Day 6)",
+  "heldout": false,
+  "match": {
+    "scenario": "red_card_swing",
+    "seed": 7
+  },
+  "claims": [
+    {
+      "id": "s01",
+      "text": "Harbor thắng 2-1",
+      "expected": "TRUE",
+      "category": "result",
+      "checks": {
+        "score:harbor_lions:FULL": "2",
+        "score:kestrel_athletic:FULL": "1"
+      },
+      "note": "2-1 at full time"
+    },
+    {
+      "id": "s02",
+      "text": "Kestrel were 1-0 up at half-time",
+      "expected": "TRUE",
+      "category": "result",
+      "tags": [
+        "window:H1"
+      ],
+      "checks": {
+        "score:kestrel_athletic:H1": "1",
+        "score:harbor_lions:H1": "0"
+      },
+      "note": "Arregui 30'"
+    },
+    {
+      "id": "s03",
+      "text": "Kestrel nhận một thẻ đỏ",
+      "expected": "TRUE",
+      "category": "discipline",
+      "checks": {
+        "red_cards:kestrel_athletic:FULL": "1"
+      },
+      "note": "Arregui, straight red at 52'"
+    },
+    {
+      "id": "s04",
+      "text": "Harbor had a player sent off",
+      "expected": "FALSE",
+      "category": "discipline",
+      "checks": {
+        "red_cards:harbor_lions:FULL": "0"
+      },
+      "note": "no red card for Harbor"
+    },
+    {
+      "id": "s05",
+      "text": "Harbor không bị phạt thẻ nào",
+      "expected": "TRUE",
+      "category": "discipline",
+      "tags": [
+        "negation"
+      ],
+      "checks": {
+        "cards:harbor_lions:FULL": "0"
+      },
+      "note": "0 cards"
+    },
+    {
+      "id": "s06",
+      "text": "Harbor out-shot Kestrel 26 to 5 after the break",
+      "expected": "TRUE",
+      "category": "shots",
+      "tags": [
+        "window:H2",
+        "comparative"
+      ],
+      "checks": {
+        "shots:harbor_lions:H2": "26",
+        "shots:kestrel_athletic:H2": "5"
+      },
+      "note": "26 to 5 in the second half"
+    },
+    {
+      "id": "s07",
+      "text": "Kestrel có 15 cú sút trong hiệp 1",
+      "expected": "PARTLY_TRUE",
+      "at": "50'",
+      "category": "shots",
+      "tags": [
+        "window:H1",
+        "as_of"
+      ],
+      "checks": {
+        "shots:kestrel_athletic:H1": "16"
+      },
+      "note": "16: off by one with a value >= 5 (asked at 50', the first half is over)"
+    },
+    {
+      "id": "s08",
+      "text": "Kestrel có xG trên 3 trong hiệp 1",
+      "expected": "TRUE",
+      "category": "xg",
+      "tags": [
+        "window:H1"
+      ],
+      "checks": {
+        "xg:kestrel_athletic:H1": "3.47"
+      },
+      "note": "3.47 > 3"
+    },
+    {
+      "id": "s09",
+      "text": "Harbor's xG in the second half was above 5",
+      "expected": "TRUE",
+      "category": "xg",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "xg:harbor_lions:H2": "5.15"
+      },
+      "note": "5.15 > 5"
+    },
+    {
+      "id": "s10",
+      "text": "Harbor có 11 quả phạt góc ở hiệp 2",
+      "expected": "TRUE",
+      "category": "set_piece",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "corners:harbor_lions:H2": "11"
+      },
+      "note": "11"
+    },
+    {
+      "id": "s11",
+      "text": "Kestrel won more corners than Harbor",
+      "expected": "FALSE",
+      "category": "set_piece",
+      "tags": [
+        "comparative"
+      ],
+      "checks": {
+        "corners:kestrel_athletic:FULL": "4",
+        "corners:harbor_lions:FULL": "13"
+      },
+      "note": "4 to 13"
+    },
+    {
+      "id": "s12",
+      "text": "Kestrel had more possession in the first half",
+      "expected": "TRUE",
+      "category": "possession",
+      "tags": [
+        "window:H1",
+        "comparative"
+      ],
+      "checks": {
+        "possession:kestrel_athletic:H1": "53%",
+        "possession:harbor_lions:H1": "47%"
+      },
+      "note": "53% to 47%"
+    },
+    {
+      "id": "s13",
+      "text": "Harbor kiểm soát bóng 60% trong hiệp 2",
+      "expected": "FALSE",
+      "category": "possession",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "possession:harbor_lions:H2": "50%"
+      },
+      "note": "50%: 10 points off, more than twice the 2.5-point tolerance"
+    },
+    {
+      "id": "s14",
+      "text": "Kestrel áp đảo hiệp 1 nhưng vẫn thua",
+      "expected": "TRUE",
+      "category": "dominance",
+      "tags": [
+        "window:H1"
+      ],
+      "checks": {
+        "possession:kestrel_athletic:H1": "53%",
+        "possession:harbor_lions:H1": "47%",
+        "shots:kestrel_athletic:H1": "16",
+        "shots:harbor_lions:H1": "2",
+        "xg:kestrel_athletic:H1": "3.47",
+        "xg:harbor_lions:H1": "0.23",
+        "momentum:kestrel_athletic:H1": "0.60",
+        "momentum:harbor_lions:H1": "-0.60",
+        "score:kestrel_athletic:FULL": "1",
+        "score:harbor_lions:FULL": "2"
+      },
+      "note": "rubric 3/4 (shots 16-2, xG 3.47-0.23, momentum 0.60; possession 53%); lost 1-2"
+    },
+    {
+      "id": "s15",
+      "text": "Kestrel dominated the second half",
+      "expected": "FALSE",
+      "category": "dominance",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "possession:kestrel_athletic:H2": "50%",
+        "possession:harbor_lions:H2": "50%",
+        "shots:kestrel_athletic:H2": "5",
+        "shots:harbor_lions:H2": "26",
+        "xg:kestrel_athletic:H2": "0.94",
+        "xg:harbor_lions:H2": "5.15",
+        "momentum:kestrel_athletic:H2": "-0.65",
+        "momentum:harbor_lions:H2": "0.65"
+      },
+      "note": "rubric 0/4"
+    },
+    {
+      "id": "s16",
+      "text": "Calder took more shots than anyone else in the match",
+      "expected": "TRUE",
+      "category": "player",
+      "tags": [
+        "superlative"
+      ],
+      "checks": {
+        "shots:harbor_lions-09:FULL": "8"
+      },
+      "note": "8 shots; the next players have 5; a refusal is not wrong"
+    },
+    {
+      "id": "s17",
+      "text": "Lindqvist ghi bàn trong hiệp 2",
+      "expected": "TRUE",
+      "category": "player",
+      "tags": [
+        "window:H2"
+      ],
+      "checks": {
+        "score:harbor_lions-08:H2": "1"
+      },
+      "note": "77'"
+    },
+    {
+      "id": "s18",
+      "text": "Kestrel đang dẫn 1-0",
+      "expected": "TRUE",
+      "at": "60'",
+      "category": "result",
+      "tags": [
+        "as_of"
+      ],
+      "checks": {
+        "score:kestrel_athletic:FULL": "1",
+        "score:harbor_lions:FULL": "0"
+      },
+      "note": "0-1 at 60' (Calder equalised at 63')"
+    },
+    {
+      "id": "s19",
+      "text": "Harbor dominated the second half",
+      "expected": "INSUFFICIENT_DATA",
+      "at": "40'",
+      "expect_reason": "future_window",
+      "category": "future",
+      "tags": [
+        "as_of",
+        "window:H2"
+      ],
+      "note": "asked at 40': the second half is ahead"
+    },
+    {
+      "id": "s20",
+      "text": "Harbor won and had more corners",
+      "expected": "TRUE",
+      "category": "multi",
+      "tags": [
+        "comparative"
+      ],
+      "checks": {
+        "score:harbor_lions:FULL": "2",
+        "score:kestrel_athletic:FULL": "1",
+        "corners:harbor_lions:FULL": "13",
+        "corners:kestrel_athletic:FULL": "4"
+      },
+      "note": "2-1 and 13 corners to 4"
+    },
+    {
+      "id": "s21",
+      "text": "Trọng tài xử ép Kestrel",
+      "expected": "INSUFFICIENT_DATA",
+      "expect_reason": "unsupported_claim",
+      "category": "unsupported",
+      "note": "refereeing bias is not measurable"
+    }
+  ]
+}

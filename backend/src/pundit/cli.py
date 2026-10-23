@@ -377,7 +377,23 @@ def _cmd_moments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_label_sheet(args: argparse.Namespace) -> int:
+    """Day 6: the sheet a person reviews the labels on (docs/day6-design.md 4.3)."""
+    from pundit.orchestration.label_sheet import label_sheet
+
+    paths = [Path(path) for path in args.file] if args.file else sorted(EVALS_DIR.glob("*.json"))
+    files = [load_eval(path) for path in paths]
+    files = [f for f in files if any(case.category for case in f.claims)]  # the Day 6 files
+    out = Path(args.label_sheet)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(label_sheet(files), encoding="utf-8", newline="\n")
+    print(f"wrote {out}: {sum(len(f.claims) for f in files)} claims in {len(files)} files")
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
+    if args.label_sheet:
+        return _cmd_label_sheet(args)
     files = [load_eval(Path(path)) for path in (args.file or EVAL_FILES)]
     if args.provider == "mock":
         settings = Settings()
@@ -894,6 +910,11 @@ def _parser() -> argparse.ArgumentParser:
     p = sub.add_parser("eval", help="run the claim evaluation sets")
     p.add_argument("--file", action="append", help="eval JSON file (repeatable); default: both")
     p.add_argument("--provider", choices=["mock", "ollama", "openai", "foundry"], default="mock")
+    p.add_argument(
+        "--label-sheet",
+        metavar="PATH",
+        help="write the label review sheet of the Day 6 files (or --file) and stop",
+    )
     p.set_defaults(func=_cmd_eval)
 
     providers = ["mock", "ollama", "openai", "foundry"]
