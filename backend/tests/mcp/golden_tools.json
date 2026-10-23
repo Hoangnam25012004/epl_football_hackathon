@@ -1,0 +1,737 @@
+[
+  {
+    "name": "compare_stat",
+    "title": "Compare the two teams",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "WindowArg": {
+          "additionalProperties": false,
+          "description": "A time window, with the names of the agents' window (llm/dto.py LlmWindow).",
+          "properties": {
+            "type": {
+              "description": "full, first_half, second_half, last_minutes (with minutes), from_minute (with start_minute), until_minute (with end_minute) or minute_range (with both)",
+              "enum": [
+                "full",
+                "first_half",
+                "second_half",
+                "last_minutes",
+                "from_minute",
+                "until_minute",
+                "minute_range"
+              ],
+              "title": "Type",
+              "type": "string"
+            },
+            "minutes": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 130,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "last_minutes only",
+              "title": "Minutes"
+            },
+            "start_minute": {
+              "anyOf": [
+                {
+                  "maximum": 130,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Start Minute"
+            },
+            "end_minute": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 130,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "End Minute"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "WindowArg",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "metric": {
+          "description": "Metric name (list_metrics)",
+          "enum": [
+            "ball_in_play_time",
+            "box_entries",
+            "cards",
+            "chaos_index",
+            "corners",
+            "difficult_passes_completed",
+            "final_third_entries",
+            "fouls",
+            "interceptions",
+            "momentum",
+            "offsides",
+            "pass_accuracy",
+            "pass_difficulty_avg",
+            "pass_length_avg",
+            "pass_share",
+            "pass_speed_avg",
+            "passes",
+            "player_distance",
+            "player_top_speed",
+            "possession",
+            "possession_time",
+            "ppda",
+            "red_cards",
+            "score",
+            "shot_speed_max",
+            "shots",
+            "shots_on_target",
+            "speed_alerts",
+            "tackles",
+            "tempo",
+            "var_overturns",
+            "xg",
+            "yellow_cards"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WindowArg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time window; empty for the whole match (so far)"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "match_id",
+        "metric"
+      ],
+      "title": "compare_statArguments"
+    },
+    "output_fields": [
+      "as_of",
+      "away",
+      "diff",
+      "disclaimer",
+      "home",
+      "match_id",
+      "metric",
+      "ratio",
+      "source",
+      "synthetic",
+      "window"
+    ]
+  },
+  {
+    "name": "get_events",
+    "title": "Match events",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Event ids (at most 50), e.g. the evidence of a statistic",
+          "title": "Ids"
+        },
+        "last": {
+          "anyOf": [
+            {
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The latest N events",
+          "title": "Last"
+        },
+        "types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only these event types: goal, shot, card, var_check, offside...",
+          "title": "Types"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "match_id"
+      ],
+      "title": "get_eventsArguments"
+    },
+    "output_fields": [
+      "as_of",
+      "disclaimer",
+      "events",
+      "match_id",
+      "missing",
+      "source",
+      "synthetic",
+      "truncated"
+    ]
+  },
+  {
+    "name": "get_moments",
+    "title": "Key moments",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        },
+        "min_importance": {
+          "default": 2,
+          "description": "3: goals, red cards, VAR; 2: also big chances and momentum",
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Min Importance",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 30,
+          "description": "At most this many moments",
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "match_id"
+      ],
+      "title": "get_momentsArguments"
+    },
+    "output_fields": [
+      "as_of",
+      "disclaimer",
+      "match_id",
+      "moments",
+      "source",
+      "synthetic",
+      "truncated"
+    ]
+  },
+  {
+    "name": "get_scoreboard",
+    "title": "Scoreboard",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "match_id"
+      ],
+      "title": "get_scoreboardArguments"
+    },
+    "output_fields": [
+      "as_of",
+      "away",
+      "disclaimer",
+      "finished",
+      "home",
+      "match_id",
+      "period",
+      "source",
+      "synthetic"
+    ]
+  },
+  {
+    "name": "get_stat",
+    "title": "Get a statistic",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "WindowArg": {
+          "additionalProperties": false,
+          "description": "A time window, with the names of the agents' window (llm/dto.py LlmWindow).",
+          "properties": {
+            "type": {
+              "description": "full, first_half, second_half, last_minutes (with minutes), from_minute (with start_minute), until_minute (with end_minute) or minute_range (with both)",
+              "enum": [
+                "full",
+                "first_half",
+                "second_half",
+                "last_minutes",
+                "from_minute",
+                "until_minute",
+                "minute_range"
+              ],
+              "title": "Type",
+              "type": "string"
+            },
+            "minutes": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 130,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "last_minutes only",
+              "title": "Minutes"
+            },
+            "start_minute": {
+              "anyOf": [
+                {
+                  "maximum": 130,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Start Minute"
+            },
+            "end_minute": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 130,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "End Minute"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "WindowArg",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "metric": {
+          "description": "Metric name (list_metrics)",
+          "enum": [
+            "ball_in_play_time",
+            "box_entries",
+            "cards",
+            "chaos_index",
+            "corners",
+            "difficult_passes_completed",
+            "final_third_entries",
+            "fouls",
+            "interceptions",
+            "momentum",
+            "offsides",
+            "pass_accuracy",
+            "pass_difficulty_avg",
+            "pass_length_avg",
+            "pass_share",
+            "pass_speed_avg",
+            "passes",
+            "player_distance",
+            "player_top_speed",
+            "possession",
+            "possession_time",
+            "ppda",
+            "red_cards",
+            "score",
+            "shot_speed_max",
+            "shots",
+            "shots_on_target",
+            "speed_alerts",
+            "tackles",
+            "tempo",
+            "var_overturns",
+            "xg",
+            "yellow_cards"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Team: id, short name (HAR), name, or home / away",
+          "title": "Team"
+        },
+        "player": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Player: id (harbor_lions-09) or name",
+          "title": "Player"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WindowArg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time window; empty for the whole match (so far)"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "match_id",
+        "metric"
+      ],
+      "title": "get_statArguments"
+    },
+    "output_fields": [
+      "as_of",
+      "disclaimer",
+      "match_id",
+      "source",
+      "stat",
+      "synthetic"
+    ]
+  },
+  {
+    "name": "list_matches",
+    "title": "List matches",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "title": "list_matchesArguments"
+    },
+    "output_fields": [
+      "disclaimer",
+      "live",
+      "scenarios",
+      "synthetic"
+    ]
+  },
+  {
+    "name": "list_metrics",
+    "title": "List metrics",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "enum": [
+                "team",
+                "match",
+                "player"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        }
+      },
+      "title": "list_metricsArguments"
+    },
+    "output_fields": [
+      "disclaimer",
+      "metrics",
+      "synthetic"
+    ]
+  },
+  {
+    "name": "list_players",
+    "title": "List players",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Team: id, short name (HAR), name, or home / away",
+          "title": "Team"
+        }
+      },
+      "required": [
+        "match_id"
+      ],
+      "title": "list_playersArguments"
+    },
+    "output_fields": [
+      "disclaimer",
+      "match_id",
+      "players",
+      "synthetic"
+    ]
+  },
+  {
+    "name": "verify_claim",
+    "title": "Check a claim",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "match_id": {
+          "description": "Match id from list_matches: a scenario and a seed (dominant_loser-42) or a live session id",
+          "title": "Match Id",
+          "type": "string"
+        },
+        "text": {
+          "description": "What the commentator said (VI or EN)",
+          "maxLength": 300,
+          "minLength": 3,
+          "title": "Text",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "match_id",
+        "text"
+      ],
+      "title": "verify_claimArguments"
+    },
+    "output_fields": [
+      "analyst",
+      "as_of",
+      "assertions",
+      "claim",
+      "disclaimer",
+      "evidence_event_ids",
+      "evidence_total",
+      "explanation",
+      "headline",
+      "language",
+      "match_id",
+      "reason_code",
+      "source",
+      "synthetic",
+      "verdict"
+    ]
+  }
+]

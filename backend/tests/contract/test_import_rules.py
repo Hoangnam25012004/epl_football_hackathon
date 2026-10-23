@@ -1,9 +1,11 @@
-"""One-way imports (design section 2.3; Day 5 adds `speech`, docs/day5-design.md 2.5):
-domain <- stats <- state <- engine <- agents <- llm <- orchestration <- speech <- api <- cli.
+"""One-way imports (design section 2.3; Day 5 adds `speech`, docs/day5-design.md 2.5; Day 6
+adds `mcp_server`, docs/day6-design.md 2.2):
+domain <- stats <- state <- engine <- agents <- llm <- orchestration <- speech <- mcp_server
+<- api <- cli.
 
 Agents never import Microsoft Agent Framework, FastAPI or HTTP clients (principle L6); MAF lives
 in orchestration and llm.maf_backend only; FastAPI in api only; HTTP and the Azure SDK of the
-voice in the speech modules that talk to Azure.
+voice in the speech modules that talk to Azure; the MCP SDK in mcp_server.server only.
 """
 
 import ast
@@ -12,8 +14,8 @@ from pathlib import Path
 import pundit
 
 LAYERS = [
-    "domain", "stats", "state", "engine", "agents", "llm", "orchestration", "speech", "api",
-    "cli",
+    "domain", "stats", "state", "engine", "agents", "llm", "orchestration", "speech",
+    "mcp_server", "api", "cli",
 ]  # fmt: skip
 PACKAGE = Path(pundit.__file__).parent
 EXTERNAL = {
@@ -24,6 +26,7 @@ EXTERNAL = {
     "fastapi": {"api"},
     "starlette": {"api"},
     "uvicorn": {"cli"},
+    "mcp": {"mcp_server.server"},
 }
 
 
