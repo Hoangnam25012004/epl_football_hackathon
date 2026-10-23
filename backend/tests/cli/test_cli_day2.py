@@ -101,7 +101,8 @@ def test_moments(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_eval(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["eval"]) == 0
+    # the Day 2 sets; `pundit eval` alone runs every set of evals/ (Day 6, tests/eval)
+    assert main(["eval", "--file", str(EVAL_FILES[0]), "--file", str(EVAL_FILES[1])]) == 0
     out = capsys.readouterr().out
     assert "accuracy (labelled set): 100%" in out and "wrong verdicts (all sets): 0" in out
     assert out.strip().endswith("PASSED")

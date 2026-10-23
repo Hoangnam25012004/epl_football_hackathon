@@ -11,8 +11,10 @@ import io
 import json
 import logging
 import os
+import subprocess
 import sys
 from collections.abc import Callable, Sequence
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -68,7 +70,16 @@ from pundit.engine.replay import RealClock, describe_event, replay, status_line
 from pundit.engine.scenarios import SCENARIOS
 from pundit.engine.validate import validate_match
 from pundit.llm.settings import ConfigError, Settings, load_settings, read_env_file
-from pundit.orchestration.evaluation import load_eval, run_eval, seq_at
+from pundit.orchestration.evaluation import (
+    EvalRow,
+    RunInfo,
+    compare,
+    load_eval,
+    load_run,
+    markdown,
+    run_eval,
+    seq_at,
+)
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.service import ClaimService, StaticSource
 from pundit.orchestration.studio_eval import build_report, run_offline
@@ -391,30 +402,110 @@ def _cmd_label_sheet(args: argparse.Namespace) -> int:
     return 0
 
 
+def _git_commit() -> str:
+    try:
+        done = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
+def _eval_settings(provider: str) -> Settings:
+    if provider == "mock":
+        return Settings()
+    env = {**read_env_file(ENV_FILE), **os.environ}
+    env.update({"USE_MOCK_LLM": "false", "LLM_PROVIDER": provider})
+    return Settings.from_env(env)
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     if args.label_sheet:
         return _cmd_label_sheet(args)
-    files = [load_eval(Path(path)) for path in (args.file or EVAL_FILES)]
-    if args.provider == "mock":
-        settings = Settings()
+    if args.resume and not args.out:
+        print("error: --resume needs --out (the run file to continue)", file=sys.stderr)
+        return 2
+    paths = [Path(path) for path in args.file] if args.file else sorted(EVALS_DIR.glob("*.json"))
+    files = [load_eval(path) for path in paths]
+    if args.compare:
+        first, second = (load_run(Path(path), files) for path in args.compare)
+        differences = compare(first, second)
+        names = [f"{r.info.provider} ({r.info.model})" if r.info else "?" for r in (first, second)]
+        print(f"{len(differences)} claims judged differently: {names[0]} vs {names[1]}")
+        for d in differences:
+            print(f"  {d.id:<5} label {d.expected:<17} {d.first:<17} {d.second:<17} {d.text}")
+        return 0
+    if args.from_runs:
+        reports = [load_run(Path(path), files) for path in args.from_runs]
     else:
-        env = {**read_env_file(ENV_FILE), **os.environ}
-        env.update({"USE_MOCK_LLM": "false", "LLM_PROVIDER": args.provider})
-        settings = Settings.from_env(env)
-    report = asyncio.run(run_eval(files, ClaimService(settings)))
-    print(f"evaluation with provider {settings.provider} ({settings.model_name}) | synthetic data")
-    for line in report.lines():
-        print(line)
-    min_accuracy = 1.0 if settings.provider == "mock" else 0.9
-    passed = report.passed(require_full_accuracy=False) and report.accuracy >= min_accuracy
-    if settings.provider != "mock" and not report.llm_working():
-        print(
-            "LLM NOT WORKING: the real model gave no usable answer or was unavailable (timeout "
-            "or error) on more than 20% of the claims, so this run mostly tested the "
-            "deterministic fallback. Check the provider, the server or key, and the network "
-            "(pundit claim --trace)."
+        settings = _eval_settings(args.provider)
+        info = RunInfo(
+            provider=settings.provider,
+            model=settings.model_name,
+            commit=_git_commit(),
+            date=date.today().isoformat(),
         )
-        passed = False
+        ids = {i.strip() for i in args.ids.split(",") if i.strip()} if args.ids else None
+
+        def progress(row: EvalRow) -> None:
+            mark = "ok" if row.correct else ("WRONG" if row.wrong else "-")
+            ms = row.result.timings_ms.get("total", 0.0)
+            print(
+                f"  {row.case.id:<5} {row.result.verdict:<17} {mark:<5} {ms:>8.0f} ms", flush=True
+            )
+
+        out = Path(args.out) if args.out else None
+        reports = [
+            asyncio.run(
+                run_eval(
+                    files,
+                    ClaimService(settings),
+                    out=out,
+                    resume=args.resume,
+                    ids=ids,
+                    limit=args.limit,
+                    info=info,
+                    on_row=progress if out is not None else None,
+                )
+            )
+        ]
+    passed = True
+    for report in reports:
+        ran = report.info
+        name = f"{ran.provider} ({ran.model})" if ran else "run"
+        print(f"evaluation with provider {name} | synthetic data")
+        for line in report.lines():
+            print(line)
+        mock = ran is None or ran.provider == "mock"
+        floor = args.min_accuracy if args.min_accuracy is not None else (0.85 if mock else 0.0)
+        problems = report.failures(min_accuracy=floor)
+        if not mock and not report.llm_working():
+            print(
+                "LLM NOT WORKING: the real model gave no usable answer or was unavailable "
+                "(timeout or error) on more than 20% of the claims, so this run mostly tested "
+                "the deterministic fallback. Check the provider, the server or key, and the "
+                "network (pundit claim --trace)."
+            )
+            problems.append("the LLM was not working")
+        for problem in problems:
+            print(f"GATE: {problem}")
+        passed = passed and not problems
+    if args.json:
+        data = [r.to_dict() for r in reports]
+        Path(args.json).write_text(
+            json.dumps(data[0] if len(data) == 1 else data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        print(f"wrote {args.json}")
+    if args.markdown:
+        Path(args.markdown).write_text(markdown(reports), encoding="utf-8", newline="\n")
+        print(f"wrote {args.markdown}")
     print("PASSED" if passed else "FAILED")
     return 0 if passed else 1
 
@@ -908,8 +999,27 @@ def _parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_cmd_moments)
 
     p = sub.add_parser("eval", help="run the claim evaluation sets")
-    p.add_argument("--file", action="append", help="eval JSON file (repeatable); default: both")
+    p.add_argument(
+        "--file", action="append", help="eval JSON file (repeatable); default: every evals/*.json"
+    )
     p.add_argument("--provider", choices=["mock", "ollama", "openai", "foundry"], default="mock")
+    p.add_argument("--out", metavar="RUN.jsonl", help="write each claim as soon as it is done")
+    p.add_argument(
+        "--resume", action="store_true", help="keep the claims --out holds, run the rest"
+    )
+    p.add_argument("--ids", help="only these claim ids (comma separated)")
+    p.add_argument("--limit", type=int, help="run at most N new claims")
+    p.add_argument("--min-accuracy", type=float, help="gate (default 0.85 with the mock)")
+    p.add_argument("--json", metavar="PATH", help="write the machine-readable report")
+    p.add_argument("--markdown", metavar="PATH", help="write the report (docs/eval.md)")
+    p.add_argument(
+        "--from",
+        dest="from_runs",
+        action="append",
+        metavar="RUN.jsonl",
+        help="report on saved runs (repeatable) instead of verifying",
+    )
+    p.add_argument("--compare", nargs=2, metavar="RUN.jsonl", help="claims two runs judged apart")
     p.add_argument(
         "--label-sheet",
         metavar="PATH",

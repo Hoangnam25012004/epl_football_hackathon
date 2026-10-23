@@ -30,3 +30,6 @@ htmlcov/
 
 # Day 5: the listening review (backend/scripts/tts_review.py --out review, run from backend/)
 /backend/review/
+
+# Day 6: eval runs (pundit eval --out); only docs/eval.md is committed
+/backend/evals/runs/
