@@ -3,7 +3,7 @@
 // Every page: Suspense (static export + useSearchParams), the interface language, toasts and the
 // synthetic-data badge (principle U5). The badge is part of the shell, so no page can lose it.
 import { Suspense, useEffect, type ReactNode } from "react";
-import { I18nProvider, type UiLang } from "@/lib/i18n";
+import { I18nProvider, type LangDefault } from "@/lib/i18n";
 import { SyntheticFallback } from "./SyntheticBadge";
 import { ToastHost } from "./Toast";
 
@@ -13,7 +13,7 @@ export function PageShell({
   transparent = false,
   children,
 }: {
-  defaultLang: UiLang;
+  defaultLang: LangDefault;
   theme?: "auto" | "studio";
   transparent?: boolean;
   children: ReactNode;

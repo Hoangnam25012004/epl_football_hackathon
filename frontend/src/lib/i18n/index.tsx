@@ -1,11 +1,22 @@
 "use client";
 
-// Interface language (docs/day4-design.md section 4.8): `?ui=` > localStorage > the page default.
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+// Interface language (docs/day4-design.md section 4.8): `?ui=` > localStorage > the page default
+// (Day 6: or the browser's language, for the landing page).
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { en, type Key } from "./en";
 import { vi } from "./vi";
 
 export type UiLang = "en" | "vi";
+/** A page's default language: a fixed one, or the browser's (Vietnamese or English). */
+export type LangDefault = UiLang | "browser";
 export type Vars = Record<string, string | number>;
 
 const DICTS: Record<UiLang, Record<Key, string>> = { en, vi };
@@ -32,8 +43,23 @@ export function kindLabel(lang: UiLang, kind: string): string {
   return kind.replace(/_/g, " ");
 }
 
-export function initialUiLang(fallback: UiLang): UiLang {
-  if (typeof window === "undefined") return fallback;
+/** The first of the browser's languages that is Vietnamese or English; English otherwise. */
+export function browserLang(languages: readonly string[]): UiLang {
+  for (const language of languages) {
+    const code = language.toLowerCase();
+    if (code.startsWith("vi")) return "vi";
+    if (code.startsWith("en")) return "en";
+  }
+  return "en";
+}
+
+/** What a page prerendered at build time was written in: the server knows no browser. */
+export function serverUiLang(fallback: LangDefault): UiLang {
+  return fallback === "browser" ? "en" : fallback;
+}
+
+export function initialUiLang(fallback: LangDefault): UiLang {
+  if (typeof window === "undefined") return serverUiLang(fallback);
   const fromQuery = new URLSearchParams(window.location.search).get("ui");
   if (fromQuery === "en" || fromQuery === "vi") return fromQuery;
   try {
@@ -42,8 +68,15 @@ export function initialUiLang(fallback: UiLang): UiLang {
   } catch {
     /* storage blocked */
   }
-  return fallback;
+  if (fallback !== "browser") return fallback;
+  return browserLang(
+    window.navigator.languages?.length
+      ? window.navigator.languages
+      : [window.navigator.language ?? ""],
+  );
 }
+
+const noSubscription = () => () => {};
 
 type I18n = {
   lang: UiLang;
@@ -57,10 +90,25 @@ const I18nContext = createContext<I18n>({
   t: (key, vars) => translate("en", key, vars),
 });
 
-export function I18nProvider({ fallback, children }: { fallback: UiLang; children: ReactNode }) {
-  const [lang, setLangState] = useState<UiLang>(() => initialUiLang(fallback));
+export function I18nProvider({
+  fallback,
+  children,
+}: {
+  fallback: LangDefault;
+  children: ReactNode;
+}) {
+  // A page prerendered at build time (the landing page) hydrates in its default language, then
+  // switches to the stored or browser one: rendering that one at once would not match the HTML
+  // (React error 418). A page rendered on the client starts in the right language.
+  const initial = useSyncExternalStore(
+    noSubscription,
+    () => initialUiLang(fallback),
+    () => serverUiLang(fallback),
+  );
+  const [chosen, setChosen] = useState<UiLang | null>(null);
+  const lang = chosen ?? initial;
   const setLang = useCallback((next: UiLang) => {
-    setLangState(next);
+    setChosen(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
