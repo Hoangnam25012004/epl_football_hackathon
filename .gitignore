@@ -33,3 +33,6 @@ htmlcov/
 
 # Day 6: eval runs (pundit eval --out); only docs/eval.md is committed
 /backend/evals/runs/
+
+# Day 6: the cassette of the fault-injection runs (scripts/chaos_run.py --record)
+/backend/.chaos/

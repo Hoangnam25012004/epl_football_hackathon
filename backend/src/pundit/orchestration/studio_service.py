@@ -96,7 +96,9 @@ class StudioService:
         # offline, a call may wait for the other requests of its job: the HTTP client must not
         # give up before the call budget does
         self._ports = ports or default_studio_ports(settings, timeout_s=self.budgets.llm_timeout_s)
-        self.breaker = breaker or CircuitBreaker(clock=clock)
+        self.breaker = breaker or CircuitBreaker(
+            clock=clock, cooldown_s=settings.llm_breaker_cooldown_s
+        )
         self.llm_min_importance = llm_min_importance or settings.studio_llm_min_importance
         self._clock = clock
         self._trace_clock = trace_clock

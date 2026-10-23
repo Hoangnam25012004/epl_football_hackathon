@@ -100,7 +100,9 @@ class ClaimService:
     ) -> None:
         self.settings = settings
         self._ports = ports or default_ports(settings)
-        self.breaker = breaker or CircuitBreaker(clock=clock)
+        self.breaker = breaker or CircuitBreaker(
+            clock=clock, cooldown_s=settings.llm_breaker_cooldown_s
+        )
         self._clock = clock
         self._trace_clock = trace_clock
         self._use_workflow = use_workflow

@@ -118,7 +118,9 @@ class RecapService:
     ) -> None:
         self.settings = settings
         self._writer = writer or default_recap_writer(settings)
-        self.breaker = breaker or CircuitBreaker(clock=clock)
+        self.breaker = breaker or CircuitBreaker(
+            clock=clock, cooldown_s=settings.llm_breaker_cooldown_s
+        )
         self.budget_s = budget_s or settings.recap_budget_s
         self._clock = clock
         self._trace_clock = trace_clock

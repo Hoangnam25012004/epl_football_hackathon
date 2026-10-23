@@ -8,3 +8,4 @@ src/lib/contracts/
 tests/fixtures/
 package-lock.json
 next-env.d.ts
+.data/

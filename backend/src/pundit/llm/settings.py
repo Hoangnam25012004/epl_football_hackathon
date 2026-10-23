@@ -74,6 +74,9 @@ class Settings(BaseModel):
     claim_budget_s: float = Field(default=DEFAULT_TIMEOUTS[1], gt=0)
     mock_llm_faults: str = ""
     mock_llm_latency_ms: float = Field(default=0.0, ge=0)
+    # Day 6: how long an open LLM breaker (claims, studio, recaps) waits before a trial call;
+    # shortened only by the fault-injection runs (docs/day6-design.md 5.7)
+    llm_breaker_cooldown_s: float = Field(default=60.0, gt=0)
     cors_origins: tuple[str, ...] = (DEFAULT_CORS,)
     # Day 3 studio (docs/day3-design.md section 13.6)
     studio_enabled: bool = True
@@ -173,6 +176,7 @@ class Settings(BaseModel):
             "llm_timeout_s": self.llm_timeout_s,
             "claim_budget_s": self.claim_budget_s,
             "mock_llm_faults": self.mock_llm_faults or None,
+            "llm_breaker_cooldown_s": self.llm_breaker_cooldown_s,
             "studio_enabled": self.studio_enabled,
             "studio_budgets_s": {
                 "talking_point": self.studio_tp_budget_s,
@@ -288,6 +292,7 @@ class Settings(BaseModel):
             "claim_budget_s": number("CLAIM_BUDGET_S", budget),
             "mock_llm_faults": faults,
             "mock_llm_latency_ms": number("MOCK_LLM_LATENCY_MS", 0.0),
+            "llm_breaker_cooldown_s": number("LLM_BREAKER_COOLDOWN_S", 60.0),
             "cors_origins": tuple(
                 o.strip() for o in (get("CORS_ORIGINS") or DEFAULT_CORS).split(",") if o.strip()
             ),
