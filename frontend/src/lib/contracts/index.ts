@@ -215,7 +215,9 @@ export interface GuardrailViolation {
     | "WRONG_ENTITY"
     | "WRONG_OUTCOME"
     | "WRONG_LANGUAGE"
-    | "WRONG_REGISTER";
+    | "WRONG_REGISTER"
+    | "WRONG_RATIO"
+    | "WRONG_MINUTE";
   detail: string;
   span?: string | null;
 }

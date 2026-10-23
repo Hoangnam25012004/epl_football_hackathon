@@ -30,6 +30,7 @@ from pundit.agents.contracts import (
 from pundit.agents.entities import find_entities
 from pundit.agents.explain_templates import MAX_TEXT_CHARS
 from pundit.agents.language import Term, Text, find_terms, vi_mode
+from pundit.agents.lexicon import RATIO_PATTERNS, ratio_value
 from pundit.agents.numbers import EN_STAT_NOUNS, VI_STAT_NOUNS, Num, extract_numbers
 from pundit.agents.wording import window_numbers
 from pundit.stats.result import Unit
@@ -715,16 +716,99 @@ def ungrounded_violations(
     return violations
 
 
+# ----------------------------------------------------------------------------- Day 6
+
+RATIO_TOLERANCE = 0.10  # as the claim judge reads "twice as many" (docs/day2-design.md 5.1)
+LOWER_BOUND = ("more than", "over", "at least", "hon", "tren", "it nhat")  # folded
+# a minute said of something that happened: it must be the minute of an event of the facts
+EVENT_MINUTE_TYPES = frozenset({"goal", "card", "var_check", "substitution", "shot", "offside"})
+_EVENT_MINUTE = (
+    re.compile(r"(?<!\w)(?:o|vao|tai)\s+phut\s+(?:thu\s+)?(\d{1,3})(?:\s*\+\s*(\d{1,2}))?(?!\w)"),
+    re.compile(r"(?<!\w)(?:at|in)\s+minute\s+(\d{1,3})(?:\s*\+\s*(\d{1,2}))?(?!\w)"),
+    re.compile(r"(?<!\w)(?:at|in)\s+the\s+(\d{1,3})(?:st|nd|rd|th)\s+minute()(?!\w)"),
+    re.compile(r"(?<!\w)(?:at|in)\s+(\d{1,3})(?:\s*\+\s*(\d{1,2}))?\s*'"),
+)
+
+
+def ratio_violations(text: Text, facts: Sequence[Fact]) -> list[GuardrailViolation]:
+    """'twice as many', 'gấp đôi', '15 times as many': the ratio of two facts of one metric or
+    a derived ratio, within 10 %; 'more than twice' needs at least it. A ratio word is a number
+    too, and an LLM may echo the claim's ("twice as many") where the facts say fifteen times."""
+    ratios = [f.value for f in facts if f.derived and f.unit == "ratio"]
+    ratios += [
+        a.value / b.value
+        for a in facts
+        for b in facts
+        if a is not b and not a.derived and not b.derived and a.metric is not None
+        and a.metric == b.metric and b.value
+    ]  # fmt: skip
+    found: list[GuardrailViolation] = []
+    for pattern in RATIO_PATTERNS:
+        for match in pattern.finditer(text.folded):
+            stated = ratio_value(match.group("n"))
+            if stated is None:
+                continue
+            before = text.folded[max(0, match.start() - 12) : match.start()].rstrip()
+            if before.endswith(LOWER_BOUND):
+                ok = any(r >= stated * (1 - RATIO_TOLERANCE) for r in ratios)
+            else:
+                ok = any(abs(r - stated) <= RATIO_TOLERANCE * stated for r in ratios)
+            if not ok:
+                shown = text.raw[match.start() : match.end()]
+                given = ", ".join(f"{r:.3g}" for r in sorted(set(ratios))) or "none"
+                found.append(
+                    GuardrailViolation(
+                        code="WRONG_RATIO",
+                        detail=f"{shown!r} is not a ratio of the facts (they give {given})",
+                        span=shown,
+                    )
+                )
+    return found
+
+
+def event_minute_violations(text: Text, event_minutes: frozenset[str]) -> list[GuardrailViolation]:
+    """'ở phút 90+6', 'at minute 63', 'in the 63rd minute': something happened then, so the
+    facts must hold an event of that minute ('tính đến phút 63', the claim's minute, is not
+    this kind of phrase)."""
+    found: list[GuardrailViolation] = []
+    for pattern in _EVENT_MINUTE:
+        for match in pattern.finditer(text.folded):
+            added = match.group(2)
+            minute = f"{int(match.group(1))}" + (f"+{int(added)}" if added else "") + "'"
+            if minute not in event_minutes:
+                shown = text.raw[match.start() : match.end()]
+                known = ", ".join(sorted(event_minutes)) or "none"
+                found.append(
+                    GuardrailViolation(
+                        code="WRONG_MINUTE",
+                        detail=f"{shown!r}: no event of the facts happened at {minute} "
+                        f"(their events: {known})",
+                        span=shown,
+                    )
+                )
+    return found
+
+
 def check_judged(
-    text: str, judged: JudgedClaim, *, content_filtered: bool = False, model_text: bool = False
+    text: str,
+    judged: JudgedClaim,
+    *,
+    content_filtered: bool = False,
+    model_text: bool = False,
+    event_minutes: frozenset[str] | None = None,
 ) -> GuardrailReport:
     """`check` plus the rules of a verdict explanation: it stands alone (FRAGMENT) and, when a
-    model wrote it (`model_text`), every sentence about the match cites a number (UNGROUNDED).
+    model wrote it (`model_text`), every sentence about the match cites a number (UNGROUNDED)
+    and (Day 6) every minute said of an event is one of the facts' events (`event_minutes`).
     Templates are built from the facts and may add a definition, so they skip the latter."""
     report = check(
         text, judged.all_facts(), guard_context(judged), content_filtered=content_filtered
     )
     extra = fragment_violations(text) if text.strip() else []
+    if text.strip():
+        extra += ratio_violations(Text.of(text), judged.all_facts())
+    if model_text and text.strip() and event_minutes is not None:
+        extra += event_minute_violations(Text.of(text), event_minutes)
     if model_text and text.strip() and judged.verdict != "INSUFFICIENT_DATA":
         written = Text.of(text)
         extra += ungrounded_violations(written, extract_numbers(written), judged.context)

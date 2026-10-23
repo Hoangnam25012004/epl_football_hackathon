@@ -318,7 +318,9 @@
             "WRONG_ENTITY",
             "WRONG_OUTCOME",
             "WRONG_LANGUAGE",
-            "WRONG_REGISTER"
+            "WRONG_REGISTER",
+            "WRONG_RATIO",
+            "WRONG_MINUTE"
           ],
           "title": "Code",
           "type": "string"

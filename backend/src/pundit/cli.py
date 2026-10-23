@@ -81,6 +81,7 @@ from pundit.orchestration.evaluation import (
     seq_at,
 )
 from pundit.orchestration.recap_service import RecapService
+from pundit.orchestration.resilience import CircuitBreaker
 from pundit.orchestration.service import ClaimService, StaticSource
 from pundit.orchestration.studio_eval import build_report, run_offline
 from pundit.orchestration.studio_service import StudioService
@@ -424,6 +425,18 @@ def _eval_settings(provider: str) -> Settings:
     return Settings.from_env(env)
 
 
+EVAL_THRESHOLD = 1_000_000  # failures before the breaker of an eval run opens: never
+
+
+def _eval_service(settings: Settings) -> ClaimService:
+    """The claim service of an eval run. With a real model its breaker never opens, so every
+    claim asks the model: a slow minute must not turn the rest of a run into the rules alone
+    (the app's breaker is what protects a live demo; an eval measures the model)."""
+    if settings.provider == "mock":
+        return ClaimService(settings)
+    return ClaimService(settings, breaker=CircuitBreaker(threshold=EVAL_THRESHOLD))
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     if args.label_sheet:
         return _cmd_label_sheet(args)
@@ -464,7 +477,7 @@ def _cmd_eval(args: argparse.Namespace) -> int:
             asyncio.run(
                 run_eval(
                     files,
-                    ClaimService(settings),
+                    _eval_service(settings),
                     out=out,
                     resume=args.resume,
                     ids=ids,

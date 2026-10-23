@@ -668,6 +668,7 @@ def markdown(reports: Sequence[EvalReport]) -> str:
         "frozen before any parser change of Day 6; they measure coverage and are never used to",
         "tune the parser. **Invented numbers** are numbers in a published explanation with no",
         "source in the claim's facts, counted by an audit that shares no code with the guardrail.",
+        "With a real model the circuit breaker is off during a run, so every claim asks it.",
         "",
     ]
     for name, report in zip(names, reports, strict=True):

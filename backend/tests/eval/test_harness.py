@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 from helpers import mock_service, run
 
-from pundit.cli import EVAL_FILES, main
+from pundit.cli import EVAL_FILES, EVAL_THRESHOLD, _eval_service, main
+from pundit.llm.settings import Settings
 from pundit.orchestration.evaluation import (
     VERDICTS,
     EvalCase,
@@ -175,3 +176,13 @@ def test_the_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["eval", *files, "--compare", str(out), str(out)]) == 0
     assert "0 claims judged differently" in capsys.readouterr().out
     assert main(["eval", *files, "--resume"]) == 2
+
+
+def test_an_eval_with_a_real_model_never_opens_its_breaker() -> None:
+    real = Settings(use_mock_llm=False, llm_provider="ollama")
+    service = _eval_service(real)
+    assert service.breaker.threshold == EVAL_THRESHOLD
+    for _ in range(50):
+        service.breaker.record_failure()
+    assert service.breaker.allow()  # every claim still asks the model
+    assert _eval_service(Settings()).breaker.threshold < EVAL_THRESHOLD  # the mock: as the app

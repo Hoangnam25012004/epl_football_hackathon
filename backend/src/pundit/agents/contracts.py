@@ -61,6 +61,9 @@ ViolationCode = Literal[
     "WRONG_OUTCOME",  # studio: "ghi bàn" for a shot that was saved, the wrong card colour
     "WRONG_LANGUAGE",  # studio: an English text where Vietnamese was asked, or the reverse
     "WRONG_REGISTER",  # studio: casual text with jargon or several numbers, analyst without any
+    # Day 6, found by the independent number audit (docs/day6-design.md 4.5):
+    "WRONG_RATIO",  # "twice as many" for 15 shots to 1: a ratio word the facts do not give
+    "WRONG_MINUTE",  # "VAR ruled it out at 90+6'" when the decision came at 36'
 ]
 MomentKind = Literal[
     "goal",

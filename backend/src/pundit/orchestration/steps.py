@@ -37,12 +37,18 @@ from pundit.agents.contracts import (
     ToolCall,
 )
 from pundit.agents.explain_templates import template_draft
-from pundit.agents.guardrail import CONTENT_FILTER, check_judged, feedback_lines
+from pundit.agents.guardrail import (
+    CONTENT_FILTER,
+    EVENT_MINUTE_TYPES,
+    check_judged,
+    feedback_lines,
+)
 from pundit.agents.judge import judge
 from pundit.agents.language import Text
 from pundit.agents.spec_validation import validate_spec
 from pundit.agents.trace import SpanHandle, TraceRecorder
 from pundit.domain.log import LogView
+from pundit.domain.matchtime import format_minute
 from pundit.llm.ports import (
     ClaimAnalystPort,
     ContentFiltered,
@@ -126,6 +132,19 @@ def _canonical(spec: ClaimSpec, run: ClaimRun) -> list[str]:
             )
         )
     return sorted(items)
+
+
+def _event_minutes(judged: JudgedClaim, view: LogView) -> frozenset[str]:
+    """The minutes of the events behind the facts that name a moment (a goal, a card, VAR...):
+    the only minutes a model may say something happened at."""
+    minutes: set[str] = set()
+    for fact in judged.all_facts():
+        for event_id in fact.evidence_event_ids:
+            if view.has(event_id):
+                event = view.get(event_id)
+                if event.type in EVENT_MINUTE_TYPES:
+                    minutes.add(format_minute(event.period, event.clock_ms))
+    return frozenset(minutes)
 
 
 def same_meaning(a: ClaimSpec, b: ClaimSpec, run: ClaimRun) -> bool:
@@ -451,7 +470,12 @@ class ClaimSteps:
                 violations=(GuardrailViolation(code="UNSAFE_CONTENT", detail=CONTENT_FILTER),),
             )
         else:
-            report = check_judged(draft.text, judged, model_text=draft.source == "llm")
+            report = check_judged(
+                draft.text,
+                judged,
+                model_text=draft.source == "llm",
+                event_minutes=_event_minutes(judged, run.view),
+            )
         run.time("guardrail", span)
         if report.passed:
             span.finish({"passed": True})
