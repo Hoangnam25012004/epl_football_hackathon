@@ -99,6 +99,13 @@ def test_late_client_gets_the_state_in_hello(client: TestClient) -> None:
     assert payload["claims"][0]["verdict"] == "TRUE"
 
 
-def test_unknown_match_is_refused(client: TestClient) -> None:
-    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/match/nope-1") as ws:
+@pytest.mark.parametrize("match_id", ["nope-1", "dominant_loser-42~e2eagain"])
+def test_unknown_match_is_closed_with_4404(client: TestClient, match_id: str) -> None:
+    """Accepted, then closed with 4404: the code a browser sees (Day 6, a private link the
+    server no longer has; a close before the handshake would reach it as 1006)."""
+    with (
+        client.websocket_connect(f"/ws/match/{match_id}") as ws,
+        pytest.raises(WebSocketDisconnect) as caught,
+    ):
         ws.receive_json()
+    assert caught.value.code == 4404

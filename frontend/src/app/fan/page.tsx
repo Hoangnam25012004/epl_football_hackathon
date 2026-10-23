@@ -10,6 +10,7 @@ import { useStore } from "zustand";
 import { ConnectionBanner } from "@/components/common/ConnectionBanner";
 import { PageShell } from "@/components/common/PageShell";
 import { Scoreboard } from "@/components/common/Scoreboard";
+import { PrivateChip } from "@/components/common/PrivateChip";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
 import { useToast } from "@/components/common/Toast";
 import { NoMatch } from "@/components/common/NoMatch";
@@ -17,7 +18,7 @@ import { LangToggle, Tabs } from "@/components/common/ui";
 import { CommentaryFeed, PlayerTab, RecapPanel } from "@/components/fan/FanFeed";
 import { ProfileSetup } from "@/components/fan/ProfileSetup";
 import { VoiceControl } from "@/components/fan/VoiceControl";
-import { api, parseMatchId } from "@/lib/api";
+import { api, parseMatchId, sessionBody } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import {
   DEFAULT_PROFILE,
@@ -156,6 +157,7 @@ function Fan() {
       </Link>
       <span className="ml-auto flex items-center gap-2">
         <LangToggle />
+        <PrivateChip matchId={matchId} />
         <SyntheticBadge compact />
       </span>
     </header>
@@ -186,7 +188,7 @@ function Fan() {
         onCreate={async () => {
           const parsed = parseMatchId(matchId);
           if (!parsed) return;
-          const result = await api.createMatch({ ...parsed, autostart: true });
+          const result = await api.createMatch({ ...sessionBody(parsed), autostart: true });
           if (result.ok) window.location.reload();
         }}
       />

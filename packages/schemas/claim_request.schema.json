@@ -31,7 +31,7 @@
     },
     "match_id": {
       "maxLength": 64,
-      "pattern": "^[a-z0-9_]+-\\d+$",
+      "pattern": "^[a-z0-9_]+-\\d+(~[a-z0-9]{8})?$",
       "title": "Match Id",
       "type": "string"
     },

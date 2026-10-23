@@ -58,7 +58,10 @@ async def match_stream(websocket: WebSocket, match_id: str) -> None:
     sessions: SessionManager = websocket.app.state.manager
     session = sessions.get(match_id)
     if session is None:
-        await websocket.close(code=UNKNOWN_MATCH, reason=f"unknown match {match_id}")
+        # accepted first: a close before the handshake is an HTTP 403, which a browser only
+        # sees as 1006 (and would retry for ever) instead of 4404 "create this match"
+        await websocket.accept()
+        await websocket.close(code=UNKNOWN_MATCH, reason=close_reason(f"unknown match {match_id}"))
         return
     profile = Profile()
     if session.director is not None:  # Day 2 clients (no query) get the default profile

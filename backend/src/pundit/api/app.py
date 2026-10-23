@@ -1,5 +1,7 @@
 """FastAPI application factory (design section 11; Day 3 section 15; Day 6 /mcp)."""
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -89,14 +91,22 @@ def create_app(
         queue_size=queue_size,
         studio=studio,
         narrator=narrator,
+        max_sessions=settings.max_sessions,
+        private_idle_s=settings.private_idle_s,
+        shared_idle_s=settings.shared_idle_s,
+        private_per_ip=settings.private_per_ip,
     )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.info("pundit api starting: %s", settings.describe())
         # a mounted app's lifespan never runs: the MCP session manager is started here
+        janitor = asyncio.create_task(sessions.run_janitor(), name="session-janitor")
         async with app.state.mcp.run():
             yield
+            janitor.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await janitor
             await sessions.shutdown()
         if narrator is not None:
             await narrator.aclose()

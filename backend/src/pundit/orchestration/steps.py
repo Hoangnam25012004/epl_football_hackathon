@@ -516,7 +516,7 @@ class ClaimSteps:
         run.timings_ms["total"] = round(run.trace.elapsed_ms(), 3)
         return ClaimResult(
             claim_id=run.claim_id,
-            match_id=judged.context.match_id,
+            match_id=run.request.match_id,  # the id the client used: a session id (Day 6)
             as_of_seq=judged.context.as_of_seq,
             as_of_display=judged.context.clock_display,
             text=run.request.text,

@@ -13,6 +13,11 @@
       "title": "From Minute",
       "type": "number"
     },
+    "private": {
+      "default": false,
+      "title": "Private",
+      "type": "boolean"
+    },
     "restart": {
       "default": false,
       "title": "Restart",
@@ -34,6 +39,19 @@
       "minimum": 0,
       "title": "Seed",
       "type": "integer"
+    },
+    "session": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9]{8}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session"
     },
     "speed": {
       "default": 20.0,

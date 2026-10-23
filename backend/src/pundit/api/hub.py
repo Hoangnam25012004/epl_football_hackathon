@@ -13,6 +13,7 @@ WsMessage per distinct payload. No client ever misses a number because of its pr
 """
 
 import asyncio
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -46,6 +47,7 @@ class Hub:
         state: Callable[[], dict[str, Any]],
         *,
         state_for: Callable[[Client], dict[str, Any]] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         """`state()` returns the payload of `hello` / `resync` (snapshot, moments, claims);
         `state_for(client)`, when given, the same rendered for the client's profile."""
@@ -54,6 +56,9 @@ class Hub:
         self._state_for = state_for
         self._n = 0
         self._clients: set[Client] = set()
+        self._clock = clock
+        # Day 6: when a viewer last came or left (a session nobody watches is cleaned up)
+        self.last_change = clock()
 
     @property
     def last_n(self) -> int:
@@ -71,10 +76,12 @@ class Hub:
     ) -> Client:
         client = Client(self, maxsize, profile)
         self._clients.add(client)
+        self.last_change = self._clock()
         return client
 
     def unsubscribe(self, client: Client) -> None:
         self._clients.discard(client)
+        self.last_change = self._clock()
 
     def state_message(self, kind: WsType, client: Client | None = None) -> WsMessage:
         if self._state_for is not None and client is not None:

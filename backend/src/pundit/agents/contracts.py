@@ -9,7 +9,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from pundit.domain.ids import MATCH_ID_PATTERN, PlayerId, TeamId, team_of_player
+from pundit.domain.ids import SESSION_ID_PATTERN, PlayerId, TeamId, team_of_player
 from pundit.domain.matchtime import Window
 from pundit.domain.types import Side
 from pundit.stats.registry import Scope
@@ -141,7 +141,7 @@ def _sorted_unique(ids: tuple[str, ...], what: str) -> None:
 
 
 class ClaimRequest(Contract):
-    match_id: str = Field(pattern=MATCH_ID_PATTERN, max_length=64)
+    match_id: str = Field(pattern=SESSION_ID_PATTERN, max_length=64)  # Day 6: a session id
     text: str = Field(min_length=3, max_length=MAX_CLAIM_CHARS)
     language: Literal["auto", "vi", "en"] = "auto"
     as_of_seq: int | None = Field(default=None, ge=0)  # None = latest event when received

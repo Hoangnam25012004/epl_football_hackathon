@@ -37,6 +37,7 @@ export const en = {
   "err.invalid": "Invalid input.",
   "err.server": "Server error.",
   "err.other": "Something went wrong.",
+  "err.busy": "The server is busy. Try again in a moment.",
 
   "status.created": "Not started",
   "status.running": "Live",
@@ -57,6 +58,17 @@ export const en = {
   "landing.server": "Server",
   "landing.llm": "LLM: {provider} · {model}",
   "landing.createFailed": "Could not create the match: {message}",
+  "landing.startDemo": "Start my demo match",
+  "landing.startDemoHint":
+    "A private replay of “Dominated but lost”, for you alone: play, pause, change the speed or restart it without disturbing anyone.",
+  "landing.private": "My own session",
+  "landing.privateHint": "Open a private copy of this match that only your link reaches.",
+  "landing.mySessions": "My matches",
+  "landing.busyFull": "The demo is full: every match is being watched. Try again in {s} s.",
+  "landing.busyMany": "You have started several matches already. Try again in {s} s.",
+  "private.chip": "Your private session",
+  "private.hint":
+    "Only people with this link see it. It is removed after 15 minutes with nobody watching.",
 
   "studio.title": "Studio",
   "studio.play": "Play",

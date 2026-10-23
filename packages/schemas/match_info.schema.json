@@ -142,6 +142,11 @@
       "title": "Moments",
       "type": "integer"
     },
+    "private": {
+      "default": false,
+      "title": "Private",
+      "type": "boolean"
+    },
     "scenario": {
       "title": "Scenario",
       "type": "string"

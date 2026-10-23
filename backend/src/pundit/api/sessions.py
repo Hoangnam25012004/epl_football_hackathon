@@ -21,8 +21,11 @@ and REST never make a clip (nobody listens to the past).
 """
 
 import asyncio
+import builtins
 import contextlib
 import logging
+import math
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from functools import cached_property
@@ -69,7 +72,9 @@ from pundit.api.panels import (
     timeline,
 )
 from pundit.api.studio import StudioCrew, StudioDirector, StudioItem, StudioKind
+from pundit.domain.errors import PunditError
 from pundit.domain.events import EVENT_ADAPTER, Event
+from pundit.domain.ids import new_token, session_id
 from pundit.domain.log import LogView
 from pundit.domain.meta import MatchMeta
 from pundit.engine.generator import generate
@@ -91,6 +96,11 @@ SILENT_EVENTS = frozenset({"player_physical"})
 HELLO_TALKING_POINTS = 20
 HELLO_LOWER_THIRDS = 5
 HELLO_COMMENTARY = 30
+# Day 6 (docs/day6-design.md section 6.4)
+PRIVATE_WINDOW_S = 600.0  # new private sessions are counted per address over ten minutes
+MAX_TRACKED_ADDRESSES = 4096
+JANITOR_EVERY_S = 30.0
+FULL_RETRY_S = 60
 
 
 class MatchSession:
@@ -105,8 +115,14 @@ class MatchSession:
         queue_size: int = DEFAULT_QUEUE_SIZE,
         studio: StudioCrew | None = None,
         narrator: Narrator | None = None,
+        key: str | None = None,
+        private: bool = False,
+        now: Callable[[], float] = time.monotonic,
     ) -> None:
         self.match = match
+        # what clients call the session: the match id, or the match id and a token (Day 6)
+        self.key = key or match.meta.match_id
+        self.private = private
         self.service = service
         self.narrator = narrator if studio is not None else None  # the voice reads the studio
         self.speed = speed
@@ -124,9 +140,10 @@ class MatchSession:
             LogView.from_events(match.meta, match.events[:1])
         )
         self.hub = Hub(
-            match.meta.match_id,
+            self.key,
             self.state_payload,
             state_for=self.client_state if studio is not None else None,
+            clock=now,
         )
         self.status: SessionStatus = "created"
         self.error: str | None = None
@@ -150,6 +167,11 @@ class MatchSession:
     def latest_seq(self) -> int:
         return len(self.state) - 1
 
+    @property
+    def watched(self) -> bool:
+        """At least one viewer is connected: such a session is never stopped to make room."""
+        return self.hub.clients > 0
+
     def view_at(self, seq: int) -> LogView:
         """Immutable prefix: the first `seq + 1` applied events."""
         return self.state.view(seq + 1)
@@ -162,7 +184,8 @@ class MatchSession:
     def info(self) -> dict[str, Any]:
         meta = self.meta
         return {
-            "match_id": self.match_id,
+            "match_id": self.key,
+            **({"private": True} if self.private else {}),  # absent: the Day 5 shape
             "scenario": meta.scenario,
             "seed": meta.seed,
             "status": self.status,
@@ -466,7 +489,7 @@ class MatchSession:
                 self._set_status("stopped")
             raise
         except Exception as exc:  # a broken replay must not take the server down
-            log.exception("replay of %s failed", self.match_id)
+            log.exception("replay of %s failed", self.key)
             self.error = f"{type(exc).__name__}: {exc}"[:300]
             self._set_status("error")
 
@@ -477,7 +500,7 @@ class MatchSession:
             return
         self.error = None
         self._set_status("running")
-        self._task = asyncio.create_task(self._run(), name=f"replay:{self.match_id}")
+        self._task = asyncio.create_task(self._run(), name=f"replay:{self.key}")
 
     async def _cancel_replay(self) -> None:
         """Cancel the replay task at its next sleep: `apply()` is synchronous, so an event is
@@ -513,7 +536,7 @@ class MatchSession:
             finally:
                 self._swapping = False
             self.speed = speed
-            self._task = asyncio.create_task(self._run(), name=f"replay:{self.match_id}")
+            self._task = asyncio.create_task(self._run(), name=f"replay:{self.key}")
         else:
             self.speed = speed
         self._publish_status()
@@ -545,7 +568,7 @@ class MatchSession:
 
     def next_claim_id(self) -> str:
         self._claim_count += 1
-        return f"{self.match_id}-c{self._claim_count:04d}"
+        return f"{self.key}-c{self._claim_count:04d}"  # unique across private sessions
 
     def add_claim(self, result: ClaimResult) -> None:
         self.claims[result.claim_id] = result
@@ -569,8 +592,26 @@ def public_talking_point(item: TalkingPoint) -> TalkingPoint:
     return item.model_copy(update={"trace": None})
 
 
+class SessionsFull(PunditError):
+    """Every session is being watched: no room for another one (HTTP 503 demo_full)."""
+
+    retry_after_s = FULL_RETRY_S
+
+
+class TooManySessions(PunditError):
+    """This address made its new private sessions of the last ten minutes (HTTP 429)."""
+
+    def __init__(self, retry_after_s: int) -> None:
+        super().__init__(f"too many new private sessions: retry in {retry_after_s} s")
+        self.retry_after_s = retry_after_s
+
+
 class SessionManager:
-    """Sessions by match id; generated matches are cached (generation takes ~0.3 s)."""
+    """Sessions by session id (a match id, or a match id and a private token); generated
+    matches are cached (generation takes ~0.3 s). Day 6 (docs/day6-design.md section 6.4): a
+    session somebody watches is never stopped; at the cap a session nobody watches makes room
+    (a finished one first, then the one left alone longest), else 503; the janitor removes the
+    sessions nobody has watched for a while."""
 
     def __init__(
         self,
@@ -581,6 +622,10 @@ class SessionManager:
         max_sessions: int = 16,
         studio: StudioCrew | None = None,
         narrator: Narrator | None = None,
+        private_idle_s: float = 900.0,
+        shared_idle_s: float = 3600.0,
+        private_per_ip: int = 3,
+        now: Callable[[], float] = time.monotonic,
     ) -> None:
         self.service = service
         self.studio = studio
@@ -588,15 +633,58 @@ class SessionManager:
         self.clock_factory = clock_factory
         self.queue_size = queue_size
         self.max_sessions = max_sessions
+        self.private_idle_s = private_idle_s
+        self.shared_idle_s = shared_idle_s
+        self.private_per_ip = private_per_ip
         self.sessions: dict[str, MatchSession] = {}
         self._matches: dict[tuple[str, int], GeneratedMatch] = {}
         self._lock = asyncio.Lock()
+        self._now = now
+        self._private_by_ip: OrderedDict[str, list[float]] = OrderedDict()
 
     async def _generate(self, scenario: str, seed: int) -> GeneratedMatch:
         key = (scenario, seed)
         if key not in self._matches:
             self._matches[key] = await asyncio.to_thread(generate, scenario, seed)
         return self._matches[key]
+
+    def _has_room(self) -> bool:
+        return len(self.sessions) < self.max_sessions or any(
+            not session.watched for session in self.sessions.values()
+        )
+
+    async def _make_room(self) -> None:
+        """At the cap, stop a session nobody watches: a finished one first, then the one left
+        alone longest. Never a watched one: with none to stop, the demo is full."""
+        while len(self.sessions) >= self.max_sessions:
+            idle = [(key, s) for key, s in self.sessions.items() if not s.watched]
+            if not idle:
+                raise SessionsFull("every session of the demo is being watched")
+            key, victim = min(
+                idle, key=lambda item: (item[1].status != "finished", item[1].hub.last_change)
+            )
+            await victim.stop()
+            del self.sessions[key]
+            log.info("session %s stopped to make room", key)
+
+    def _take_private_slot(self, client: str) -> None:
+        """Count a new private session of `client` (its address); refuse past the limit."""
+        now = self._now()
+        recent = [t for t in self._private_by_ip.get(client, ()) if now - t < PRIVATE_WINDOW_S]
+        if len(recent) >= self.private_per_ip:
+            self._private_by_ip[client] = recent
+            raise TooManySessions(max(1, math.ceil(PRIVATE_WINDOW_S - (now - recent[0]))))
+        recent.append(now)
+        self._private_by_ip[client] = recent
+        self._private_by_ip.move_to_end(client)
+        while len(self._private_by_ip) > MAX_TRACKED_ADDRESSES:
+            self._private_by_ip.popitem(last=False)
+
+    def _fresh_token(self, match_id: str) -> str:
+        while True:
+            token = new_token()
+            if session_id(match_id, token) not in self.sessions:
+                return token
 
     async def create(
         self,
@@ -607,19 +695,30 @@ class SessionManager:
         from_minute: float = 0.0,
         autostart: bool = True,
         restart: bool = False,
+        private: bool = False,
+        token: str | None = None,
+        client: str = "local",
     ) -> MatchSession:
-        """Idempotent: the session of a running match is returned unless `restart=True`."""
+        """Idempotent: the session of a running match is returned unless `restart=True`.
+        `private` makes a session of its own (a new token); a `token` names one, which is
+        restarted with the same id, or made again with it after the janitor removed it."""
         async with self._lock:
             match_id = f"{scenario}-{seed}"
-            existing = self.sessions.get(match_id)
+            if private and token is None:
+                token = self._fresh_token(match_id)
+            key = session_id(match_id, token)
+            existing = self.sessions.get(key)
             if existing is not None and not restart:
                 return existing
             if existing is not None:
                 await existing.stop()
-                del self.sessions[match_id]
-            if len(self.sessions) >= self.max_sessions:
-                oldest = next(iter(self.sessions))
-                await self.sessions.pop(oldest).stop()
+                del self.sessions[key]
+            else:
+                if not self._has_room():
+                    raise SessionsFull("every session of the demo is being watched")
+                if token is not None:  # every new private session counts, a made-up token too
+                    self._take_private_slot(client)
+                await self._make_room()
             match = await self._generate(scenario, seed)
             session = MatchSession(
                 match,
@@ -630,8 +729,11 @@ class SessionManager:
                 queue_size=self.queue_size,
                 studio=self.studio,
                 narrator=self.narrator,
+                key=key,
+                private=token is not None,
+                now=self._now,
             )
-            self.sessions[match_id] = session
+            self.sessions[key] = session
         if existing is not None:
             # only now: a client that reconnects at once lands on the new session
             existing.announce_restart()
@@ -643,7 +745,35 @@ class SessionManager:
         return self.sessions.get(match_id)
 
     def list(self) -> list[MatchSession]:
-        return list(self.sessions.values())
+        """The shared sessions: a private one is only reached by its link (section 6.3)."""
+        return [session for session in self.sessions.values() if not session.private]
+
+    async def sweep(self) -> builtins.list[str]:  # (`list` is a method here)
+        """Stop and remove the sessions nobody has watched for a while (15 minutes for a
+        private one, an hour for a shared one): a short disconnection loses nothing."""
+        removed: builtins.list[str] = []
+        async with self._lock:
+            now = self._now()
+            for key, session in list(self.sessions.items()):
+                if session.watched:
+                    continue
+                limit = self.private_idle_s if session.private else self.shared_idle_s
+                if now - session.hub.last_change >= limit:
+                    await session.stop()
+                    del self.sessions[key]
+                    removed.append(key)
+        if removed:
+            log.info("sessions nobody watched were removed: %s", ", ".join(removed))
+        return removed
+
+    async def run_janitor(self, every_s: float = JANITOR_EVERY_S) -> None:
+        """The janitor of the app's lifespan (cancelled at shutdown)."""
+        while True:
+            await asyncio.sleep(every_s)
+            try:
+                await self.sweep()
+            except Exception:  # the janitor must never die: the next sweep tries again
+                log.exception("session janitor failed")
 
     def find_claim(self, claim_id: str) -> ClaimResult | None:
         for session in self.sessions.values():

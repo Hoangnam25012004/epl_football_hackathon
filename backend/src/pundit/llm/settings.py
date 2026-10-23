@@ -122,6 +122,11 @@ class Settings(BaseModel):
     mcp_allowed_hosts: tuple[str, ...] = DEFAULT_MCP_HOSTS
     mcp_rate_per_minute: int = Field(default=DEFAULT_MCP_RATE, ge=1, le=100_000)
     trust_proxy: bool = False  # X-Forwarded-For names the client (Azure ingress)
+    # Day 6: sessions (docs/day6-design.md section 6.4)
+    max_sessions: int = Field(default=16, ge=1, le=256)
+    private_idle_s: float = Field(default=900.0, gt=0)  # unwatched private session: removed
+    shared_idle_s: float = Field(default=3600.0, gt=0)  # unwatched shared session: removed
+    private_per_ip: int = Field(default=3, ge=1, le=100)  # new private sessions per 10 minutes
 
     @property
     def speech_enabled(self) -> bool:
@@ -197,6 +202,12 @@ class Settings(BaseModel):
                 "rate_per_minute": self.mcp_rate_per_minute,
             },
             "trust_proxy": self.trust_proxy,
+            "sessions": {
+                "max": self.max_sessions,
+                "private_idle_s": self.private_idle_s,
+                "shared_idle_s": self.shared_idle_s,
+                "private_per_ip": self.private_per_ip,
+            },
         }
 
     @classmethod
@@ -311,6 +322,10 @@ class Settings(BaseModel):
             "mcp_allowed_hosts": hosts,
             "mcp_rate_per_minute": integer("MCP_RATE_PER_MINUTE", DEFAULT_MCP_RATE, 1, 100_000),
             "trust_proxy": flag("TRUST_PROXY", False),
+            "max_sessions": integer("MAX_SESSIONS", 16, 1, 256),
+            "private_idle_s": number("PRIVATE_IDLE_S", 900.0),
+            "shared_idle_s": number("SHARED_IDLE_S", 3600.0),
+            "private_per_ip": integer("PRIVATE_PER_IP", 3, 1, 100),
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))

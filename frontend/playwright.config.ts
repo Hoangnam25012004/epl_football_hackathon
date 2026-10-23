@@ -11,6 +11,8 @@ export const E2E_SERVER_ENV = {
   MOCK_TTS_TIME_SCALE: "0.1",
   MOCK_TTS_LATENCY_MS: "100",
   STT_PROVIDER: "mock",
+  // Day 6: the suite makes several private sessions from 127.0.0.1, run after run
+  PRIVATE_PER_IP: "100",
 };
 // Day 6: the mock LLM fails every role of every claim and studio job; short budgets
 export const CHAOS_SERVER_ENV = {

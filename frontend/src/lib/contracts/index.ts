@@ -886,6 +886,7 @@ export interface MatchInfo {
   home: TeamBrief;
   match_id: string;
   moments: number;
+  private?: boolean;
   scenario: string;
   seed: number;
   speed: number;
@@ -1345,9 +1346,11 @@ export interface StudioHealth {
 export interface CreateMatch {
   autostart?: boolean;
   from_minute?: number;
+  private?: boolean;
   restart?: boolean;
   scenario: "dominant_loser" | "comeback_var" | "red_card_swing" | "balanced";
   seed?: number;
+  session?: string | null;
   speed?: number;
 }
 /**

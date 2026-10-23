@@ -50,6 +50,8 @@ def test_moments_and_ws_messages_validate() -> None:
             "as_of_seq": 10,
             "include_trace": True,
         },
+        # Day 6: a private session's id (docs/day6-design.md 6.2)
+        {"match_id": "dominant_loser-42~k3v9x2ma", "text": "Đội nhà áp đảo hiệp 2"},
     ],
 )
 def test_good_requests(body: dict[str, object]) -> None:
@@ -65,6 +67,8 @@ def test_good_requests(body: dict[str, object]) -> None:
         {"match_id": "dominant_loser-42", "text": "Harbor dominated", "as_of_seq": -1},
         {"match_id": "dominant_loser-42", "text": "Harbor dominated", "extra": 1},
         {"match_id": "Dominant Loser", "text": "Harbor dominated"},
+        {"match_id": "dominant_loser-42~short", "text": "Harbor dominated"},
+        {"match_id": "dominant_loser-42~K3V9X2MA", "text": "Harbor dominated"},
     ],
 )
 def test_bad_requests(body: dict[str, object]) -> None:

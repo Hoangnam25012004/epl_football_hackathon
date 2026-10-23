@@ -170,7 +170,11 @@ describe("api", () => {
   });
 
   it("parses match ids and builds WebSocket URLs", () => {
-    expect(parseMatchId("dominant_loser-42")).toEqual({ scenario: "dominant_loser", seed: 42 });
+    expect(parseMatchId("dominant_loser-42")).toEqual({
+      scenario: "dominant_loser",
+      seed: 42,
+      token: null, // Day 6: a private session's id carries one (tests/unit/sessions.test.ts)
+    });
     expect(parseMatchId("dominant_loser-x")).toBeNull();
     expect(parseMatchId("other-1")).toBeNull();
     expect(wsUrl("/ws/match/a", "http://localhost:8000")).toBe("ws://localhost:8000/ws/match/a");

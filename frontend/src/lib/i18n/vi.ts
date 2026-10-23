@@ -37,6 +37,7 @@ export const vi: Record<Key, string> = {
   "err.invalid": "Dữ liệu nhập không hợp lệ.",
   "err.server": "Máy chủ gặp lỗi.",
   "err.other": "Đã có lỗi xảy ra.",
+  "err.busy": "Máy chủ đang bận. Bạn thử lại sau ít phút.",
 
   "status.created": "Chưa bắt đầu",
   "status.running": "Đang diễn ra",
@@ -56,6 +57,16 @@ export const vi: Record<Key, string> = {
   "landing.noSessions": "Chưa có trận nào đang chạy.",
   "landing.server": "Máy chủ",
   "landing.llm": "LLM: {provider} · {model}",
+  "landing.startDemo": "Bắt đầu trận demo của tôi",
+  "landing.startDemoHint":
+    "Một bản phát lại riêng của “Áp đảo nhưng thua”, chỉ cho bạn: chạy, tạm dừng, đổi tốc độ hay chạy lại mà không ảnh hưởng ai.",
+  "landing.private": "Phiên riêng của tôi",
+  "landing.privateHint": "Mở một bản riêng của trận này, chỉ ai có link của bạn mới vào được.",
+  "landing.mySessions": "Trận của tôi",
+  "landing.busyFull": "Bản demo đang đầy: trận nào cũng có người xem. Thử lại sau {s} giây.",
+  "landing.busyMany": "Bạn đã bắt đầu nhiều trận rồi. Thử lại sau {s} giây.",
+  "private.chip": "Phiên riêng của bạn",
+  "private.hint": "Chỉ người có link này mới xem được. Phiên tự huỷ sau 15 phút không ai xem.",
   "landing.createFailed": "Không tạo được trận: {message}",
 
   "studio.title": "Studio",

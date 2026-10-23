@@ -6,6 +6,7 @@ import statistics
 from typing import Annotated, Any, Literal, get_args
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from pundit.agents.contracts import (
@@ -28,10 +29,20 @@ from pundit.agents.personalize import ProfileError, parse_profile, render_lower_
 from pundit.agents.voices import voice_list
 from pundit.api.onair import OnAirCommand, OnAirError, OnAirState
 from pundit.api.panels import MAX_IDS, MAX_LAST, EventsPage, Period, StatsPanel, TimelineView
-from pundit.api.sessions import MatchSession, SessionManager, public_claim, public_talking_point
+from pundit.api.sessions import (
+    MatchSession,
+    SessionManager,
+    SessionsFull,
+    TooManySessions,
+    public_claim,
+    public_talking_point,
+)
 from pundit.api.studio import StudioDirector, StudioKind
+from pundit.domain.clients import client_ip
+from pundit.domain.ids import TOKEN_PATTERN
 from pundit.engine.rosters import roster_team
 from pundit.engine.scenarios import EXAMPLE_CLAIMS, SCENARIOS
+from pundit.llm.settings import Settings
 from pundit.speech.narrator import Narrator
 from pundit.state.match_state import MatchSnapshot
 
@@ -50,6 +61,9 @@ class CreateMatch(BaseModel):
     from_minute: float = Field(default=0.0, ge=0, le=120)
     autostart: bool = True
     restart: bool = False
+    # Day 6 (docs/day6-design.md section 6.3): a session of one's own, named by its token
+    private: bool = False
+    session: str | None = Field(default=None, pattern=TOKEN_PATTERN)
 
 
 class TeamBrief(BaseModel):
@@ -74,7 +88,8 @@ class StudioStats(BaseModel):
 
 
 class MatchInfo(BaseModel):
-    match_id: str
+    match_id: str  # the session id: "dominant_loser-42", or "dominant_loser-42~k3v9x2ma"
+    private: bool = False  # only present for a private session (Day 6)
     scenario: str
     seed: int
     status: Literal["created", "running", "paused", "finished", "stopped", "error"]
@@ -288,16 +303,42 @@ def sessions_narrator(request: Request) -> Narrator | None:
     return narrator
 
 
-@router.post("/matches", response_model=MatchInfo, response_model_exclude_unset=True)
-async def create_match(body: CreateMatch, request: Request) -> MatchInfo:
-    session = await manager(request).create(
-        body.scenario,
-        body.seed,
-        speed=body.speed,
-        from_minute=body.from_minute,
-        autostart=body.autostart,
-        restart=body.restart,
+def _refused(status: int, detail: str, retry_after_s: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        content={"detail": detail, "retry_after_s": retry_after_s},
+        headers={"Retry-After": str(retry_after_s)},
     )
+
+
+@router.post(
+    "/matches",
+    response_model=MatchInfo,
+    response_model_exclude_unset=True,
+    responses={429: {"description": "too_many_sessions"}, 503: {"description": "demo_full"}},
+)
+async def create_match(body: CreateMatch, request: Request) -> Any:
+    settings: Settings = request.app.state.settings
+    peer = request.client.host if request.client is not None else None
+    client = client_ip(
+        peer, request.headers.get("x-forwarded-for"), trust_proxy=settings.trust_proxy
+    )
+    try:
+        session = await manager(request).create(
+            body.scenario,
+            body.seed,
+            speed=body.speed,
+            from_minute=body.from_minute,
+            autostart=body.autostart,
+            restart=body.restart,
+            private=body.private,
+            token=body.session,
+            client=client,
+        )
+    except SessionsFull as exc:
+        return _refused(503, "demo_full", exc.retry_after_s)
+    except TooManySessions as exc:
+        return _refused(429, "too_many_sessions", exc.retry_after_s)
     return _info(session)
 
 

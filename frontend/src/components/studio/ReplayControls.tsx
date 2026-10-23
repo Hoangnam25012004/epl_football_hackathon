@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/common/Toast";
 import { Segmented } from "@/components/common/ui";
-import { api, parseMatchId, type Result } from "@/lib/api";
+import { api, parseMatchId, sessionBody, type Result } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { SessionStatus } from "@/lib/ws-types";
 
@@ -66,8 +66,7 @@ export function ReplayControls({
     if (!window.confirm(t("studio.restartConfirm", { minute }))) return;
     void run(() =>
       api.createMatch({
-        scenario: parsed.scenario,
-        seed: parsed.seed,
+        ...sessionBody(parsed), // a private session restarts under the same id
         speed: speed ?? 20,
         from_minute: minute,
         restart: true,

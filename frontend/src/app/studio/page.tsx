@@ -8,6 +8,7 @@ import { useStore } from "zustand";
 import { ConnectionBanner } from "@/components/common/ConnectionBanner";
 import { PageShell } from "@/components/common/PageShell";
 import { Scoreboard } from "@/components/common/Scoreboard";
+import { PrivateChip } from "@/components/common/PrivateChip";
 import { SyntheticBadge } from "@/components/common/SyntheticBadge";
 import { useToast } from "@/components/common/Toast";
 import { NoMatch } from "@/components/common/NoMatch";
@@ -21,7 +22,7 @@ import { MomentumTimeline } from "@/components/studio/MomentumTimeline";
 import { ReplayControls } from "@/components/studio/ReplayControls";
 import { StatsPanel } from "@/components/studio/StatsPanel";
 import { TalkingPointQueue } from "@/components/studio/TalkingPointQueue";
-import { api, parseMatchId } from "@/lib/api";
+import { api, parseMatchId, sessionBody } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { items } from "@/store/match-store";
 import { useMatchConnection } from "@/hooks/useMatchConnection";
@@ -62,7 +63,7 @@ function Studio() {
   const createThisMatch = useCallback(async () => {
     const parsed = matchId ? parseMatchId(matchId) : null;
     if (!parsed) return;
-    const result = await api.createMatch({ ...parsed, autostart: false });
+    const result = await api.createMatch({ ...sessionBody(parsed), autostart: false });
     if (result.ok) window.location.reload();
     else toast.show(result.error.message, "error");
   }, [matchId, toast]);
@@ -106,6 +107,7 @@ function Studio() {
             {t("landing.compare")} ↗
           </a>
           <LangToggle />
+          <PrivateChip matchId={matchId} />
           <SyntheticBadge />
         </nav>
       </header>

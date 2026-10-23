@@ -23,9 +23,15 @@ import type {
 } from "./contracts";
 
 export type ApiErrorCode =
-  "not_found" | "conflict" | "invalid" | "server" | "network" | "timeout" | "other";
+  "not_found" | "conflict" | "invalid" | "server" | "network" | "timeout" | "busy" | "other";
 
-export type ApiError = { status: number; code: ApiErrorCode; message: string };
+// `busy` (Day 6): the server asks to come back later (429 too_many_sessions, 503 demo_full)
+export type ApiError = {
+  status: number;
+  code: ApiErrorCode;
+  message: string;
+  retryAfterS?: number;
+};
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
 export const DEFAULT_TIMEOUT_MS = 8_000;
@@ -49,6 +55,13 @@ function codeOf(status: number): ApiErrorCode {
   if (status === 422) return "invalid";
   if (status >= 500) return "server";
   return "other";
+}
+
+/** `retry_after_s` of a refusal that says when to come back (Day 6). */
+function retryAfterOf(body: unknown): number | undefined {
+  if (body === null || typeof body !== "object" || !("retry_after_s" in body)) return undefined;
+  const value = Number((body as { retry_after_s: unknown }).retry_after_s);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 /** FastAPI's `detail`: a string, or a list of validation errors. */
@@ -101,9 +114,15 @@ export async function request<T>(
     }
     if (!response.ok) {
       const message = detailOf(json) ?? (response.statusText || `HTTP ${response.status}`);
+      const retryAfterS = retryAfterOf(json);
       return {
         ok: false,
-        error: { status: response.status, code: codeOf(response.status), message },
+        error: {
+          status: response.status,
+          code: retryAfterS === undefined ? codeOf(response.status) : "busy",
+          message,
+          ...(retryAfterS === undefined ? {} : { retryAfterS }),
+        },
       };
     }
     return { ok: true, data: json as T };
@@ -187,11 +206,36 @@ export const api = {
     }),
 };
 
-/** "dominant_loser-42" → {scenario, seed}; null for anything else. */
-export function parseMatchId(
-  id: string,
-): { scenario: CreateMatch["scenario"]; seed: number } | null {
-  const found = /^(dominant_loser|comeback_var|red_card_swing|balanced)-(\d{1,7})$/.exec(id);
+export type ParsedMatchId = {
+  scenario: CreateMatch["scenario"];
+  seed: number;
+  token: string | null; // a private session's token (Day 6), null for the shared session
+};
+
+/** "dominant_loser-42" or "dominant_loser-42~k3v9x2ma" → its parts; null for anything else. */
+export function parseMatchId(id: string): ParsedMatchId | null {
+  const found =
+    /^(dominant_loser|comeback_var|red_card_swing|balanced)-(\d{1,7})(?:~([a-z0-9]{8}))?$/.exec(id);
   if (!found) return null;
-  return { scenario: found[1] as CreateMatch["scenario"], seed: Number(found[2]) };
+  return {
+    scenario: found[1] as CreateMatch["scenario"],
+    seed: Number(found[2]),
+    token: found[3] ?? null,
+  };
+}
+
+/** The body that makes (again) the session an id names: a private one keeps its token. */
+export function sessionBody(parsed: ParsedMatchId): Pick<CreateMatch, "scenario" | "seed"> & {
+  session?: string;
+} {
+  return {
+    scenario: parsed.scenario,
+    seed: parsed.seed,
+    ...(parsed.token ? { session: parsed.token } : {}),
+  };
+}
+
+/** Is `id` a private session of one viewer? */
+export function isPrivate(id: string): boolean {
+  return parseMatchId(id)?.token != null;
 }
