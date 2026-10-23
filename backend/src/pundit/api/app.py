@@ -1,4 +1,4 @@
-"""FastAPI application factory (design section 11; Day 3 section 15)."""
+"""FastAPI application factory (design section 11; Day 3 section 15; Day 6 /mcp)."""
 
 import logging
 from collections.abc import AsyncIterator, Callable
@@ -13,6 +13,7 @@ from starlette.types import Scope
 
 from pundit.api import audio, routes, ws
 from pundit.api.hub import DEFAULT_QUEUE_SIZE
+from pundit.api.mcp_mount import mount_mcp
 from pundit.api.sessions import SessionManager
 from pundit.api.studio import StudioCrew
 from pundit.domain.meta import DISCLAIMER
@@ -93,8 +94,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.info("pundit api starting: %s", settings.describe())
-        yield
-        await sessions.shutdown()
+        # a mounted app's lifespan never runs: the MCP session manager is started here
+        async with app.state.mcp.run():
+            yield
+            await sessions.shutdown()
         if narrator is not None:
             await narrator.aclose()
         if transcriber is not None:
@@ -125,6 +128,8 @@ def create_app(
         app.include_router(audio.router)
     if transcriber is not None:  # speech to text (P2), off by default
         app.include_router(audio.stt_router)
+    # Day 6: /mcp and /mcp/ before the UI's catch-all; MCP_ENABLED=false is the Day 5 app
+    app.state.mcp = mount_mcp(app, sessions, settings)
     ui = ui_directory(settings)
     if ui is not None:  # mounted last: every API route and /docs match first
         app.mount("/", UIFiles(directory=ui, html=True), name="ui")

@@ -65,9 +65,8 @@ def snapshot(found: list[Tool]) -> list[dict[str, Any]]:
 def test_tools_list_is_the_golden_contract() -> None:
     current = snapshot(listing(build_server(static())[0]))
     if os.environ.get("UPDATE_MCP_GOLDEN") == "1":
-        GOLDEN.write_text(
-            json.dumps(current, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
+        text = json.dumps(current, indent=2, ensure_ascii=False) + "\n"
+        GOLDEN.write_text(text, encoding="utf-8", newline="\n")
     assert current == json.loads(GOLDEN.read_text(encoding="utf-8"))
 
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers import STUDIO_ON, TTS_ON, api_settings, generated
+from helpers import MCP_ON, STUDIO_ON, TTS_ON, api_settings, generated
 
 from pundit.agents.moments import detect_all
 from pundit.api.app import create_app
@@ -63,6 +63,18 @@ def test_health(client: TestClient) -> None:
         assert speech["voices"] == ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]
         assert speech["languages"] == ["vi"] and speech["stt"] == "off"
         assert speech["synthesized"] == 0 and speech["degraded"] == []
+    if MCP_ON:  # Day 6: the MCP block; absent with MCP_ENABLED=false
+        assert body.pop("mcp") == {
+            "enabled": True,
+            "status": "ok",
+            "transport": "streamable-http",
+            "path": "/mcp",
+            "calls": 0,
+            "errors": 0,
+            "refused": 0,
+            "rate_limited": 0,
+            "by_tool": {},
+        }
     assert body == expected
 
 

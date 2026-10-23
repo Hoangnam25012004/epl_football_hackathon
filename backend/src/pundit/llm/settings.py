@@ -30,6 +30,9 @@ AudioStoreKind = Literal["none", "local", "blob"]
 SttProvider = Literal["off", "mock", "azure"]
 DEFAULT_AUDIO_STORE_DIR = Path(".data") / "audio"  # relative to the working directory (backend/)
 DEFAULT_AZURE_RPM = 18
+# Day 6 MCP (docs/day6-design.md section 2.4)
+DEFAULT_MCP_HOSTS = ("127.0.0.1", "localhost")
+DEFAULT_MCP_RATE = 60
 
 Provider = Literal["mock", "ollama", "openai", "foundry"]
 RealProvider = Literal["ollama", "openai", "foundry"]
@@ -111,6 +114,11 @@ class Settings(BaseModel):
     stt_provider: SttProvider = "off"
     stt_max_seconds: float = Field(default=15.0, gt=0, le=60)
     mock_stt_text: str | None = None
+    # Day 6: MCP on /mcp (docs/day6-design.md section 2.4)
+    mcp_enabled: bool = True
+    mcp_allowed_hosts: tuple[str, ...] = DEFAULT_MCP_HOSTS
+    mcp_rate_per_minute: int = Field(default=DEFAULT_MCP_RATE, ge=1, le=100_000)
+    trust_proxy: bool = False  # X-Forwarded-For names the client (Azure ingress)
 
     @property
     def speech_enabled(self) -> bool:
@@ -179,6 +187,12 @@ class Settings(BaseModel):
                 "stt_provider": self.stt_provider,
                 "mock_tts_faults": self.mock_tts_faults or None,
             },
+            "mcp": {
+                "enabled": self.mcp_enabled,
+                "allowed_hosts": list(self.mcp_allowed_hosts),
+                "rate_per_minute": self.mcp_rate_per_minute,
+            },
+            "trust_proxy": self.trust_proxy,
         }
 
     @classmethod
@@ -260,6 +274,7 @@ class Settings(BaseModel):
         if drop_at > queue_size:
             problems.append("STUDIO_DROP_AT must not exceed STUDIO_QUEUE_SIZE")
         speech = _speech_values(get, number, integer, problems)
+        hosts = _hosts(get("MCP_ALLOWED_HOSTS"), problems)
         settings_values: dict[str, object] = {
             "use_mock_llm": use_mock,
             "llm_provider": provider if provider in REAL_PROVIDERS else None,
@@ -287,10 +302,32 @@ class Settings(BaseModel):
             "studio_drop_at": min(drop_at, queue_size),
             "ui_dir": get("UI_DIR"),
             **speech,
+            "mcp_enabled": flag("MCP_ENABLED", True),
+            "mcp_allowed_hosts": hosts,
+            "mcp_rate_per_minute": integer("MCP_RATE_PER_MINUTE", DEFAULT_MCP_RATE, 1, 100_000),
+            "trust_proxy": flag("TRUST_PROXY", False),
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))
         return cls.model_validate(settings_values)
+
+
+def _hosts(value: str | None, problems: list[str]) -> tuple[str, ...]:
+    """MCP_ALLOWED_HOSTS: host names, comma separated ("127.0.0.1,localhost,app.example")."""
+    if value is None:
+        return DEFAULT_MCP_HOSTS
+    hosts: list[str] = []
+    for raw in value.split(","):
+        host = raw.strip().lower()
+        if not host:
+            continue
+        if "/" in host or " " in host or ":" in host.removeprefix("[").split("]")[-1]:
+            problems.append(
+                f"MCP_ALLOWED_HOSTS lists host names without scheme, port or path, got {raw!r}"
+            )
+        elif host not in hosts:
+            hosts.append(host)
+    return tuple(hosts) or DEFAULT_MCP_HOSTS
 
 
 def _choice[T: str](value: str | None, choices: tuple[T, ...], default: T) -> T | None:

@@ -105,6 +105,20 @@ class StudioHealth(BaseModel):
     degraded: list[str]
 
 
+class McpHealth(BaseModel):
+    """MCP on /mcp (docs/day6-design.md section 3.7)."""
+
+    enabled: bool
+    status: Literal["ok", "unavailable"]
+    transport: str
+    path: str
+    calls: int = 0
+    errors: int = 0
+    refused: int = 0  # arguments the client can correct, rate limits included
+    rate_limited: int = 0
+    by_tool: dict[str, int] = Field(default_factory=dict)
+
+
 class SpeechHealth(BaseModel):
     """The voice of the app (docs/day5-design.md section 9.4)."""
 
@@ -136,6 +150,7 @@ class Health(BaseModel):
     synthetic: bool = True
     studio: StudioHealth | None = None  # absent when STUDIO_ENABLED=false (the Day 2 shape)
     speech: SpeechHealth | None = None  # absent when TTS_PROVIDER=off (the Day 4 shape)
+    mcp: McpHealth | None = None  # absent when MCP_ENABLED=false (the Day 5 shape)
 
 
 class TalkingPointStatusBody(BaseModel):
@@ -240,6 +255,9 @@ async def healthz(request: Request) -> Health:
     speech = _speech_health(request)
     if speech is not None:
         blocks["speech"] = speech
+    mcp = getattr(request.app.state, "mcp", None)
+    if mcp is not None and mcp.status != "disabled":
+        blocks["mcp"] = McpHealth.model_validate(mcp.health())
     return Health(
         status="ok",
         llm_provider=service.provider,

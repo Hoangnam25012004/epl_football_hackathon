@@ -1,5 +1,65 @@
 {
   "$defs": {
+    "McpHealth": {
+      "description": "MCP on /mcp (docs/day6-design.md section 3.7).",
+      "properties": {
+        "by_tool": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Tool",
+          "type": "object"
+        },
+        "calls": {
+          "default": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "errors": {
+          "default": 0,
+          "title": "Errors",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "rate_limited": {
+          "default": 0,
+          "title": "Rate Limited",
+          "type": "integer"
+        },
+        "refused": {
+          "default": 0,
+          "title": "Refused",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "transport": {
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "status",
+        "transport",
+        "path"
+      ],
+      "title": "McpHealth",
+      "type": "object"
+    },
     "SpeechHealth": {
       "description": "The voice of the app (docs/day5-design.md section 9.4).",
       "properties": {
@@ -168,6 +228,17 @@
     "llm_provider": {
       "title": "Llm Provider",
       "type": "string"
+    },
+    "mcp": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpHealth"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "model": {
       "title": "Model",

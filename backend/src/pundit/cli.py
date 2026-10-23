@@ -85,6 +85,7 @@ EVAL_FILES = (
     EVALS_DIR / "claims_dominant_loser_42.json",
     EVALS_DIR / "heldout_dominant_loser_42.json",
 )
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
 RECENT_MINUTES = 10.0  # window of the "LAST 10'" possession in replay status lines
 DATA_DIR = REPO_ROOT / "data" / "matches"
 GOLDEN_DIR = REPO_ROOT / "backend" / "tests" / "golden" / "data"
@@ -746,8 +747,9 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     from pundit.api.app import create_app
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     logging.getLogger("agent_framework").setLevel(logging.WARNING)  # one line per superstep
+    logging.getLogger("mcp").setLevel(logging.WARNING)  # one line per request; pundit.mcp logs
     settings = load_settings(ENV_FILE)
     if args.ui:  # Day 4: serve the static export of the frontend at "/"
         ui = Path(args.ui).resolve()
@@ -756,6 +758,31 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             return 2
         settings = settings.model_copy(update={"ui_dir": str(ui)})
     uvicorn.run(create_app(settings), host=args.host, port=args.port)
+    return 0
+
+
+def _cmd_mcp(args: argparse.Namespace) -> int:
+    """The read-only MCP tools on generated matches (docs/day6-design.md section 3.7): stdio by
+    default, where stdout carries JSON-RPC only and every log line goes to stderr."""
+    from pundit.mcp_server.limits import RateLimiter
+    from pundit.mcp_server.server import build_server, run_stdio, standalone_app
+    from pundit.mcp_server.sources import StaticMatches
+    from pundit.mcp_server.tools import rules_only
+
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, stream=sys.stderr, force=True)
+    logging.getLogger("agent_framework").setLevel(logging.WARNING)
+    logging.getLogger("mcp").setLevel(logging.WARNING)
+    settings = load_settings(ENV_FILE)
+    limiter = RateLimiter(settings.mcp_rate_per_minute) if args.http else None
+    server, _ = build_server(StaticMatches(), claims=rules_only(settings), limiter=limiter)
+    if not args.http:
+        asyncio.run(run_stdio(server))
+        return 0
+    import uvicorn
+
+    hosts = settings.mcp_allowed_hosts
+    print(f"MCP on http://{args.host}:{args.port}/mcp (hosts: {', '.join(hosts)})", file=sys.stderr)
+    uvicorn.run(standalone_app(server, allowed_hosts=hosts), host=args.host, port=args.port)
     return 0
 
 
@@ -931,6 +958,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--ui", help="static export of the frontend to serve at / (frontend/out)")
     p.set_defaults(func=_cmd_serve)
+
+    p = sub.add_parser("mcp", help="serve the read-only MCP tools on stdio (--http: on /mcp)")
+    p.add_argument("--http", action="store_true", help="Streamable HTTP instead of stdio")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8001)
+    p.set_defaults(func=_cmd_mcp)
     return parser
 
 

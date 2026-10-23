@@ -1271,12 +1271,32 @@ export interface PlayerBrief {
 export interface Health {
   degraded: string[];
   llm_provider: string;
+  mcp?: McpHealth | null;
   model: string;
   sessions: number;
   speech?: SpeechHealth | null;
   status: "ok";
   studio?: StudioHealth | null;
   synthetic?: boolean;
+}
+/**
+ * MCP on /mcp (docs/day6-design.md section 3.7).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "McpHealth".
+ */
+export interface McpHealth {
+  by_tool?: {
+    [k: string]: number;
+  };
+  calls?: number;
+  enabled: boolean;
+  errors?: number;
+  path: string;
+  rate_limited?: number;
+  refused?: number;
+  status: "ok" | "unavailable";
+  transport: string;
 }
 /**
  * The voice of the app (docs/day5-design.md section 9.4).

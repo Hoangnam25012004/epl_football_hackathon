@@ -24,7 +24,7 @@ EXTERNAL = {
     "httpx": {"llm.maf_backend", "speech.azure_tts", "speech.azure_stt", "speech.auth"},
     "azure": {"llm.maf_backend", "speech.auth", "speech.durable"},
     "fastapi": {"api"},
-    "starlette": {"api"},
+    "starlette": {"api", "mcp_server.server"},  # the SDK's HTTP transport is Starlette
     "uvicorn": {"cli"},
     "mcp": {"mcp_server.server"},
 }

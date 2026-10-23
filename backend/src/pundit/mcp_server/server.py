@@ -3,13 +3,14 @@
 The tools of tools.py on the MCP SDK: read-only (every tool says so in its annotations), a rate
 limit per client, one log line per call (never the words of a claim). `pundit mcp` serves it on
 stdio with generated matches; the API serves it on /mcp with its live sessions first
-(api/mcp_mount.py). This is the only module that knows the SDK.
+(api/mcp_mount.py). This is the only module that knows the SDK and its HTTP transport.
 """
 
+import contextlib
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version
 from typing import Annotated, Literal
@@ -17,9 +18,15 @@ from typing import Annotated, Literal
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
+from starlette.applications import Starlette
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from pundit.domain.clients import client_ip
 from pundit.mcp_server import tools
 from pundit.mcp_server.errors import ToolInputError
 from pundit.mcp_server.limits import RateLimiter
@@ -47,6 +54,15 @@ READ_ONLY = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
 VERIFY_COST = 3  # a claim runs the whole verifier: it counts as three calls
+MAX_BODY_BYTES = 64 * 1024  # a claim is 300 characters; 50 event ids are about 1.5 KB
+MCP_PATH = "/mcp"
+# Every method is routed to the endpoint, so a catch-all mount (the UI) never answers /mcp with a
+# 404, which a client would read as "session gone". Only POST is served: stateless, a GET would
+# open an SSE stream that never carries anything and holds a connection for good; 405 is the
+# protocol's answer for "no stream here".
+ROUTE_METHODS = ["GET", "POST", "DELETE"]
+ALLOW_POST = {"Allow": "POST"}
+LOCAL = "local"
 INSTRUCTIONS = (
     "Pundit Copilot: deterministic statistics and claim checks for synthetic football matches. "
     "Every number comes from these tools with the event ids it is computed from: quote them and "
@@ -125,15 +141,22 @@ class McpStats:
         }
 
 
-def client_key(ctx: Context) -> str:
-    """The client's IP on HTTP; "local" in memory and on stdio."""
+def client_key(ctx: Context, *, trust_proxy: bool = False) -> str:
+    """The client's IP on HTTP (behind a trusted proxy, the hop it added); "local" in memory
+    and on stdio."""
     try:
         request = ctx.request_context.request
     except (AttributeError, LookupError, RuntimeError, ValueError):
-        return "local"
-    client = getattr(request, "client", None)
-    host = getattr(client, "host", None)
-    return host if isinstance(host, str) and host else "local"
+        return LOCAL
+    if request is None:
+        return LOCAL
+    host = getattr(getattr(request, "client", None), "host", None)
+    peer = host if isinstance(host, str) and host else None
+    headers = getattr(request, "headers", None)
+    forwarded = headers.get("x-forwarded-for") if headers is not None else None
+    if peer is None and not (trust_proxy and forwarded):
+        return LOCAL
+    return client_ip(peer, forwarded, trust_proxy=trust_proxy)
 
 
 def _package_version() -> str:
@@ -148,6 +171,7 @@ def build_server(
     *,
     claims: ClaimService | None = None,
     limiter: RateLimiter | None = None,
+    trust_proxy: bool = False,
     name: str = "pundit",
 ) -> tuple[MCPServer, McpStats]:
     """The MCP server over `source`, and its counters (for /healthz)."""
@@ -175,7 +199,7 @@ def build_server(
         stats.by_tool[tool] = stats.by_tool.get(tool, 0) + 1
         try:
             if limiter is not None:
-                limiter.take(client_key(ctx), cost)
+                limiter.take(client_key(ctx, trust_proxy=trust_proxy), cost)
             return await work()
         except ToolInputError as exc:
             status = "refused"
@@ -404,3 +428,79 @@ def build_server(
         )
 
     return server, stats
+
+
+def transport_security(hosts: Sequence[str]) -> TransportSecuritySettings:
+    """Another Host is refused with 421 (DNS rebinding); a page of another origin with 403. The
+    allowed hosts' own origins pass (MCP Inspector on localhost); a client with no Origin header
+    (Copilot, Claude, curl) is never refused for it."""
+    forms = [form for host in hosts for form in (host, f"{host}:*")]
+    return TransportSecuritySettings(
+        allowed_hosts=forms,
+        allowed_origins=[f"{scheme}://{form}" for scheme in ("http", "https") for form in forms],
+    )
+
+
+def http_app(server: MCPServer, *, allowed_hosts: Sequence[str]) -> Starlette:
+    """The Streamable HTTP app of `server` at /mcp (it runs the session manager itself).
+    Stateless with JSON answers: the tools never notify, so no session is kept in memory and any
+    replica can answer any request."""
+    return server.streamable_http_app(
+        stateless_http=True,
+        json_response=True,
+        max_request_body_size=MAX_BODY_BYTES,
+        transport_security=transport_security(allowed_hosts),
+    )
+
+
+class HttpEndpoint:
+    """/mcp inside a host app (the API routes it at /mcp and /mcp/). The SDK's session manager
+    runs once per instance, so each run of the host app (`running()` in its lifespan) builds a
+    fresh one; outside a run a request gets 503 instead of a crash."""
+
+    def __init__(self, server: MCPServer, *, allowed_hosts: Sequence[str]) -> None:
+        self._server = server
+        self._hosts = tuple(allowed_hosts)
+        self._current: ASGIApp | None = None
+
+    @contextlib.asynccontextmanager
+    async def running(self) -> AsyncIterator[None]:
+        app = http_app(self._server, allowed_hosts=self._hosts)
+        endpoint = next(route.endpoint for route in app.routes if isinstance(route, Route))
+        async with self._server.session_manager.run():
+            self._current = endpoint
+            try:
+                yield
+            finally:
+                self._current = None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("method") != "POST":
+            refused = PlainTextResponse("Method Not Allowed", status_code=405, headers=ALLOW_POST)
+            await refused(scope, receive, send)
+            return
+        current = self._current
+        if current is None:
+            await PlainTextResponse("MCP is not running", status_code=503)(scope, receive, send)
+            return
+        await current(scope, receive, send)
+
+
+def standalone_app(server: MCPServer, *, allowed_hosts: Sequence[str]) -> Starlette:
+    """`pundit mcp --http`: the endpoint alone at /mcp and /mcp/ (generated matches only)."""
+    endpoint = HttpEndpoint(server, allowed_hosts=allowed_hosts)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Starlette) -> AsyncIterator[None]:
+        async with endpoint.running():
+            yield
+
+    routes = [
+        Route(path, endpoint=endpoint, methods=ROUTE_METHODS) for path in (MCP_PATH, MCP_PATH + "/")
+    ]
+    return Starlette(routes=routes, lifespan=lifespan)
+
+
+async def run_stdio(server: MCPServer) -> None:
+    """Serve on stdin / stdout: stdout carries JSON-RPC only (logs go to stderr)."""
+    await server.run_stdio_async()

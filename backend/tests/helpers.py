@@ -28,6 +28,9 @@ STUDIO_ON = os.environ.get("STUDIO_ENABLED", "true").strip().lower() not in {"0"
 # Day 5: and again with TTS_PROVIDER=off, which must give exactly the Day 4 app
 # (docs/day5-design.md section 12.5); otherwise the API tests run with the mock voice
 TTS_ON = os.environ.get("TTS_PROVIDER", "mock").strip().lower() != "off"
+# Day 6: and again with MCP_ENABLED=false, which must give exactly the Day 5 app
+# (docs/day6-design.md section 11, W2)
+MCP_ON = os.environ.get("MCP_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
 DAY2_HELLO_KEYS = {"match", "snapshot", "moments", "claims", "degraded"}
 # Day 4 adds `on_air` (the editors' lower-third decision) to the studio hello
 STUDIO_HELLO_KEYS = {"profile", "talking_points", "lower_thirds", "commentary", "recaps", "on_air"}
@@ -84,8 +87,9 @@ def run[T](coroutine: Coroutine[Any, Any, T]) -> T:
 
 def api_settings(**values: Any) -> Settings:
     """Settings of an API test app: the studio follows STUDIO_ENABLED, the voice
-    TTS_PROVIDER (mock unless it says off)."""
+    TTS_PROVIDER (mock unless it says off), MCP MCP_ENABLED."""
     values.setdefault("tts_provider", "mock" if TTS_ON else "off")
+    values.setdefault("mcp_enabled", MCP_ON)
     return Settings(studio_enabled=STUDIO_ON, **values)
 
 
