@@ -78,9 +78,13 @@ VI_ENTRIES: list[tuple[str, Lex]] = [
     *_metric("cards", "thẻ", "thẻ phạt", "chiếc thẻ"),
     *_metric("var_overturns", "bàn bị VAR huỷ", "bàn bị VAR hủy", "bàn bị huỷ", "bàn bị hủy",
              "bàn thắng bị huỷ", "bàn thắng bị hủy", "bị VAR huỷ", "bị VAR hủy",
-             "bị VAR từ chối", "bàn bị từ chối", "bàn thắng bị từ chối"),
+             "bị VAR từ chối", "bàn bị từ chối", "bàn thắng bị từ chối",
+             # Day 6: the active voice ("VAR đã huỷ một bàn thắng của X")
+             "VAR huỷ", "VAR hủy", "VAR đã huỷ", "VAR đã hủy", "VAR từ chối", "VAR đã từ chối",
+             "VAR không công nhận", "VAR đã không công nhận", verb=True),
     *_metric("yellow_cards", "thẻ vàng", "chiếc thẻ vàng"),
     *_metric("red_cards", "thẻ đỏ", "chiếc thẻ đỏ", "thẻ đỏ trực tiếp"),
+    *_metric("red_cards", "bị đuổi khỏi sân", "bị truất quyền thi đấu", verb=True),
     *_metric("offsides", "việt vị", "lần việt vị", "pha việt vị", "rơi vào thế việt vị"),
     *_metric("passes", "đường chuyền", "lần chuyền", "chuyền bóng", "pha chuyền", "chuyền",
              "lượt chuyền"),
@@ -102,6 +106,14 @@ VI_ENTRIES: list[tuple[str, Lex]] = [
     *_metric("tempo", "nhịp độ", "tempo"),
     *_metric("shot_speed_max", "cú sút mạnh nhất", "tốc độ sút", "tốc độ cú sút",
              "cú sút nhanh nhất"),
+    # Day 6: English words in a Vietnamese sentence, as commentators mix them
+    *_metric("shots", "shots", "shot"),
+    *_metric("shots_on_target", "shots on target", "shot on target"),
+    *_metric("corners", "corners", "corner"),
+    *_metric("fouls", "fouls", "foul"),
+    *_metric("passes", "passes"),
+    *_metric("tackles", "tackles"),
+    *_metric("interceptions", "interceptions"),
     *_cat("dominance", "áp đảo", "lấn lướt", "lấn át", "làm chủ thế trận", "nắm thế trận",
           "kiểm soát thế trận", "chiếm ưu thế", "vượt trội", "dồn ép", "ép sân", "thống trị",
           "chiếm thế thượng phong", "làm chủ trận đấu", "kiểm soát trận đấu", "chơi tốt hơn",
@@ -112,6 +124,8 @@ VI_ENTRIES: list[tuple[str, Lex]] = [
     *_cat("passive", "bị"),
     *_cat("result", "thắng", "chiến thắng", "giành chiến thắng", "thắng trận", "đánh bại",
           "thắng lợi", "giành thắng lợi", "dẫn trước", "đang dẫn", "thắng cuộc", op=">"),
+    # Day 6: "dẫn" alone ("Kestrel dẫn 1-0") is a result only with a score (also "to dribble")
+    *_cat("result", "dẫn", op=">"),
     *_cat("result", "thua", "để thua", "thua trận", "thất bại", "bại trận", "nhận thất bại",
           "bị dẫn", "đang bị dẫn", "thua cuộc", op="<"),
     *_cat("result", "hoà", "hòa", "hoà nhau", "hòa nhau", "chia điểm", "bất phân thắng bại",
@@ -166,10 +180,14 @@ EN_ENTRIES: list[tuple[str, Lex]] = [
              "goal disallowed", "overturned by var", "ruled out by var", "chalked off",
              "goals overturned", "goal overturned", "goal overturned by var",
              "goals overturned by var", "goal disallowed by var", "goals disallowed by var",
-             "goal ruled out by var", "goals ruled out by var"),
+             "goal ruled out by var", "goals ruled out by var",
+             # Day 6: the active voice ("VAR overturned an Ironvale goal")
+             "var overturned", "var disallowed", "var ruled out", "var chalked off",
+             "var cancelled", "var canceled", verb=True),
     *_metric("yellow_cards", "yellow cards", "yellow card", "yellows"),
-    *_metric("red_cards", "red cards", "red card", "reds", "sent off", "sending off",
-             "sendings off", "dismissals", "dismissal"),
+    *_metric("red_cards", "red cards", "red card", "reds", "sending off", "sendings off",
+             "dismissals", "dismissal"),
+    *_metric("red_cards", "sent off", verb=True),  # "had a player sent off": at least one
     *_metric("offsides", "offsides", "offside", "caught offside", "offside calls"),
     *_metric("passes", "passes", "pass"),
     *_metric("pass_accuracy", "pass accuracy", "passing accuracy", "pass completion",
@@ -196,10 +214,10 @@ EN_ENTRIES: list[tuple[str, Lex]] = [
           "were outplayed by", "was outplayed by", passive=True, by=True),
     *_cat("result", "won", "win", "wins", "beat", "beats", "victorious", "took the win",
           "came out on top", "are leading", "were leading", "is leading", "are ahead",
-          "were ahead", "is ahead", "defeated", op=">"),
+          "were ahead", "is ahead", "defeated", "led", "leads", "lead", op=">"),
     *_cat("result", "lost", "lose", "loses", "were beaten", "was beaten", "got beaten",
           "were defeated", "was defeated", "are trailing", "were trailing", "is trailing",
-          "are behind", "were behind", op="<"),
+          "are behind", "were behind", "trailed", "trails", op="<"),
     *_cat("result", "drew", "draw", "drawn", "tied", op="=="),
     *_cat("comparative", "more", "higher", "greater", "stronger", "better", "harder",
           "more intense", "outshot", "out-shot", "outscored", direction=1),
@@ -233,19 +251,22 @@ IMPLIED_METRIC = {"outshot": "shots", "out-shot": "shots", "outscored": "score"}
 
 # "gấp đôi", "gấp 3 lần", "twice as many", "3 times as many"
 _RATIO_WORDS = {
-    "doi": 2.0, "hai": 2.0, "ba": 3.0, "bon": 4.0, "nam": 5.0, "ruoi": 1.5,
+    "doi": 2.0, "hai": 2.0, "ba": 3.0, "bon": 4.0, "nam": 5.0, "sau": 6.0, "bay": 7.0,
+    "tam": 8.0, "chin": 9.0, "muoi": 10.0, "ruoi": 1.5,
     "twice": 2.0, "double": 2.0, "triple": 3.0, "treble": 3.0,
-    "two": 2.0, "three": 3.0, "four": 4.0, "five": 5.0,
+    "two": 2.0, "three": 3.0, "four": 4.0, "five": 5.0, "six": 6.0, "seven": 7.0,
+    "eight": 8.0, "nine": 9.0, "ten": 10.0,
 }  # fmt: skip
+_VI_RATIO = "doi|hai|ba|bon|nam|sau|bay|tam|chin|muoi|ruoi"
+_EN_RATIO = "two|three|four|five|six|seven|eight|nine|ten"
+# "gấp tám lần": every number word, or the number would be read as a plain value (Day 6)
 RATIO_PATTERNS = (
-    re.compile(
-        r"(?<!\w)(?:nhieu\s+)?gap\s+(?P<n>\d+(?:[.,]\d+)?|doi|hai|ba|bon|nam|ruoi)(?:\s+lan)?(?!\w)"
-    ),
+    re.compile(rf"(?<!\w)(?:nhieu\s+)?gap\s+(?P<n>\d+(?:[.,]\d+)?|{_VI_RATIO})(?:\s+lan)?(?!\w)"),
     re.compile(
         r"(?<!\w)(?P<n>twice|double|triple|treble)(?:\s+(?:as\s+many|as\s+much|the))?(?!\w)"
     ),
     re.compile(
-        r"(?<!\w)(?P<n>\d+(?:\.\d+)?|two|three|four|five)\s+times\s+(?:as\s+many|as\s+much|more)(?!\w)"
+        rf"(?<!\w)(?P<n>\d+(?:\.\d+)?|{_EN_RATIO})\s+times\s+(?:as\s+many|as\s+much|more)(?!\w)"
     ),
 )
 

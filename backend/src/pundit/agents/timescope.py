@@ -38,6 +38,11 @@ _PATTERNS: tuple[tuple[ScopeKind, str], ...] = (
     ("h2", r"hiep\s+(?:2|hai|sau|thu\s+hai)"),
     # "sau giờ nghỉ (giữa hiệp)", "sau khi nghỉ giữa hiệp": after the break
     ("h2", r"sau\s+(?:khi\s+)?(?:gio\s+|thoi\s+gian\s+)?nghi(?:\s+giua\s+(?:hiep|tran))?"),
+    # Day 6: before the break, at its end: the first half
+    ("h1", r"truoc\s+(?:khi\s+)?(?:gio\s+|thoi\s+gian\s+)?nghi(?:\s+giua\s+(?:hiep|tran))?"),
+    ("h1", r"(?:khi\s+)?(?:ket\s+thuc|het)\s+hiep\s+(?:1|mot|dau(?:\s+tien)?)"),
+    # "sau 45 phút" = after 45 minutes of play (not "sau phút 45", from minute 45 on)
+    ("first", rf"sau\s+{N1}\s+phut(?!\s+(?:cuoi|dau))"),  # "sau 10 phút đầu" is "from 10"
     ("last", rf"{N1}\s+phut\s+(?:cuoi(?:\s+cung)?|gan\s+(?:nhat|day)|vua\s+qua|qua)"),
     ("first", rf"{N1}\s+phut\s+dau(?:\s+tien)?"),
     (
@@ -59,6 +64,16 @@ _PATTERNS: tuple[tuple[ScopeKind, str], ...] = (
         r"(?:the\s+)?(?:second|2nd)\s+half"
         r"|after\s+(?:the\s+)?(?:break|interval|half[\s-]?time|restart)",
     ),
+    # Day 6: "before the break", "at half-time", "going into the interval": the first half
+    (
+        "h1",
+        r"(?:before|by|at|going\s+into|heading\s+into)\s+(?:the\s+)?"
+        r"(?:break|interval|half[\s-]?time|ht)",
+    ),
+    ("first", rf"after\s+{N1}\s+minutes"),  # after 45 minutes of play
+    # "HT: Kestrel led 1-0", "FT: ..." (a preface naming the moment of the claim)
+    ("h1", r"(?:ht|half[\s-]?time)(?=\s*:)"),
+    ("full", r"(?:ft|full[\s-]?time)(?=\s*:)"),
     ("last", rf"(?:the\s+)?(?:last|past|final|closing)\s+{N1}\s+minutes?"),
     ("first", rf"(?:the\s+)?(?:first|opening)\s+{N1}\s+minutes?"),
     ("range", rf"minutes?\s+{N1}\s*(?:-|\u2013|to|and)\s*{N2}"),
