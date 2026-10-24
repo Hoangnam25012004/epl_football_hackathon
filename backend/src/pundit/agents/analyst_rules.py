@@ -791,6 +791,21 @@ def analyze_claim(ctx: ClaimContext) -> ClaimSpec:
     return analyze_text(ctx.text, ctx.match, ctx.language)
 
 
+def llm_reading_grounded(spec: ClaimSpec, text: str) -> bool:
+    """Whether a reading only the LLM made (the rules could not parse the claim) is said by the
+    claim's words. A dominance assertion needs a dominance word ("áp đảo", "dominated", "on
+    top"...), in either language: a small model read claims about a lead lost by ten men as the
+    team dominating, and called true claims FALSE (Day 6, the Ollama eval)."""
+    if not any(a.kind == "dominance" for a in spec.assertions):
+        return True
+    written = Text.of(text)
+    return any(
+        hit.payload.cat == "dominance"
+        for language in ("vi", "en")
+        for hit in find_terms(written, lexicon(language))
+    )
+
+
 def claim_language(text: str, match: MatchContext) -> Lang:
     claim = Text.of(text)
     return detect_language(claim, [(m.start, m.end) for m in find_entities(claim, match)])

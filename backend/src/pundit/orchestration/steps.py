@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Literal
 
-from pundit.agents.analyst_rules import analyze_claim, claim_language
+from pundit.agents.analyst_rules import analyze_claim, claim_language, llm_reading_grounded
 from pundit.agents.collector import collect, get_stat
 from pundit.agents.context import build_match_context
 from pundit.agents.contracts import (
@@ -291,7 +291,11 @@ class ClaimSteps:
                 run.flag("analyst_fallback")
                 decision = f"fallback: llm {outcome.failure}"
         elif not rule.assertions and "out of scope" not in rule.notes:
-            chosen, source, decision = llm, "llm", "llm (rules could not parse)"
+            if llm_reading_grounded(llm, ctx.text):
+                chosen, source, decision = llm, "llm", "llm (rules could not parse)"
+            else:  # the LLM read a dominance the claim does not name: refused, as the rules do
+                run.flag("analyst_disagreement")
+                decision = "rules (the llm read a dominance the claim does not name)"
         elif same_meaning(llm, rule, run):
             chosen, source, decision = llm, "llm", "llm (agrees with rules)"
         else:

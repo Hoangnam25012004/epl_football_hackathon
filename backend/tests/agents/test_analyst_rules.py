@@ -10,7 +10,7 @@ from helpers import match_context
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from pundit.agents.analyst_rules import analyze_text
+from pundit.agents.analyst_rules import analyze_text, llm_reading_grounded
 from pundit.agents.contracts import ClaimSpec, Subject
 from pundit.agents.spec_validation import validate_spec
 from pundit.agents.timescope import rolling_minutes
@@ -268,3 +268,17 @@ def test_fuzz_never_crashes_and_specs_are_valid(words: list[str], noise: str) ->
         assert validate_spec(spec, ctx) == []
     else:
         assert spec.unsupported_reason is not None
+
+
+def test_an_llm_only_dominance_reading_needs_a_dominance_word() -> None:
+    """Day 6: a reading only the LLM made is used where the claim's words say it."""
+    match = match_context("red_card_swing", 7)
+    dominance = analyze_text("Kestrel áp đảo cả trận", match, "vi")
+    assert [a.kind for a in dominance.assertions] == ["dominance"]
+    for words in ("Kestrel không trụ nổi đến cuối trận", "Ten-man Kestrel ran out of steam"):
+        assert not llm_reading_grounded(dominance, words)
+    for words in ("Kestrel were well on top for long spells", "Kestrel ép sân nhưng bất lực",
+                  "doi khach ap dao ca tran"):  # fmt: skip
+        assert llm_reading_grounded(dominance, words)
+    shots = analyze_text("Kestrel sút nhiều hơn Harbor", match, "vi")
+    assert llm_reading_grounded(shots, "Ten-man Kestrel ran out of steam")  # dominance only

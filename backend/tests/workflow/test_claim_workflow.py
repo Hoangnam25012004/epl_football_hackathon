@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 from helpers import DL, generated, mock_service, run, source, verify
 
-from pundit.agents.contracts import ClaimRequest, ClaimResult
+from pundit.agents.analyst_rules import analyze_claim
+from pundit.agents.contracts import ClaimContext, ClaimRequest, ClaimResult, ClaimSpec
 from pundit.engine.replay import FakeClock
 from pundit.llm.faults import FaultPlan
 from pundit.llm.mock import MockClaimAnalyst, MockExplainer
@@ -221,3 +222,38 @@ def test_concurrent_claims_are_pinned_to_their_own_as_of() -> None:
                 MetricParams(team=fact.team, window=result.assertions[0].assertion.window),
             )
             assert fact.value == expected.value
+
+
+class DominanceReader:
+    """An analyst that reads every claim as Kestrel dominating the match: what a small model did
+    with claims the rules could not parse (Day 6, the Ollama eval)."""
+
+    model = "stub"
+
+    async def analyze(self, ctx: ClaimContext, feedback: list[str] | None = None) -> ClaimSpec:
+        del feedback
+        reading = ctx.model_copy(update={"text": "Kestrel áp đảo cả trận", "language": "vi"})
+        return analyze_claim(reading)
+
+
+@pytest.mark.parametrize(
+    "text", ["Kestrel không trụ nổi đến cuối trận", "Ten-man Kestrel ran out of steam"]
+)
+def test_an_llm_dominance_the_claim_does_not_name_is_refused(text: str) -> None:
+    settings = Settings()
+    service = ClaimService(settings, ports=lambda: (DominanceReader(), MockExplainer()))
+    result = verify(text, service=service, scenario="red_card_swing", seed=7)
+    assert result.verdict == "INSUFFICIENT_DATA"
+    assert result.analyst_source == "rule"
+    assert "analyst_disagreement" in result.degraded
+    decision = next(s for s in result.trace or () if s.agent == "RuleAnalyst").output["decision"]
+    assert "does not name" in decision
+
+
+def test_an_llm_dominance_the_claim_names_is_used() -> None:
+    """The rules read this one too; a claim they cannot parse but that says "áp đảo" keeps the
+    LLM's reading (the check only asks for the word)."""
+    settings = Settings()
+    service = ClaimService(settings, ports=lambda: (DominanceReader(), MockExplainer()))
+    result = verify("Kestrel áp đảo cả trận", service=service, scenario="red_card_swing", seed=7)
+    assert result.analyst_source == "llm" and result.verdict != "INSUFFICIENT_DATA"
