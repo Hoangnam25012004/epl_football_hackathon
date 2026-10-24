@@ -9,6 +9,7 @@ from pundit.domain.matchtime import FULL, H1, H2, MinuteWindow, RollingWindow
 from pundit.mcp_server.errors import ToolInputError
 from pundit.mcp_server.params import (
     WindowArg,
+    as_of_text,
     fold,
     metric_spec,
     resolve_player,
@@ -215,3 +216,14 @@ def test_an_unknown_metric_points_to_list_metrics() -> None:
         metric_spec("goals_per_banana")
     assert f"list_metrics lists the {len(REGISTRY)} metrics" in str(caught.value)
     assert "did you mean" not in str(caught.value)
+
+
+def test_as_of_may_be_a_number() -> None:
+    """Day 6 M3 (MCP Inspector): a model may write the minute as a number."""
+    assert as_of_text(63) == "63'"
+    assert as_of_text(63.0) == "63'"
+    assert as_of_text("45+2'") == "45+2'"
+    assert as_of_text(None) is None
+    for wrong in (63.5, True):
+        with pytest.raises(ToolInputError, match="minute"):
+            as_of_text(wrong)

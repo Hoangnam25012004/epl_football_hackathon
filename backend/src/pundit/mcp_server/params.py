@@ -118,6 +118,18 @@ def resolve_player(context: MatchContext, text: str | None) -> str | None:
     raise ToolInputError(f"unknown player {text!r}: {hint}")
 
 
+def as_of_text(value: str | float | None) -> str | None:
+    """A minute as a model may write it: "63'", "HT", or a number (63, found by the MCP
+    Inspector: a number was refused with a raw validation error, Day 6 M3)."""
+    if isinstance(value, bool):
+        raise ToolInputError('as_of is a minute such as "63\'", "45+2\'", "HT" or "FT"')
+    if isinstance(value, int | float):
+        if value != int(value):
+            raise ToolInputError(f'as_of {value} is not a whole minute: write "63\'" or 63')
+        return f"{int(value)}'"
+    return value
+
+
 def resolve_window(window: WindowArg | None, view: LogView) -> MinuteWindow | RollingWindow:
     if window is None:
         return FULL

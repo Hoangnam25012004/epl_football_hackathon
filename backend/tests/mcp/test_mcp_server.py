@@ -128,6 +128,18 @@ def test_structured_content_follows_the_output_schema(tool: str, arguments: dict
     assert (stats.calls, stats.errors, stats.refused) == (1, 0, 0)
 
 
+def test_as_of_as_a_number_is_the_same_minute() -> None:
+    server, _ = build_server(static())
+    arguments = {"match_id": DL, "metric": "shots", "team": "harbor_lions"}
+    as_text = call(server, GET_STAT, {**arguments, "as_of": "60'"})
+    as_number = call(server, GET_STAT, {**arguments, "as_of": 60})
+    assert as_number.is_error is False
+    assert as_number.structured_content == as_text.structured_content
+    half = call(server, GET_STAT, {**arguments, "as_of": 60.5})
+    assert half.is_error is True
+    assert "not a whole minute" in half.content[0].text  # type: ignore[union-attr]
+
+
 def test_a_wrong_argument_is_a_tool_error_with_how_to_fix() -> None:
     server, stats = build_server(static())
     result = call(server, GET_STAT, {"match_id": DL, "metric": "shots", "team": "Kestrel FC Wrong"})

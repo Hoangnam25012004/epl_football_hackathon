@@ -42,7 +42,7 @@ from pundit.mcp_server.outputs import (
     ScoreboardOut,
     StatOut,
 )
-from pundit.mcp_server.params import WindowArg
+from pundit.mcp_server.params import WindowArg, as_of_text
 from pundit.mcp_server.sources import MatchSource
 from pundit.orchestration.service import ClaimService
 from pundit.orchestration.tools import COMPARE_STAT, GET_STAT, catalog
@@ -85,9 +85,9 @@ MatchId = Annotated[
     ),
 ]
 AsOf = Annotated[
-    str | None,
+    str | float | None,
     Field(
-        description='Answer at this minute: "63\'", "45+2\'", "HT" or "FT"; '
+        description='Answer at this minute: "63\'" (or 63), "45+2\'", "HT" or "FT"; '
         "empty for the latest event"
     ),
 ]
@@ -262,7 +262,7 @@ def build_server(
                 team=team,
                 player=player,
                 window=window,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
             ),
         )
 
@@ -288,7 +288,7 @@ def build_server(
                 match_id=match_id,
                 metric=metric,
                 window=window,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
             ),
         )
 
@@ -306,7 +306,7 @@ def build_server(
             lambda: tools.get_scoreboard(
                 source,
                 match_id=match_id,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
             ),
         )
 
@@ -330,7 +330,7 @@ def build_server(
                 ids=ids,
                 last=last,
                 types=types,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
             ),
         )
 
@@ -351,7 +351,7 @@ def build_server(
             lambda: tools.get_moments(
                 source,
                 match_id=match_id,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
                 min_importance=min_importance,
                 limit=limit,
             ),
@@ -376,7 +376,7 @@ def build_server(
                 service,
                 match_id=match_id,
                 text=text,
-                as_of=as_of,
+                as_of=as_of_text(as_of),
             ),
             cost=VERIFY_COST,
         )

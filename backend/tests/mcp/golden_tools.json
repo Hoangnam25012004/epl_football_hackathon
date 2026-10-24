@@ -144,11 +144,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         }
       },
@@ -242,11 +245,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         }
       },
@@ -289,11 +295,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         },
         "min_importance": {
@@ -351,11 +360,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         }
       },
@@ -547,11 +559,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         }
       },
@@ -702,11 +717,14 @@
               "type": "string"
             },
             {
+              "type": "number"
+            },
+            {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Answer at this minute: \"63'\", \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
+          "description": "Answer at this minute: \"63'\" (or 63), \"45+2'\", \"HT\" or \"FT\"; empty for the latest event",
           "title": "As Of"
         }
       },
