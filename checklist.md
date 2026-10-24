@@ -202,24 +202,24 @@
 > Phần làm được khi chưa có Azure (MCP server, eval 100 claim, thử fallback, phiên riêng cho từng người xem, quét secret / tuân thủ, sửa lỗi và hướng dẫn demo): thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day6-design.md](docs/day6-design.md). Phần đo trên bản deploy chờ Azure.
 
 **Eval**
-- [ ] **P0** Mở rộng bộ eval lên 50–100 claim (cả 2–3 kịch bản)
-- [ ] **P0** Đo: tỷ lệ verdict đúng, tỷ lệ số liệu bịa (mục tiêu **0%**)
-- [ ] **P1** Eval chế độ "Người mới xem": giải thích đúng luật, kích hoạt đúng tình huống
-- [ ] **P0** Ghi kết quả eval vào README (bảng số liệu)
+- [x] **P0** Mở rộng bộ eval lên 50–100 claim (cả 2–3 kịch bản) (100 claim / 3 trận: 72 có nhãn, 28 held-out đóng băng trước khi sửa parser; nhãn dựa trên số đếm độc lập; **bảng nhãn chờ bạn duyệt** (M4))
+- [x] **P0** Đo: tỷ lệ verdict đúng, tỷ lệ số liệu bịa (mục tiêu **0%**) (mock: 96 % bộ có nhãn, 0 verdict sai, 0/274 số không nguồn, gate trong CI; Ollama `qwen2.5:3b`: 97 % bộ có nhãn, 0 verdict sai, held-out 75 %, 0/188 số không nguồn, sau bản sửa "cách đọc 'áp đảo' chỉ LLM đưa ra phải có từ áp đảo trong câu"; kiểm toán số độc lập với Guardrail)
+- [x] **P1** Eval chế độ "Người mới xem": giải thích đúng luật, kích hoạt đúng tình huống (4 trận trong CI, 4 × 3 ở `-m slow`; giải thích ngay ở dòng đầu cần luật 17/18, trường hợp còn lại đến ở dòng kế tiếp cùng phút)
+- [ ] **P0** Ghi kết quả eval vào README (bảng số liệu) (`docs/eval.md` tiếng Anh đã sẵn; chép vào README ở Ngày 7)
 
 **Độ trễ**
-- [ ] **P0** Đo trên bản deploy: event → talking point (< 3s), event → audio (< 5s)
-- [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS
+- [ ] **P0** Đo trên bản deploy: event → talking point (< 3s), event → audio (< 5s) (chờ Azure, tầng B)
+- [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS (chưa cần: số đo local đạt; song song agent đã có từ Ngày 3)
 
 **Ổn định & UI**
-- [ ] **P0** Thử tắt Foundry → fallback hoạt động, UI không crash
-- [ ] **P0** Sửa toàn bộ lỗi chặn demo
-- [ ] **P1** Đánh bóng UI: màu, font, responsive, trạng thái loading / lỗi
-- [ ] **P0** Kiểm tra bảo mật: không có secret trong repo / lịch sử git
-- [ ] **P1** Đóng gói Stats Tools thành **MCP server** read-only, demo gọi thử từ GitHub Copilot (điểm cộng cho tiêu chí Agentic)
-- [ ] **P1** Ghi lại cách đã dùng GitHub Copilot Agent Mode trong quá trình phát triển (hero technology)
+- [x] **P0** Thử tắt Foundry → fallback hoạt động, UI không crash (proxy bơm lỗi trước Ollama, cùng client với Foundry: C1–C13 13/13, 3 lượt liên tiếp; E2E `chaos` CH1–CH3; M6 tắt Ollama thật chờ bạn; Foundry thật ở tầng B)
+- [x] **P0** Sửa toàn bộ lỗi chặn demo (bug bash: 0 blocker / major còn mở; demo-run S1–S7 3/3 liên tiếp trên bản build production)
+- [x] **P1** Đánh bóng UI: màu, font, responsive, trạng thái loading / lỗi (hướng dẫn 3 bước, HelpDrawer, title, trạng thái panel, bố cục < 1280 px; 60 ảnh × axe)
+- [x] **P0** Kiểm tra bảo mật: không có secret trong repo / lịch sử git (scanner của mình trên lịch sử + working tree + build + `.env`, tuân thủ tên thật, gitleaks, job CI `security`)
+- [ ] **P1** Đóng gói Stats Tools thành **MCP server** read-only, demo gọi thử từ GitHub Copilot (điểm cộng cho tiêu chí Agentic) (MCP xong: stdio + `/mcp`, 9 tool; demo Copilot chờ M1)
+- [ ] **P1** Ghi lại cách đã dùng GitHub Copilot Agent Mode trong quá trình phát triển (hero technology) (`docs/copilot.md` có cấu hình và 6 câu; chỉ ghi việc đã làm thật, hiện chưa có)
 
-**Hoàn thành khi:** demo chạy trơn 3 lần liên tiếp trên URL public, không lỗi.
+**Hoàn thành khi:** demo chạy trơn 3 lần liên tiếp trên URL public, không lỗi. (Bản local: 3/3 trên bản build production; URL public chờ Azure.)
 
 ---
 
@@ -246,7 +246,7 @@
 - [ ] **P0** Upload **public** lên YouTube hoặc Vimeo
 
 **Nộp bài**
-- [ ] **P0** Repo public, link demo hoạt động, link video hoạt động
+- [ ] **P0** Repo public, link demo hoạt động, link video hoạt động (build UI với `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` để trang đầu có link thay cho "sắp có"; job CI `security` + gate eval xanh trước khi push public)
 - [ ] **P0** Link demo không cần đăng nhập (hoặc ghi tài khoản test trong testing instructions)
 - [ ] **P0** Chọn hạng mục: Grand Prize + **Best Multi-Agent System** (mỗi bài thắng tối đa 1 Grand + 1 Category)
 - [ ] **P0** Điền form nộp bài trên Innovation Studio, **nộp trước 22:00 giờ VN 27/10** (dư thời gian xử lý sự cố)

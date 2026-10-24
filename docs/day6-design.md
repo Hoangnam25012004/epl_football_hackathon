@@ -1063,3 +1063,112 @@ Chạy theo thứ tự. Mỗi pha có điều kiện qua; chưa qua thì sửa r
 | 9 | UI | ✅ Bug bash + trạng thái + hướng dẫn demo 3 bước cho giám khảo; không làm mới nhận diện |
 | 10 | Tài liệu nộp bài | ✅ `docs/eval.md`, `docs/mcp.md`, `docs/copilot.md` bằng tiếng Anh |
 | 11 | Commit | ✅ Commit local theo từng bước G1–G10, chưa push |
+
+---
+
+## 17. As-built (24/10/2026)
+
+### 17.1. Đã xây
+
+- **MCP (G1–G2):** `mcp_server/` (nguồn, tham số, output, tool, giới hạn, server). 9 tool chỉ đọc (`list_matches`, `list_metrics`, `list_players`, `get_scoreboard`, `get_stat`, `compare_stat`, `get_moments`, `get_events`, `verify_claim` chỉ dùng luật) + 2 resource + 2 prompt. stdio `pundit mcp`; `/mcp` trong `pundit serve` (Streamable HTTP, stateless, JSON, chỉ POST), kiểm host / origin, giới hạn tần suất theo client, body ≤ 64 KB. Đọc phiên live (ghim `as_of`) và phiên riêng theo mã (không liệt kê). `scripts/mcp_smoke.py`, `docs/mcp.md`, `.vscode/mcp.json` (chỉ trên máy).
+- **Eval (G3–G5):** 100 claim / 3 trận (72 có nhãn, 28 held-out đóng băng ở `5a56b3c`); `eval_oracle.py` đếm độc lập; bảng duyệt nhãn `evals/review/label-sheet.md`; harness: category / tag / checks, ma trận nhầm lẫn, nhóm, JSONL chạy tiếp được, so sánh hai lượt, Markdown / JSON, gate; `number_audit.py` độc lập với Guardrail; sửa parser theo luật tổng quát (`lexicon`, `timescope`, `analyst_rules`). Guardrail thêm `WRONG_RATIO`, `WRONG_MINUTE`. Cách đọc chỉ LLM đưa ra phải bám vào chữ của câu (phát biểu "áp đảo" cần một từ áp đảo). Eval với model thật dùng breaker không bao giờ mở. `docs/eval.md` giữ phần ghi tay sau dấu mốc khi sinh lại.
+- **Ổn định (G6):** `LLM_BREAKER_COOLDOWN_S`; `scripts/llm_chaos_proxy.py` (pass / hang / delay / http / filter / reset / garbage / empty / flaky, điều khiển qua `/_chaos`, cassette); `scripts/chaos_run.py` (C1–C13); project Playwright `chaos` (CH1–CH3).
+- **Phiên riêng (G7):** mã `scenario-seed~token`; trần `MAX_SESSIONS`, janitor, `PRIVATE_PER_IP`; 503 `demo_full` / 429 `too_many_sessions` kèm `Retry-After`; claim mang mã phiên; WS mã lạ: accept rồi đóng 4404. Trang đầu: "Bắt đầu trận demo của tôi", "Trận của tôi", ô phiên riêng theo kịch bản; chip phiên riêng ở Studio / Fan.
+- **Bảo mật (G8):** `tools/security/scan_secrets.py` (9 luật; lịch sử mọi ref, working tree, `frontend/out`, `.env` từng commit; che đoạn khớp; vân tay sha256; allowlist bắt buộc lý do và vân tay ≥ 16 ký tự hex), `scan_compliance.py` + `real_names.txt` (47 CLB, 18 tên ngắn, 54 sân, 219 cầu thủ, 30 HLV, 29 trọng tài; "Premier League" chỉ được nằm trong câu miễn trừ), `test_scanners.py` (35 test); job CI `security` (+ gitleaks) và bước gate eval mock trong job backend.
+- **UI (G9):** trang đầu theo §8.5 (giới thiệu, nút demo, 3 bước có link, địa chỉ MCP để chép, "Thử gì", "Trận của tôi", "Nâng cao" thu gọn, link mã nguồn / video lấy từ `NEXT_PUBLIC_REPO_URL` / `NEXT_PUBLIC_VIDEO_URL` lúc build); trang đầu theo ngôn ngữ trình duyệt; HelpDrawer ("?"); `<title>` từng trang; trạng thái panel (lỗi + thử lại, chưa đủ dữ liệu, hàng đợi talking point rỗng); `tests/e2e/demo.spec.ts` (S1–S7); project `shots` (`SHOTS=1`).
+- **Test bổ sung:** W9 `tests/eval/test_beginner_eval.py`; W11 tải 30 phiên / 10 có người xem.
+- **Commit (local, chưa push):** `feat(mcp): read-only match tools over the Stats Tools registry` · `feat(mcp): stdio and /mcp transports, live sessions, Copilot setup` · `test(eval): held-out claims (frozen)` · `test(eval): 52 labelled claims on three matches` · `feat(eval): categories, resumable runs, independent number audit` · `fix(claims): scorelines, VAR decisions, comparisons, first-half phrases` · `feat(security): secret and Official Rules scans, CI security job, eval gate` · `feat(resilience): fault-injection proxy, chaos runs and a chaos E2E project` · `fix(guardrail): ratio words and event minutes the facts do not give` · `feat(sessions): a private session per viewer, never stopping a watched one` · `fix(ui): the landing page hydrates in any language, and follows the browser's` · `feat(ui): a demo guide for judges, studio help, page titles, panel states` · `test(eval): beginner mode over whole matches, sessions under load` · `fix(studio): a latency p95 never above the slowest job; C8 meets a slow LLM` · `fix(claims): a dominance only the LLM read needs a dominance word` · `docs: Day 6 as-built, eval results, MCP and Copilot pages`.
+
+### 17.2. Khác biệt so với thiết kế và lý do
+
+| # | Chỗ | Thiết kế | As-built | Lý do |
+|---|---|---|---|---|
+| 1 | IP client sau proxy | Hop đầu của `X-Forwarded-For` | Hop **cuối** (do ingress thêm), chỉ khi `TRUST_PROXY=true` | Hop đầu do client tự ghi được: dùng nó thì vượt được giới hạn theo IP |
+| 2 | `/mcp` | GET / POST / DELETE | Stateless, chỉ POST; GET / DELETE trả `405 Allow: POST`; route mọi method để UI catch-all không trả 404 | GET ở chế độ stateless mở một luồng SSE không bao giờ đóng |
+| 3 | Session manager của SDK | Một lần | Tạo mới cho mỗi lifespan (`HttpEndpoint`) | `run()` của SDK chỉ gọi được một lần trên một instance; test mở nhiều app |
+| 4 | Held-out | Chỉ đo, không sửa | 3 verdict sai do held-out lộ ra được sửa như lỗi an toàn bằng luật tổng quát; lần đo đầu giữ trong `docs/eval.md` | Verdict sai làm bình luận viên nói sai trên sóng. Độ phủ held-out chỉ tăng 61 % → 64 %: không chỉnh để "phủ" held-out |
+| 5 | Guardrail | Luật Ngày 2–3 | Thêm `WRONG_RATIO` (từ chỉ tỷ lệ phải khớp tỷ số hai fact ±10 %, cận dưới phải đúng) và `WRONG_MINUTE` (model chỉ được nói sự việc xảy ra ở phút của một event đứng sau fact) | Kiểm toán số bắt được trên lượt Ollama: "twice as many" cho 15–1 (e06), "phút 90+6" cho quyết định VAR ở phút 36 (ch02) |
+| 6 | Breaker khi eval | Như app | Model thật: breaker không bao giờ mở (`EVAL_THRESHOLD`) | Lượt Ollama đầu: máy bận, timeout làm breaker mở, 22 claim thành `circuit_open` (đo luật chứ không đo model) |
+| 7 | Proxy `empty` | `invalid_output` | Lỗi gọi model (`error`) | Không có choice nào là lỗi của provider, không phải output sai định dạng |
+| 8 | Ma trận studio (C8 / C10) | Cooldown 10 s | Breaker studio / recap đặt lại mặc định 60 s trong ma trận studio | Cooldown 10 s làm studio thử lại model lỗi quá thường: lag p95 3,37 s > 3 s |
+| 9 | W9 người mới xem | Test + `pundit eval --beginner` | Chỉ test (4 trận trong CI, 4 × 3 với `-m slow`); số liệu ở §17.3 | Bảng số lấy từ test là đủ cho as-built; thêm lệnh CLI không thêm kiểm tra nào |
+| 10 | Kiểm toán output studio (P1 §4.8) | `pundit audit-studio` | Chưa làm | Cắt theo §12 (mục 2). Template studio đã có oracle 4 × 3 trận từ Ngày 3; output model của studio vẫn qua Guardrail studio |
+| 11 | Trang đầu | Danh sách kịch bản chuyển xuống "Nâng cao" | `<details>` thu gọn; mỗi bước mở trận riêng mới nhất của người xem (tự bắt đầu cho Fan / Overlay) hoặc tạo mới | Giám khảo thấy ngay 3 bước; Fan / Overlay không có nút Play |
+| 12 | Ngôn ngữ trang đầu | Theo trình duyệt | `defaultLang="browser"`; provider đọc ngôn ngữ qua `useSyncExternalStore` | Trang đầu được prerender: đọc thẳng localStorage lúc hydrate gây lỗi React 418 |
+| 13 | Báo cáo quét secret | Commit chứa blob | Commit **đưa** blob vào lịch sử (cũ nhất có blob trong diff) | Commit mới nhất thường là commit xoá nó |
+| 14 | `docs/eval.md` | Sinh lại toàn bộ | Giữ nguyên mọi thứ sau dấu `<!-- Notes written by hand … -->` | Phần ghi tay (lần đo đầu, giới hạn) không bị mất khi chạy lại |
+| 15 | Bộ chụp ảnh | Project `shots` | Chỉ có khi `SHOTS=1`; thêm axe ở 1366 cho 5 trang × 2 theme × 2 ngôn ngữ và kiểm panel Studio không chồng nhau | Không chạy mặc định trên CI; W13 cần axe theo theme / ngôn ngữ |
+| 16 | C8 / C10 trong `chaos_run.py` | Đọc lag p95 của phiên | Mỗi ca đo cửa sổ của riêng nó; C8 bắt đầu với breaker studio đóng và kéo dài 10 phút trận | Trước đó C8 chạy khi breaker đã mở từ C10 (cooldown 60 s), nên chỉ đo "breaker mở" chứ không đo "model chậm hơn ngân sách" |
+| 17 | p95 độ trễ (studio, Narrator, báo cáo studio offline) | `statistics.quantiles` mặc định | `pundit.domain.percentiles.p95` (nội suy `inclusive`) | Mặc định `exclusive` ngoại suy vượt giá trị lớn nhất khi mẫu nhỏ (§17.4 dòng 13) |
+| 18 | Luật không đọc được claim | Dùng spec của LLM | Spec chỉ LLM đưa ra chỉ được dùng khi chữ của câu nói nó: phát biểu "áp đảo" cần một từ áp đảo của lexicon (VI hoặc EN); không có thì từ chối như luật, cờ `analyst_disagreement`, lý do trong span RuleAnalyst | Lượt Ollama đầu: 2 verdict sai (rh01, rh02). Giá phải trả: h10 (model đọc đúng nhưng câu không có từ áp đảo) bị từ chối |
+
+### 17.3. Kết quả kiểm thử theo §11
+
+| Pha | Kết quả |
+|---|---|
+| **W1. Gate tĩnh** | Backend `ruff check .`, `ruff format --check .` (261 file), `mypy` (140 file): **sạch**. Frontend `npm run check`: **sạch** |
+| **W2. Hồi quy backend** | `pytest -m "not live" --cov=pundit` (gồm slow; test perf tự bỏ qua khi đo coverage): **2627 passed, 13 skipped, 0 failed** (23 phút 51 giây). Coverage tổng **95 %**; `mcp_server/*` 98–100 %, `number_audit` 97 %, `eval_oracle` 99 %. Chạy lại `tests/api`, `tests/mcp`, `tests/cli` với `TTS_PROVIDER=off`: **536 passed**; với `MCP_ENABLED=false`: **536 passed**. Lượt chạy riêng không coverage trước đó: 2562 passed, 1 failed là test hiệu năng dao động nêu dưới bảng |
+| **W3. MCP hợp đồng + oracle** | `pytest tests/mcp`: xanh (snapshot `tools/list`, oracle mọi chỉ số, `verify_claim` = `ClaimService` trên 100 claim) |
+| **W4. MCP transport** | `scripts/mcp_smoke.py`: **16/16 PASS** (stdio 9 tool, `verify_claim` tiếng Việt, tỷ số giờ nghỉ; HTTP `/mcp` và `/mcp/`, 20 lời gọi song song lúc replay 1000x không lỗi, mọi câu trả lời khớp registry tại `as_of`, phiên live trong `list_matches`, claim qua MCP không được đăng, Host lạ 421, Origin lạ 403, GET 405, giới hạn tần suất, `/healthz` đếm lời gọi; không task treo, không lỗi log). Đọc phiên riêng theo mã: test `test_mcp_reads_a_private_session_it_does_not_list` |
+| **W5. MCP client thật** | Chờ M1 (bạn chạy Copilot Agent Mode); `docs/copilot.md` có sẵn cấu hình và 6 câu, cột kết quả "not run yet" |
+| **W6. Eval mock** | `pundit eval --min-accuracy 0.85`: bộ có nhãn **96 % (69/72)**, verdict sai **0**, held-out **64 % (18/28)**, câu injection bị chấm TRUE 0, chữ bị chặn mà vẫn đăng 0, fact lệch 0, 274 con số trong lời giải thích đã đăng, **0 không có nguồn**; p50 / p95 16 / 33 ms; **PASSED** (khoảng 5 s, cũng là bước gate trong CI). Lần đo đầu trước khi sửa parser: 75 % (54/72), 4 sai, held-out 61 % (`docs/eval.md`) |
+| **W7. Eval Ollama** | `qwen2.5:3b`, 100 claim, chạy nền khoảng 70 phút sau một claim làm nóng (analyst 82 s lúc nguội). **Lượt đầu (`047d090`): 97 % (70/72), 2 verdict sai, held-out 86 %.** Hai verdict sai đều là held-out mà luật không đọc được: model đọc "Mười người Kestrel không giữ nổi lợi thế" (rh01) và "Kestrel phải chơi thiếu người từ đầu hiệp hai" (rh02) thành "Kestrel áp đảo", hệ thống dùng nguyên cách đọc đó → FALSE cho hai câu đúng. Sửa bằng luật tổng quát (§17.2 dòng 18), chạy lại đúng 3 claim chịu ảnh hưởng (h10, rh01, rh02) ở `59f72ec`. **Sau sửa: bộ có nhãn 97 % (70/72, ≥ mock), 0 verdict sai, held-out 75 % (21/28, ≥ mock), model không khả dụng 0, câu trả lời không dùng được 23, bản nháp bị Guardrail chặn 40, chữ bị chặn mà vẫn đăng 0, fact lệch 0, injection TRUE 0; p50 / p95 36 / 69 s; PASSED.** So với mock: 4 claim held-out mock từ chối mà Ollama đúng (s16, ch03, ch05, rh06), không claim nào hai bên khác verdict theo kiểu sai |
+| **W8. Kiểm toán số** | Mock: 274 con số trong lời giải thích đã đăng, **0 không có nguồn**. Ollama (sau sửa): 188 con số, **0 không có nguồn**, 0 cần xem tay (lượt Ollama trước khi có `WRONG_RATIO` / `WRONG_MINUTE` có 2). Kiểm toán output studio (P1 §4.8) chưa làm (§17.2 dòng 10). M5: `backend/evals/review/ollama-explanations.md` (20 / 65 câu giải thích của model) chờ bạn đọc |
+| **W9. Người mới xem** | 4 trận (CI) + 4 × 3 (`-m slow`): mỗi luật giải thích đầy đủ đúng một lần mỗi người xem; phạt đền / thẻ đỏ / thẻ vàng thứ hai sau đó chỉ bản ngắn; luật luôn khớp một event của trigger (bảng độc lập: việt vị ↔ `offside` hoặc VAR vì việt vị, VAR ↔ `var_check`…); đúng ngôn ngữ; hồ sơ không bật thì không có lời giải thích. Độ phủ "giải thích ngay ở dòng đầu cần luật": **17/18 (94 %)**, dưới mốc 95 %. Trường hợp còn lại: bàn bị VAR huỷ vì việt vị (`comeback_var-7`, 36') được giải thích "việt vị" (đứng trước trong `RULE_PRIORITY`), "VAR" đến ở dòng kế tiếp cùng phút. Mỗi dòng một luật là thiết kế của Ngày 3; test kiểm mọi trường hợp lệch đều là kiểu này và luật nào cũng được giải thích |
+| **W10. Fallback** | Cassette ghi bằng Ollama (16 mục; claim đầu 228 s vì model nguội). `chaos_run.py`: **13/13 PASS** + không task treo + không ERROR ngoài dự kiến, **3 lượt liên tiếp**. Số đo lượt cuối: C1 12,0 s trong ngân sách 12 s; C2 claim kế tiếp 28 ms; C3 2 request cho một claim; C9 20 claim, 0 khác luật; C10 lag p95 1051 ms trên 15 job (job tệ nhất 2562 ms là job chờ breaker mở), `n` liên tục; C8 (breaker đóng lúc bắt đầu, `delay:4`) lag p95 2467 ms trên 7 job, 2 job dùng template; C11 recap H1 từ template; C12 half-open rồi đóng, `analyst_source: llm` trở lại; C13 33 ms. Playwright `chaos` CH1–CH3: xanh. M6 (tắt Ollama thật giữa trận) chờ bạn |
+| **W11. Phiên riêng** | `test_private_sessions.py` (gồm state machine hypothesis và tải 30 phiên / 10 có người xem, trần 16: phiên có người xem không bao giờ bị huỷ, 503 đúng lúc 16 phiên đều có người xem): xanh. Playwright P1–P3: xanh |
+| **W12. Quét** | `scan_secrets.py --history --worktree --build`: 3 phát hiện, cả 3 là khoá giả của test đã allowlist có lý do (`sk-offline-test-key-123` và bản cũ `ghp_offline_test_token_123`). `scan_compliance.py`: 0 lỗi, 1 cảnh báo đã xem: "Dominic Shaw-Reid" trùng họ "Shaw" với một cầu thủ thật, là tên hư cấu có hai họ, giữ nguyên. Comment "calibrated against EPL-like ranges" của generator được sửa thành "typical top-flight ranges" (các dải là khoảng điển hình, không phải dữ liệu thật). gitleaks 8.30.1 local (`gitleaks git --log-opts=--all`): **59 commit, no leaks found**. Lưu ý: chạy app bằng Python gốc chỉ với `PYTHONPATH` (không xử lý file `.pth`) thì SDK MCP không import được (`pywintypes`); app vẫn chạy và tự tắt MCP, `/healthz` báo `mcp.enabled: false` |
+| **W13. Frontend** | Vitest: **178/178** (19 file; dưới tải của Ollama một test hiển thị dài vượt timeout 5 s, máy rảnh thì qua). Playwright mọi project: **42/42** (`e2e` 27 gồm demo, P1–P3; `mock`; `chaos` CH1–CH3), 10,2 phút. Bộ chụp ảnh **60/60** (axe 0 serious / critical ở 1366 × 5 trang × 2 theme × 2 ngôn ngữ; không tràn ngang; không panel chồng nhau). Ngân sách JS: overlay 151,9 KB / 160, studio 169,4, fan 164,3, compare 157,0, landing 154,4 KB / 300 |
+| **W14. Bug bash + demo-run** | `demo.spec.ts --repeat-each=3`: **3/3 xanh liên tiếp** (2,2 phút). Bug bash ngoài các spec: mạng 3G giả lập (400 kbps, 400 ms): trang đầu rồi Studio của phiên riêng tải được, 0 lỗi; backend tắt giữa trận → banner "đang kết nối lại" → bật lại → tạo lại phiên đúng mã, 0 lỗi khác; reload giữa trận: trận vẫn chạy, event đủ, 0 lỗi. 0 blocker / major còn mở |
+| **W15. Ghi kết quả** | Mục này; `docs/eval.md`, `docs/mcp.md`, `docs/copilot.md` (tiếng Anh); `checklist.md`; `claude.md`; commit local |
+
+Test hiệu năng `test_job_latency_p95` (Ngày 3) dao động quanh ngân sách: job chỉ có bình luận p95 49–64 ms so với 60 ms. Đo xen kẽ trên code Ngày 5 (`e11bbd2`) cho cùng phân bố (55,9–64,2 ms), nên không phải hồi quy của Ngày 6; một phần đuôi là GC (gọi `gc.collect()` trước mỗi job còn 49–54 ms). Giữ nguyên ngân sách.
+
+### 17.4. Lỗi tìm thấy khi kiểm thử và cách sửa
+
+| # | Lỗi | Tìm bằng | Sửa |
+|---|---|---|---|
+| 1 | Trang đầu ở tiếng Việt log React error 418 (hydrate lệch chữ). Có từ Ngày 4 | Script kiểm hydration (Playwright) | Provider đọc ngôn ngữ qua `useSyncExternalStore`; Vitest prerender như bản build rồi hydrate |
+| 2 | WS mã trận lạ bị đóng trước `accept`: thành HTTP 403, trình duyệt thấy 1006 và kết nối lại mãi. Có từ Ngày 4 | E2E P3 | Accept rồi đóng 4404 |
+| 3 | Kết quả claim của phiên riêng mang mã dữ liệu thay vì mã phiên | Test API G7 | `match_id` lấy từ request |
+| 4 | Dưới 1280 px các panel Studio chồng lên nhau; header đẩy nhãn Synthetic data ra ngoài màn hình (390 px) | Bộ chụp ảnh | Chiều cao riêng cho từng panel dưới `xl`; nav xuống dòng; ảnh kiểm panel không chồng |
+| 5 | Momentum / Stats / drawer kẹt "Đang tải…" sau một request lỗi khi trận đã hết | Kiểm kê trạng thái §8.4 | `LoadFailed` + thử lại; "chưa đủ dữ liệu"; hàng đợi rỗng nói khi nào có gợi ý |
+| 6 | Khung debug của overlay cuộn được nhưng bàn phím không tới (axe serious) | Axe trong bộ chụp ảnh | `tabIndex` + `aria-label` |
+| 7 | Phiên vừa tạo có thể rơi khỏi "Trận của tôi" 5 s nếu lúc đó đang làm mới, bước tiếp theo tạo thêm phiên | Viết test các bước | Phiên mới vào danh sách ngay; lần làm mới giữ phiên tạo trong lúc nó chạy |
+| 8 | 22 claim của lượt Ollama đầu thành `circuit_open` | Log lượt chạy | Breaker không mở khi eval với model thật (§17.2 dòng 6) |
+| 9 | "twice as many" cho 15–1 và "phút 90+6" cho quyết định ở phút 36 lọt Guardrail | Kiểm toán số | `WRONG_RATIO`, `WRONG_MINUTE` (§17.2 dòng 5) |
+| 10 | Lag studio p95 3,37 s ở C8 / C10 | `chaos_run.py` | Cooldown mặc định cho studio trong ma trận (§17.2 dòng 8) |
+| 11 | `prettier --check` hỏng vì `frontend/.data/` (kho audio của backend E2E) | `npm run check` | `.data/` vào `.prettierignore` |
+| 12 | Comment "EPL-like ranges" trong mã sản phẩm | `scan_compliance.py` | Sửa câu chữ |
+| 13 | Lag p95 của studio (thông tin phiên, `/healthz`) có thể lớn hơn mọi lag đo được: 15 job, tệ nhất 2562 ms, "p95" 2995 ms (một lượt khác 3,4 s, làm C10 hỏng) | C10 hỏng rồi qua sát nút; in chi tiết lag của phiên | `p95` dùng chung, nội suy trong khoảng dữ liệu; test cả ca này và property "luôn trong khoảng đo" |
+| 14 | `chaos_run.py --record` hết giờ: client HTTP chờ 120 s, claim đầu với model nguội cần 228 s | Lần ghi cassette đầu | Client chờ bằng ngân sách ghi + 60 s |
+| 15 | C8 không đo đúng điều nó tên (xem §17.2 dòng 16) | Đọc chi tiết C8: 2 job, cả hai `circuit_open` | Breaker đóng lúc bắt đầu C8, cửa sổ 10 phút |
+| 16 | Hai claim đúng bị chấm FALSE vì model đọc thành "áp đảo" dù câu không nói | Eval Ollama (held-out rh01, rh02) | §17.2 dòng 18; test bằng câu riêng (không lấy từ eval) với analyst giả luôn đọc "áp đảo" |
+
+### 17.5. Cách chạy
+
+```
+uv run --project backend pundit mcp                       # MCP stdio
+uv run --project backend pundit serve --ui frontend/out   # app + /mcp
+uv run --project backend pundit eval --min-accuracy 0.85  # gate (mock)
+uv run --project backend pundit eval --provider ollama --out backend/evals/runs/<ngày>-ollama.jsonl --resume
+uv run --project backend pundit eval --from <mock.jsonl> --from <ollama.jsonl> --markdown docs/eval.md
+uv run --project backend python scripts/chaos_run.py [--record]
+python tools/security/scan_secrets.py --history --worktree --build
+python tools/security/scan_compliance.py
+cd frontend && npx playwright test tests/e2e/demo.spec.ts --repeat-each=3
+cd frontend && SHOTS=1 npx playwright test --project=shots   # test-results/shots/index.html
+```
+
+Bản build cho bài nộp đặt `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` (chỉ nhận `https://`); thiếu thì trang đầu ghi "sắp có".
+
+### 17.6. Nghiệm thu thủ công còn lại (của bạn)
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| M1 | Copilot Agent Mode với `/mcp`: 6 câu ở §3.8, chụp tool call, điền cột kết quả `docs/copilot.md` | Chờ bạn |
+| M3 | MCP Inspector: duyệt tool / resource / prompt, thử 3 lỗi | Chờ bạn |
+| M4 | Duyệt bảng nhãn `backend/evals/review/label-sheet.md` (gate G3) | Chờ bạn |
+| M5 | Đọc 20 câu giải thích của LLM trong lượt Ollama | Chờ bạn |
+| M6 | Tắt Ollama thật giữa trận (§5.6) | Chờ bạn |
+| M7–M10 | Hai trình duyệt; kịch bản §8.1 10 phút; 390 × 844 trên điện thoại; xem `test-results/shots/index.html` | Chờ bạn (M7 đã có E2E P1, M10 đã có bảng ảnh) |

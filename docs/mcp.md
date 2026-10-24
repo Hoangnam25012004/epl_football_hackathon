@@ -24,6 +24,11 @@ with the same registry of 33 metrics.
 
 `pundit mcp --http --port 8001` serves the HTTP endpoint on its own, with generated matches only.
 
+**Private sessions.** Each viewer of the demo can start a private session of their own, with an id
+such as `dominant_loser-42~k3v9x2ma`. `list_matches` never lists them, but every tool reads one
+when it is given its id (from the studio's address bar), so an assistant can follow the very match
+its user is watching.
+
 The HTTP transport is **stateless with JSON responses**. The tools never send notifications,
 so the server keeps no MCP session in memory, and any replica can answer any request. Only `POST`
 is served: `GET` and `DELETE` get `405 Allow: POST`, the protocol's answer for "no event stream
