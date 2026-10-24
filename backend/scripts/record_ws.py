@@ -13,7 +13,9 @@ tested with the long texts of a real model.
 
 Every line is a WsMessage exactly as the server sends it. Day 5: the profile with a voice
 (`...-female`) is read by the mock narrator (temporary stores, no speed limit), so its
-commentary and recaps carry `speech` (docs/day5-design.md section 12.5).
+commentary and recaps carry `speech` (docs/day5-design.md section 12.5). Day 6: fixture A
+also writes what GET /timeline and GET /stats answer at full time (`rest/`), for the
+screenshot set.
 """
 
 import argparse
@@ -24,6 +26,8 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel
 
 from pundit.agents.context import build_match_context
 from pundit.agents.contracts import (
@@ -39,6 +43,7 @@ from pundit.agents.personalize import render_commentary, render_lower_third, ren
 from pundit.api.app import default_crew
 from pundit.api.hub import Client
 from pundit.api.onair import OnAirCommand
+from pundit.api.panels import Period
 from pundit.api.sessions import MatchSession, public_talking_point
 from pundit.domain.log import LogView
 from pundit.engine.generator import generate
@@ -49,6 +54,9 @@ from pundit.speech.narrator import Narrator, build_narrator
 
 PROFILES: dict[str, Profile] = {
     "analyst-en": Profile(mode="analyst", language="en"),
+    # Day 6: the studio and the overlay in Vietnamese connect as an analyst in Vietnamese (the
+    # screenshot set shows them with this stream)
+    "analyst-vi": Profile(mode="analyst", language="vi"),
     "casual-vi-beginner-har": Profile(
         mode="casual", language="vi", team="harbor_lions", beginner=True
     ),
@@ -57,12 +65,19 @@ PROFILES: dict[str, Profile] = {
     ),
 }
 JOIN_AT = 0.6  # a client that joins at 60 % of the events (its hello), in the second half
+TIMELINE_WINDOW = 10.0  # minutes: the default of GET /timeline, as the studio calls it
+PERIODS: tuple[Period, ...] = ("FULL", "H1", "H2")
 
 
 def _write(path: Path, messages: list[WsMessage]) -> None:
     text = "".join(message.model_dump_json() + "\n" for message in messages)
     path.write_bytes(text.encode("utf-8"))
     print(f"wrote {path} ({len(messages)} messages)")
+
+
+def _write_answer(path: Path, answer: BaseModel) -> None:
+    path.write_bytes(answer.model_dump_json().encode("utf-8"))
+    print(f"wrote {path}")
 
 
 def _drain(client: Client) -> list[WsMessage]:
@@ -119,6 +134,11 @@ async def _record_session(
     for name, client in clients.items():
         _write(out / f"{match_id}.{name}.jsonl", [hellos[name], *_drain(client)])
     _write(out / f"{match_id}.late-hello.analyst-en.jsonl", [late_hello])
+    rest = out / "rest"
+    rest.mkdir(exist_ok=True)
+    _write_answer(rest / f"timeline.{match_id}.json", live.timeline(TIMELINE_WINDOW))
+    for period in PERIODS:
+        _write_answer(rest / f"stats.{match_id}.{period}.json", live.stats(period))
     await live.stop()
 
 

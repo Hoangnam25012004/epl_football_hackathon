@@ -18,6 +18,7 @@ function validatorFor(type: string) {
 
 const NAMES: FixtureName[] = [
   "dominant_loser-42.analyst-en",
+  "dominant_loser-42.analyst-vi",
   "dominant_loser-42.casual-vi-beginner-har",
   "dominant_loser-42.casual-vi-beginner-har-female",
   "dominant_loser-42.late-hello.analyst-en",
@@ -42,6 +43,27 @@ describe("recorded REST answers of the mock E2E follow their schema", () => {
       expect(Array.isArray(body) && body.length > 0).toBe(true);
       for (const item of body)
         expect(validate(item), JSON.stringify(validate.errors?.[0])).toBe(true);
+    });
+  }
+});
+
+describe("Day 6: the recorded panels of the screenshot set follow their schema", () => {
+  const cases = [
+    ["timeline.dominant_loser-42.json", "timeline.schema.json"],
+    ["stats.dominant_loser-42.FULL.json", "stats_panel.schema.json"],
+    ["stats.dominant_loser-42.H1.json", "stats_panel.schema.json"],
+    ["stats.dominant_loser-42.H2.json", "stats_panel.schema.json"],
+  ] as const;
+  for (const [file, schemaFile] of cases) {
+    it(file, () => {
+      const ajv = new Ajv2020({ strict: false });
+      addFormats(ajv);
+      const schema = JSON.parse(readFileSync(join(schemaDir, schemaFile), "utf8"));
+      const validate = ajv.compile(schema);
+      const body = JSON.parse(
+        readFileSync(join(__dirname, "..", "fixtures", "rest", file), "utf8"),
+      );
+      expect(validate(body), JSON.stringify(validate.errors?.[0])).toBe(true);
     });
   }
 });

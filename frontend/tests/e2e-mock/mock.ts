@@ -10,6 +10,7 @@ import { fixture } from "../fixtures";
 
 export const MATCH = "dominant_loser-42";
 export const analyst = fixture("dominant_loser-42.analyst-en");
+export const analystVi = fixture("dominant_loser-42.analyst-vi");
 export const casual = fixture("dominant_loser-42.casual-vi-beginner-har");
 export const lateHello = fixture("dominant_loser-42.late-hello.analyst-en");
 type Hello = Extract<AnyWsMessage, { type: "hello" }>;

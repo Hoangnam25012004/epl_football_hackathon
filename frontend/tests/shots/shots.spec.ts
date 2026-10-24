@@ -4,13 +4,27 @@
 // streams of the `mock` project (deterministic). Writes test-results/shots/<page>-<width>-
 // <theme>-<lang>.png and an index.html that lays them out in a table, for a look by eye. At
 // 1366×768 (a judge's laptop) every page × theme × language also passes axe (W13).
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+// The momentum timeline and the match stats are answered as the real backend answers them at
+// full time (tests/fixtures/rest, same match and seed as the streams), and a page is shot once
+// the event feed names the players: the shots show what a viewer sees.
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { seriousA11y } from "../e2e/helpers";
-import { analyst, casual, MATCH, mockRest, mockSocket, play, watchErrors } from "../e2e-mock/mock";
+import {
+  analyst,
+  analystVi,
+  casual,
+  MATCH,
+  mockRest,
+  mockSocket,
+  play,
+  watchErrors,
+} from "../e2e-mock/mock";
 
 const OUT = join(__dirname, "..", "..", "test-results", "shots");
+const REST = join(__dirname, "..", "fixtures", "rest");
+const recorded = (name: string): unknown => JSON.parse(readFileSync(join(REST, name), "utf8"));
 const SIZES = [
   { width: 1920, height: 1080 },
   { width: 1366, height: 768 },
@@ -63,11 +77,34 @@ async function prepare(page: Page, name: string, lang: Lang): Promise<void> {
       }),
     ] as const,
   );
+  // the studio's preview replays the lower-third queue, a card every few seconds: with every
+  // animation at its end state, axe and the screenshot never catch a card half faded in
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent =
+      "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;" +
+      "transition-duration:0s!important;transition-delay:0s!important}";
+    document.addEventListener("DOMContentLoaded", () => document.head.append(style));
+  });
   await mockRest(page);
-  await page.route("**/healthz", (route) => route.fulfill({ json: HEALTH })); // runs first
+  // later routes run first: these answer before mockRest's empty timeline and stats
+  await page.route("**/healthz", (route) => route.fulfill({ json: HEALTH }));
+  await page.route(
+    (url) => url.pathname === `/matches/${MATCH}/timeline`,
+    (route) => route.fulfill({ json: recorded(`timeline.${MATCH}.json`) }),
+  );
+  await page.route(
+    (url) => url.pathname === `/matches/${MATCH}/stats`,
+    (route) => {
+      const period = new URL(route.request().url()).searchParams.get("period") ?? "FULL";
+      return route.fulfill({ json: recorded(`stats.${MATCH}.${period}.json`) });
+    },
+  );
   await mockSocket(page, ({ ws, query }) => {
-    // the casual VI stream for a casual viewer (fan VI, the compare page's right side)
-    play(ws, query.get("mode") === "casual" ? casual : analyst);
+    // the casual VI stream for a casual viewer (fan VI, the compare page's right side); the
+    // studio and the overlay connect as an analyst in their own language
+    if (query.get("mode") === "casual") play(ws, casual);
+    else play(ws, query.get("lang") === "vi" ? analystVi : analyst);
   });
   if (name === "landing") {
     await page.addInitScript(() => {
@@ -93,6 +130,12 @@ for (const [name, shotOf] of Object.entries(PAGES)) {
           const shot = shotOf(lang);
           await page.goto(shot.path);
           await expect(page.getByTestId(shot.ready).first()).toBeVisible();
+          if (name === "studio") {
+            // the squads and the panels have loaded: names, not player ids; a chart; stats rows
+            await expect(page.getByTestId("event-feed")).not.toContainText(/[a-z]+_[a-z]+-\d/);
+            await expect(page.getByTestId("momentum-timeline")).toBeVisible();
+            await expect(page.getByTestId("stats-row").first()).toBeVisible();
+          }
           await page.waitForFunction(() =>
             document.getAnimations().every((animation) => animation.playState !== "running"),
           );
