@@ -1,0 +1,12 @@
+# gitleaks (local runs and the CI `security` job): the default rules, plus the public values
+# they mistake for secrets. Each entry is an exact value with the reason it is public.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public identifiers, not secrets"
+regexes = [
+  # Azure built-in role "Key Vault Secrets User" (infra/resources.bicep): a role definition id
+  # Microsoft publishes for every tenant; the generic-api-key rule reads "Secrets" in its name
+  '''^4633458b-17de-408a-b874-0445c86b69e6$''',
+]
