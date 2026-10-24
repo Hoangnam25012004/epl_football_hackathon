@@ -26,6 +26,7 @@ from pundit.agents.contracts import (
     ClaimRequest,
     ClaimResult,
     CommentaryView,
+    Fact,
     FactView,
     LowerThird,
     LowerThirdView,
@@ -81,10 +82,11 @@ from pundit.orchestration.evaluation import (
     seq_at,
     with_notes,
 )
+from pundit.orchestration.number_audit import audit_studio
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.resilience import CircuitBreaker
 from pundit.orchestration.service import ClaimService, StaticSource
-from pundit.orchestration.studio_eval import build_report, run_offline
+from pundit.orchestration.studio_eval import OfflineRun, build_report, pack_of, run_offline
 from pundit.orchestration.studio_service import StudioService
 from pundit.state.match_state import MatchState
 from pundit.stats import REGISTRY, MetricParams, StatResult, compute, display
@@ -671,8 +673,9 @@ def _cmd_studio(args: argparse.Namespace) -> int:
     finally:
         if out is not None:
             out.close()
+    audit_failed = args.audit and _print_studio_audit(run)
     if not args.report:
-        return 0
+        return 1 if audit_failed else 0
     report = build_report(run)
     print()
     for line in report.lines():
@@ -681,7 +684,31 @@ def _cmd_studio(args: argparse.Namespace) -> int:
     for failure in failures:
         print(f"FAIL        {failure}")
     print("PASSED" if not failures else "FAILED")
-    return 0 if not failures else 1
+    return 0 if not failures and not audit_failed else 1
+
+
+def _print_studio_audit(run: OfflineRun) -> bool:
+    """The independent numbers audit of the model texts of a studio run; True when a number
+    has no source."""
+
+    def pack_facts(trigger: Trigger) -> tuple[list[Fact], list[float]]:
+        pack = pack_of(trigger, run.view_at(trigger.seq))
+        return list(pack.facts), list(pack.window_numbers)
+
+    recaps = [(revisions[-1], run.recap_packs[scope]) for scope, revisions in run.recaps.items()]
+    audit = audit_studio(
+        zip(run.triggers, run.outputs, strict=True), recaps, run.view_at, pack_facts
+    )
+    print()
+    print(
+        f"audit       {audit.texts} model texts published, {audit.numbers} numbers, "
+        f"{len(audit.unsourced)} with no source, {len(audit.manual)} to read by hand"
+    )
+    for item, found, text in audit.unsourced:
+        print(f"  unsourced {item}: {found.text!r} in {text!r}")
+    for item, found, text in audit.manual:
+        print(f"  to read   {item}: {found.text!r} in {text!r}")
+    return bool(audit.unsourced)
 
 
 def _cmd_recap(args: argparse.Namespace) -> int:
@@ -1064,6 +1091,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--json", help="write every item and trace to this JSONL file")
     p.add_argument("--report", action="store_true", help="print the evaluation report")
+    p.add_argument(
+        "--audit",
+        action="store_true",
+        help="audit the numbers of every published model text (docs/day6-design.md 4.8)",
+    )
     p.add_argument("--quiet", action="store_true", help="do not print the items")
     p.set_defaults(func=_cmd_studio)
 

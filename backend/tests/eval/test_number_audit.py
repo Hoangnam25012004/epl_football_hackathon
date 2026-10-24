@@ -133,3 +133,39 @@ def test_the_audit_shares_no_code_with_the_guardrail() -> None:
     banned = {"pundit.agents.numbers", "pundit.agents.guardrail", "pundit.agents.studio_guard",
               "pundit.speech.guard"}  # fmt: skip
     assert not imported & banned
+
+
+# ------------------------------------------------------------- studio (docs/day6-design.md 4.8)
+
+
+def test_a_minute_written_in_words_keeps_its_added_time() -> None:
+    """ "Phút 45+2:" was read as minute 45 alone."""
+    assert [f.text for f in extract("Phút 45+2: cơ hội lớn") if f.kind == "minute"] == ["45+2'"]
+    assert [f.text for f in extract("Minute 90+3, a save") if f.kind == "minute"] == ["90+3'"]
+    assert [f.text for f in extract("Phút 60: Harbor có 9 cú sút") if f.kind == "minute"] == ["60'"]
+
+
+def test_the_studio_audit_finds_an_invented_number() -> None:
+    from studio_helpers import offline
+
+    from pundit.orchestration.number_audit import audit_studio
+    from pundit.orchestration.studio_eval import pack_of
+
+    run = offline("comeback_var", 7)
+
+    def pack_facts(trigger):  # type: ignore[no-untyped-def]
+        pack = pack_of(trigger, run.view_at(trigger.seq))
+        return list(pack.facts), list(pack.window_numbers)
+
+    pairs = list(zip(run.triggers, run.outputs, strict=True))
+    recaps = [(revisions[-1], run.recap_packs[scope]) for scope, revisions in run.recaps.items()]
+    clean = audit_studio(pairs, recaps, run.view_at, pack_facts)
+    assert clean.texts > 100 and clean.numbers > 100 and clean.unsourced == []
+    # one commentary line made to say a number no fact gives
+    index = next(i for i, (_, o) in enumerate(pairs) if o.commentary.texts[0].source == "llm")
+    trigger, output = pairs[index]
+    first = output.commentary.texts[0].model_copy(update={"text": "Ironvale đã có 99 cú sút."})
+    item = output.commentary.model_copy(update={"texts": (first, *output.commentary.texts[1:])})
+    pairs[index] = (trigger, output.model_copy(update={"commentary": item}))
+    doctored = audit_studio(pairs, recaps, run.view_at, pack_facts)
+    assert [(i, f.text) for i, f, _ in doctored.unsourced] == [(item.id, "99")]
