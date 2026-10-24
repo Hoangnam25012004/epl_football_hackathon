@@ -119,6 +119,29 @@ def test_a_watched_session_is_never_stopped_to_make_room() -> None:
     assert set(sessions.sessions) == {a.key, b.key}
 
 
+def test_thirty_viewers_ten_of_them_watching() -> None:
+    """W11 load: 30 viewers each make a private session and 10 watch theirs (cap 16). Room is
+    always made with an unwatched one; once all 16 are watched, the next one is refused (503)."""
+    now = Now()
+    sessions = manager(now, max_sessions=16)
+    watched: list[MatchSession] = []
+    for viewer in range(30):
+        now.t += 1
+        made = create(sessions, private=True, client=f"10.0.0.{viewer}")
+        if viewer < 10:
+            watch(made)
+            watched.append(made)
+        assert all(w.key in sessions.sessions for w in watched)  # never a watched one
+        assert len(sessions.sessions) <= 16
+    assert len(sessions.sessions) == 16
+    for session in list(sessions.sessions.values()):
+        if session not in watched:
+            watch(session)
+    with pytest.raises(SessionsFull):
+        create(sessions, private=True, client="10.0.1.1")
+    assert len(sessions.sessions) == 16 and all(w.key in sessions.sessions for w in watched)
+
+
 def test_room_is_made_with_a_finished_session_first_then_the_longest_idle() -> None:
     now = Now()
     sessions = manager(now, max_sessions=3, private_per_ip=10)

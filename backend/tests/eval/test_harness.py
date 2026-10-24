@@ -11,6 +11,7 @@ from helpers import mock_service, run
 from pundit.cli import EVAL_FILES, EVAL_THRESHOLD, _eval_service, main
 from pundit.llm.settings import Settings
 from pundit.orchestration.evaluation import (
+    NOTES_MARKER,
     VERDICTS,
     EvalCase,
     EvalFile,
@@ -21,6 +22,7 @@ from pundit.orchestration.evaluation import (
     load_run,
     markdown,
     run_eval,
+    with_notes,
 )
 
 LABELLED = load_eval(EVAL_FILES[0])
@@ -186,3 +188,19 @@ def test_an_eval_with_a_real_model_never_opens_its_breaker() -> None:
         service.breaker.record_failure()
     assert service.breaker.allow()  # every claim still asks the model
     assert _eval_service(Settings()).breaker.threshold < EVAL_THRESHOLD  # the mock: as the app
+
+
+def test_a_rerun_keeps_the_notes_written_by_hand(tmp_path: Path) -> None:
+    report = markdown([few()])
+    assert with_notes(report, None) == report
+    assert with_notes(report, "# old report\nno notes\n") == report
+    notes = f"{NOTES_MARKER}\n\n## Before the fixes\n\nfirst measurement\n"
+    kept = with_notes(report, "# old report\n\n" + notes)
+    assert kept.startswith(report.rstrip()) and kept.endswith(notes)
+    sheet = tmp_path / "eval.md"
+    sheet.write_text("# old\n\n" + notes, encoding="utf-8")
+    files = ["--file", str(EVAL_FILES[0])]
+    assert main(["eval", *files, "--ids", "e01", "--markdown", str(sheet)]) == 0
+    text = sheet.read_text(encoding="utf-8")
+    assert text.startswith("# Claim checker evaluation") and text.endswith(notes)
+    assert text.count(NOTES_MARKER) == 1

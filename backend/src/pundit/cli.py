@@ -79,6 +79,7 @@ from pundit.orchestration.evaluation import (
     markdown,
     run_eval,
     seq_at,
+    with_notes,
 )
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.resilience import CircuitBreaker
@@ -517,7 +518,9 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         )
         print(f"wrote {args.json}")
     if args.markdown:
-        Path(args.markdown).write_text(markdown(reports), encoding="utf-8", newline="\n")
+        target = Path(args.markdown)
+        previous = target.read_text(encoding="utf-8") if target.is_file() else None
+        target.write_text(with_notes(markdown(reports), previous), encoding="utf-8", newline="\n")
         print(f"wrote {args.markdown}")
     print("PASSED" if passed else "FAILED")
     return 0 if passed else 1
