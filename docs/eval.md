@@ -253,6 +253,29 @@ not touch (their reading came from the rules, or was not a dominance).
 The price is h10 ("Momentum nghiêng hẳn về Harbor sau giờ nghỉ"), which the model had read right
 but which names no dominance word: refused now, as the rules refuse it.
 
+### Reading the model's explanations, and the studio audit
+
+The numbers audit only sees numbers, so the explanations the model wrote were also read. A first
+read of 20 of the 65 explanations of the Ollama run
+(`backend/evals/review/ollama-explanations.md`, still to be confirmed by a second reader) found
+13 OK, 3 clumsy, 1 misleading, 1 slightly wrong, and 2 with the right numbers on the wrong side:
+
+| id | Explanation on screen | What is wrong | Rule added |
+|---|---|---|---|
+| c16 | Ironvale kiểm soát bóng cao hơn SAL 52% trong hiệp 2. | reads as a 52-point gap; 52 % is Ironvale's share, the gap is 4 | a number right after "hơn" / "than" a team must be the gap (`WRONG_COMPARISON`) |
+| c17 | Saltmarsh had a slight advantage in possession (52% vs. 48%) in the first half. | Saltmarsh had 48 %, Ironvale 52 % | a pair of values after the only team named is in that team's order (`WRONG_ATTRIBUTION`) |
+
+The studio audit (`pundit studio --audit`, Ollama, `comeback_var-7` and `red_card_swing-7`: 405
+model texts, 545 numbers) found one number with no source: "The shot had a 0.4 chance of going
+in." for a chance shown 0.44. The guardrail now refuses a number written with fewer decimals than
+its fact is shown, unless it is the shown number itself ("1.5" for an xG shown 1.50 passes; the
+studio oracle had flagged that one too, and now reads numbers the same way).
+
+With these rules, today's guardrail refuses 3 of the 65 explanations published in the Ollama run
+(c16, c17, and s08 "Kestrel có xG 3 trong hiệp 1." for an xG of 3.47) and none of the 78 of the
+mock run. A refused explanation falls back to the template; the verdict does not change. The
+report above keeps the runs as they were.
+
 ### Known limits
 
 - A claim the parser does not understand is refused (`INSUFFICIENT_DATA`) rather than guessed:

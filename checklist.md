@@ -185,13 +185,13 @@
 - Kết quả kiểm thử, khác biệt so với thiết kế và việc còn lại (tầng B Azure, nghe bằng tai): [docs/day5-design.md](docs/day5-design.md) §19.
 
 **Triển khai Azure**
-- [ ] **P0** Dockerfile cho backend + frontend
-- [ ] **P0** Bicep / `azd`: Container Apps Env, Container Registry, Storage, Key Vault, App Insights
-- [ ] **P0** Managed Identity truy cập Foundry, Speech, Storage (không để key trong code)
-- [ ] **P0** Deploy lên **Azure Container Apps**, có URL public, `min replicas = 1`
-- [ ] **P0** Health endpoint `/healthz`
-- [ ] **P0** App Insights: log + trace cho từng agent call, đo độ trễ
-- [ ] **P1** GitHub Actions: test → build image → deploy
+- [x] **P0** Dockerfile cho backend + frontend (một image: FastAPI phục vụ UI tĩnh trên một origin; 542 MB, user không phải root, `HEALTHCHECK`; demo S1–S7, phiên riêng, `/mcp` chạy trên container; job CI `image` build + smoke)
+- [ ] **P0** Bicep / `azd`: Container Apps Env, Container Registry, Storage, Key Vault, App Insights (đã viết `azure.yaml` + `infra/`, biên dịch sạch bằng Bicep CLI 0.48.1; **chưa `azd up`**: chưa có subscription, máy chưa có `az` / `azd`)
+- [ ] **P0** Managed Identity truy cập Foundry, Speech, Storage (không để key trong code) (code đã dùng Entra ID; Bicep gán role cho user-assigned identity; chờ deploy)
+- [ ] **P0** Deploy lên **Azure Container Apps**, có URL public, `min replicas = 1` (Bicep đặt min = max = 1 vì phiên nằm trong bộ nhớ; chờ Azure)
+- [x] **P0** Health endpoint `/healthz` (có từ Ngày 2; `HEALTHCHECK` của image và probe trong Bicep dùng nó)
+- [ ] **P0** App Insights: log + trace cho từng agent call, đo độ trễ (mới có resource + connection string trong Bicep; code chưa gửi log / trace)
+- [ ] **P1** GitHub Actions: test → build image → deploy (test + build / smoke image trong `ci.yml`; `deploy.yml` bằng OIDC + `azd` đã viết, chưa chạy)
 
 **Hoàn thành khi:** URL public chạy được demo đầy đủ, có audio tiếng Việt và log hiện trong App Insights.
 
@@ -212,7 +212,7 @@
 - [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS (chưa cần: số đo local đạt; song song agent đã có từ Ngày 3)
 
 **Ổn định & UI**
-- [x] **P0** Thử tắt Foundry → fallback hoạt động, UI không crash (proxy bơm lỗi trước Ollama, cùng client với Foundry: C1–C13 13/13, 3 lượt liên tiếp; E2E `chaos` CH1–CH3; M6 tắt Ollama thật chờ bạn; Foundry thật ở tầng B)
+- [x] **P0** Thử tắt Foundry → fallback hoạt động, UI không crash (proxy bơm lỗi trước Ollama, cùng client với Foundry: C1–C13 13/13, 3 lượt liên tiếp; E2E `chaos` CH1–CH3; M6 tắt / bật Ollama thật giữa trận: fallback + chip + UI chạy tiếp; lần thử đầu sau khi bật lại hết giờ ở mặc định 90 s, phục hồi ngay khi `LLM_TIMEOUT_S=180` cho CPU này; Foundry thật ở tầng B)
 - [x] **P0** Sửa toàn bộ lỗi chặn demo (bug bash: 0 blocker / major còn mở; demo-run S1–S7 3/3 liên tiếp trên bản build production)
 - [x] **P1** Đánh bóng UI: màu, font, responsive, trạng thái loading / lỗi (hướng dẫn 3 bước, HelpDrawer, title, trạng thái panel, bố cục < 1280 px; 60 ảnh × axe)
 - [x] **P0** Kiểm tra bảo mật: không có secret trong repo / lịch sử git (scanner của mình trên lịch sử + working tree + build + `.env`, tuân thủ tên thật, gitleaks, job CI `security`)
@@ -228,6 +228,9 @@
 > Toàn bộ tài liệu nộp phải bằng **tiếng Anh** (Rules mục 4.9).
 
 **README & pitch**
+
+> Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Hoàn thiện khi đã deploy và quay video (danh sách việc ở comment đầu README).
+
 - [ ] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft / Azure nào, giải quyết vấn đề gì
 - [ ] **P0** Vấn đề → giải pháp → người dùng (studio + fan toàn cầu, ví dụ fan Việt)
 - [ ] **P0** Sơ đồ kiến trúc + bảng agent
@@ -239,7 +242,7 @@
 - [ ] **P1** Ảnh chụp màn hình / GIF
 
 **Video demo (bắt buộc DƯỚI 2 phút)**
-- [ ] **P0** Kịch bản khoảng 1:50: vấn đề (10s) → claim sai bị bắt kèm bằng chứng (25s) → talking point + lower-third (20s) → Analyst và Casual xem cùng một moment (20s) → bình luận tiếng Việt có giọng đọc + "Người mới xem" (20s) → kiến trúc multi-agent trên Azure (15s) → kết (5s)
+- [x] **P0** (nháp `docs/video/script.md`, 1:55) Kịch bản khoảng 1:50: vấn đề (10s) → claim sai bị bắt kèm bằng chứng (25s) → talking point + lower-third (20s) → Analyst và Casual xem cùng một moment (20s) → bình luận tiếng Việt có giọng đọc + "Người mới xem" (20s) → kiến trúc multi-agent trên Azure (15s) → kết (5s)
 - [ ] **P0** Quay cảnh sản phẩm chạy thật trên bản deploy
 - [ ] **P0** Phụ đề tiếng Anh cho mọi đoạn tiếng Việt
 - [ ] **P0** Không dùng nhạc có bản quyền hay logo / thương hiệu bên thứ ba

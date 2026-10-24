@@ -1,6 +1,6 @@
 # M5: LLM explanations to read (synthetic data)
 
-Run `2026-10-24-ollama.jsonl`: 100 claims, 65 explanations written by the model; the first 20 below. For each: does the sentence say what the verdict and the numbers say? Write OK, or what is wrong. The last column is a first read by Claude, for you to confirm or correct: 11 OK, 2 meaning errors (c16, c17, now blocked by the guardrail), 1 slight error (e06), 1 misleading (e04), 3 clumsy (c09, c14, c20).
+Run `2026-10-24-ollama.jsonl`: 100 claims, 65 explanations written by the model; the first 20 below. For each: does the sentence say what the verdict and the numbers say? Write OK, or what is wrong. The last column is a first read by Claude, for you to confirm or correct: 13 OK, 2 meaning errors (c16, c17, now blocked by the guardrail), 1 slight error (e06), 1 misleading (e04), 3 clumsy (c09, c14, c20).
 
 | # | id | claim | verdict | explanation | OK / wrong | Claude đọc trước |
 |---|---|---|---|---|---|---|
