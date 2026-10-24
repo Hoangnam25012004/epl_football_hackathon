@@ -3,7 +3,7 @@ meets every threshold with the mock; injected faults are rejected and never publ
 
 import pytest
 from helpers import generated, run
-from studio_helpers import MATRIX, SAMPLES, offline
+from studio_helpers import MATRIX, SAMPLES, offline, pack
 
 from pundit.llm.settings import Settings
 from pundit.orchestration.recap_service import RecapService
@@ -69,3 +69,22 @@ def test_the_oracle_is_independent_of_the_guardrail() -> None:
     assert oracle_problems(f"{stranger.short_name} ghi bàn.", no_goal=False, **common)
     assert oracle_problems("Có 987 cú sút.", no_goal=False, **common)
     assert oracle_problems(f"{scorer.short_name} ghi bàn.", no_goal=True, **common)
+
+
+def test_the_oracle_reads_numbers_as_written() -> None:
+    """Day 6, the Ollama studio audit: "1.5" for an xG shown 1.50 is the number on screen;
+    "0.4" for a chance shown 0.44 is not."""
+    for trigger, right, wrong in [
+        ("red_card_swing-7-m0005", "Kestrel Athletic đã có 1.5 bàn thắng kỳ vọng.", "1.4 xG"),
+        ("red_card_swing-7-m0040", "The shot had a 0.44 chance of going in.", "a 0.4 chance"),
+    ]:
+        built = pack("red_card_swing", 7, trigger)
+        common = {
+            "facts": built.facts,
+            "match": built.match,
+            "players": [],
+            "minutes": [],
+            "window_numbers": built.window_numbers,
+        }
+        assert not oracle_problems(right, no_goal=False, **common)
+        assert oracle_problems(wrong, no_goal=False, **common)

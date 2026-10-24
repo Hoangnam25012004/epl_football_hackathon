@@ -154,12 +154,18 @@ def pack_of(trigger: Trigger, view: LogView) -> FactPack:
 # --------------------------------------------------------------------------- oracle
 
 
+def _as_written(token: str) -> str:
+    """A number without the zeros that do not change it: "1.5" for an xG shown 1.50 is the
+    number on screen (Day 6), "0.4" for 0.44 is not."""
+    return token.rstrip("0").rstrip(".") if "." in token else token
+
+
 def _allowed_numbers(
     facts: Iterable[Fact], match: MatchContext, minutes: Iterable[str], window: Iterable[float]
 ) -> set[str]:
     allowed: set[str] = set()
     for fact in facts:
-        allowed |= set(_NUMBER.findall(fact.display))
+        allowed |= {_as_written(token) for token in _NUMBER.findall(fact.display)}
     for minute in minutes:
         allowed |= set(_NUMBER.findall(minute))
     allowed |= {str(goals) for goals in match.score.values()}
@@ -183,7 +189,7 @@ def oracle_problems(
     problems: list[str] = []
     allowed = _allowed_numbers(facts, match, minutes, window_numbers)
     for token in _NUMBER.findall(_HALF.sub(" ", text)):
-        if token not in allowed:
+        if _as_written(token) not in allowed:
             problems.append(f"number {token} matches no fact")
     allowed_players = set(players)
     for player in match.players:
