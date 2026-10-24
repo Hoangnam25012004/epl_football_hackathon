@@ -14,7 +14,6 @@ import asyncio
 import contextlib
 import logging
 import math
-import statistics
 import time
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Sequence
@@ -35,6 +34,7 @@ from pundit.agents.speech_cue import CueDraft, draft_cue, draft_recap
 from pundit.agents.spoken import EMPTY_LEXICON, SpokenLexicon
 from pundit.agents.ssml import clip_id as make_clip_id
 from pundit.agents.voices import voice_for
+from pundit.domain.percentiles import p95
 from pundit.llm.faults import TtsFaultPlan
 from pundit.llm.settings import Settings
 from pundit.orchestration.resilience import CircuitBreaker
@@ -490,12 +490,8 @@ class Narrator:
         return tuple(self._spans.get(item_id, ()))
 
     def latency_p95(self) -> float | None:
-        values = list(self._latencies)
-        if not values:
-            return None
-        if len(values) == 1:
-            return round(values[0], 1)
-        return round(statistics.quantiles(values, n=20)[18], 1)
+        value = p95(self._latencies)
+        return None if value is None else round(value, 1)
 
     def stats(self) -> dict[str, Any]:
         day, used = self._chars

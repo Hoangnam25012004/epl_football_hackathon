@@ -2,7 +2,6 @@
 item, 422 bad input or profile, 409 a recap that is not ready yet. An LLM problem is never a
 5xx: the claim (or the studio item) is answered by the deterministic path and flagged."""
 
-import statistics
 from typing import Annotated, Any, Literal, get_args
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -40,6 +39,7 @@ from pundit.api.sessions import (
 from pundit.api.studio import StudioDirector, StudioKind
 from pundit.domain.clients import client_ip
 from pundit.domain.ids import TOKEN_PATTERN
+from pundit.domain.percentiles import p95
 from pundit.engine.rosters import roster_team
 from pundit.engine.scenarios import EXAMPLE_CLAIMS, SCENARIOS
 from pundit.llm.settings import Settings
@@ -242,17 +242,12 @@ def _studio_health(sessions: SessionManager) -> StudioHealth | None:
     if crew is None:
         return None
     directors = [s.director for s in sessions.sessions.values() if s.director is not None]
-    lags = [lag for d in directors for lag in d.lags()]
-    p95 = None
-    if len(lags) == 1:
-        p95 = round(lags[0], 1)
-    elif lags:
-        p95 = round(statistics.quantiles(lags, n=20)[18], 1)
+    lag = p95(lag for d in directors for lag in d.lags())
     return StudioHealth(
         enabled=True,
         queued=sum(d.stats()["queued"] for d in directors),
         dropped=sum(d.dropped for d in directors),
-        lag_ms_p95=p95,
+        lag_ms_p95=None if lag is None else round(lag, 1),
         degraded=list(crew.service.degraded_now()),
     )
 

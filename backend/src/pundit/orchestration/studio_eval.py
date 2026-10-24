@@ -52,6 +52,7 @@ from pundit.agents.studio_guard import (
 from pundit.agents.talking_points import wants_talking_point
 from pundit.agents.triggers import detect_triggers
 from pundit.domain.log import EventLog, LogView
+from pundit.domain.percentiles import p95
 from pundit.engine.match import GeneratedMatch
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.studio_service import StudioService
@@ -333,8 +334,8 @@ class StudioReport:
             counts = self.sources
             return f"{first} {counts[f'{kind}:{first}']} / {second} {counts[f'{kind}:{second}']}"
 
-        lat = sorted(self.latencies_ms) or [0.0]
-        p95 = statistics.quantiles(lat, n=20)[18] if len(lat) > 1 else lat[0]
+        latency_p50 = statistics.median(self.latencies_ms or [0.0])
+        latency_p95 = p95(self.latencies_ms) or 0.0
         rules = ", ".join(f"{minute} {rule}" for minute, rule in self.first_rules) or "-"
         problems = self.rules_problems()
         codes = ", ".join(f"{c} {n}" for c, n in self.rejection_codes.most_common()) or "-"
@@ -360,7 +361,7 @@ class StudioReport:
             if self.match_id in EXPECTED_RULES
             else "            expected rules: n/a (table 9.4 covers the four sample matches)",
             f"continuity  longest silence {self.silence_min:.1f} min ({self.silence_at})",
-            f"latency     job p50 {statistics.median(lat):.0f} ms · p95 {p95:.0f} ms · "
+            f"latency     job p50 {latency_p50:.0f} ms · p95 {latency_p95:.0f} ms · "
             f"llm calls {self.llm_calls} · failures {self.llm_failures}",
             f"degraded    {degraded}",
             *(f"LEAK        {leak}" for leak in self.leaks[:10]),

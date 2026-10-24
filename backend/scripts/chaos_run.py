@@ -32,6 +32,7 @@ from websockets.asyncio.client import connect
 
 from pundit.agents.contracts import ClaimRequest
 from pundit.api.app import create_app
+from pundit.domain.percentiles import p95
 from pundit.engine.generator import generate
 from pundit.llm.settings import Settings
 from pundit.orchestration.resilience import CircuitBreaker
@@ -90,11 +91,11 @@ def check(name: str, ok: bool, detail: str = "") -> bool:
 
 
 class Run:
-    def __init__(self, app: Any, api: str, proxy: ChaosProxy) -> None:
+    def __init__(self, app: Any, api: str, proxy: ChaosProxy, timeout: float = 120) -> None:
         self.app = app
         self.api = api
         self.proxy = proxy
-        self.http = httpx.AsyncClient(base_url=api, timeout=120)
+        self.http = httpx.AsyncClient(base_url=api, timeout=timeout)
         self.rules = ClaimService(Settings())  # the mock: what the rules alone answer
         match = generate("dominant_loser", 42)
         self.static = StaticSource(match.meta, match.events)
@@ -289,10 +290,14 @@ async def studio_matrix(run: Run) -> bool:
     await run.mode("hang")
     await run.http.post(f"/matches/{LIVE}/start")
     await asyncio.sleep(15 * 60 / 20 + 4)  # 15 minutes of the match (and half-time) at 20x
-    hung = await run.info(LIVE)
+    director = run.app.state.manager.sessions[LIVE].director
+    hung_lags = list(director.lags()) if director is not None else []
+    # C8 starts from a closed breaker: the studio meets a slow LLM, not an open breaker
+    crew.service.breaker = CircuitBreaker()
     await run.mode("delay:4")
-    await asyncio.sleep(5 * 60 / 20)  # five more minutes, the LLM slower than the budgets
+    await asyncio.sleep(10 * 60 / 20)  # ten more minutes, the LLM slower than the budgets
     slow = await run.info(LIVE)
+    slow_lags = list(director.lags())[len(hung_lags) :] if director is not None else []
     await run.http.post(f"/matches/{LIVE}/stop")
     await asyncio.sleep(1.0)
     stop.set()
@@ -302,13 +307,14 @@ async def studio_matrix(run: Run) -> bool:
     kinds = {m["type"] for m in analyst}
     numbers = [m["n"] for m in analyst]
     contiguous = numbers == list(range(numbers[0], numbers[0] + len(numbers))) if numbers else False
-    studio = hung.get("studio", {})
+    hung_p95 = p95(hung_lags) or 0.0
     ok &= check(
         "C10 a hanging LLM for 15 minutes: the studio goes on with its templates",
         {"talking_point", "commentary", "lower_third"} <= kinds and contiguous
-        and (studio.get("lag_ms_p95") or 0) < 3000,
+        and hung_p95 < 3000,
         f"{len(analyst)} messages, kinds {sorted(kinds)}, n contiguous {contiguous}, "
-        f"lag p95 {studio.get('lag_ms_p95')} ms",
+        f"lag p95 {hung_p95:.0f} ms over {len(hung_lags)} jobs (worst "
+        f"{max(hung_lags, default=0):.0f} ms, the job that waited for the open breaker)",
     )  # fmt: skip
     recaps = [m for m in analyst if m["type"] == "recap" and m["payload"].get("scope") == "H1"]
     fan_lines = [m for m in fan if m["type"] == "commentary"]
@@ -318,10 +324,11 @@ async def studio_matrix(run: Run) -> bool:
         f"{len(recaps)} recap messages, {len(fan_lines)} Vietnamese lines for the fan",
     )
     delayed = slow.get("studio", {})
+    slow_p95 = p95(slow_lags) or 0.0
     ok &= check(
         "C8 an LLM slower than the budgets: templates on time, no job left hanging",
-        (delayed.get("lag_ms_p95") or 0) < 3000 and delayed.get("errors", 0) == 0,
-        f"lag p95 {delayed.get('lag_ms_p95')} ms, degraded {delayed.get('degraded')}",
+        bool(slow_lags) and slow_p95 < 3000 and delayed.get("errors", 0) == 0,
+        f"lag p95 {slow_p95:.0f} ms over {len(slow_lags)} jobs, degraded {delayed.get('degraded')}",
     )
     return ok
 
@@ -385,7 +392,9 @@ async def main(recording: bool, forward: bool) -> int:
     api_server, api_thread = serve(app, api_port)
     while not (proxy_server.started and api_server.started):
         await asyncio.sleep(0.05)
-    run = Run(app, f"http://127.0.0.1:{api_port}", proxy)
+    # recording: a claim waits for a cold CPU model, as long as the app's recording budget
+    budget = app.state.settings.claim_budget_s
+    run = Run(app, f"http://127.0.0.1:{api_port}", proxy, timeout=budget + 60 if recording else 120)
     try:
         if recording:
             ok = await record(run)

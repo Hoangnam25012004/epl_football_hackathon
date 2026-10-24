@@ -12,7 +12,6 @@ worker of their own: the template is published at once, a model's version when i
 import asyncio
 import contextlib
 import logging
-import statistics
 import time
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Sequence
@@ -34,6 +33,7 @@ from pundit.agents.contracts import (
 )
 from pundit.agents.recap import RECAP_SCOPES, RecapPack, build_recap_pack
 from pundit.domain.log import LogView
+from pundit.domain.percentiles import p95
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.studio_service import StudioService
 
@@ -253,12 +253,8 @@ class StudioDirector:
         return ()
 
     def lag_p95(self) -> float | None:
-        lags = list(self._lags_ms)
-        if not lags:
-            return None
-        if len(lags) == 1:
-            return round(lags[0], 1)
-        return round(statistics.quantiles(lags, n=20)[18], 1)
+        value = p95(self._lags_ms)
+        return None if value is None else round(value, 1)
 
     def stats(self) -> dict[str, Any]:
         return {
