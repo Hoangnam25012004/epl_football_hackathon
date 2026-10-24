@@ -1,0 +1,199 @@
+<!--
+Draft of 24/10/2026. To finish on Day 7, once the app is deployed:
+- the live demo and video links (top), and NEXT_PUBLIC_REPO_URL / NEXT_PUBLIC_VIDEO_URL at build;
+- "Microsoft technologies": Foundry and Azure AI Speech once they run live, the Azure resources
+  once `azd up` has deployed them, Copilot Agent Mode once docs/copilot.md has its runs;
+- the latency table on the deployed app (event -> talking point, event -> audio);
+- screenshots.
+-->
+
+# Pundit Copilot
+
+> **Synthetic data only.** Every team, player, referee and match is generated. Not affiliated
+> with the Premier League or any club.
+
+**An AI co-pilot for live football coverage: it checks what commentators say against the match
+data before it goes on air, writes verified talking points and on-screen graphics, and gives
+fans live Vietnamese commentary with a voice, explained for beginners.**
+
+Built solo for the Microsoft × Premier League "Inside the Game" hackathon (categories: Grand
+Prize, Best Multi-Agent System).
+
+| | |
+|---|---|
+| Live demo | _added at submission_ |
+| Demo video (< 2 min) | _added at submission_ |
+| Results | [docs/eval.md](docs/eval.md) |
+
+## The problem
+
+Live commentary is fast and unforgiving. A pundit says "they dominated the second half" and
+nobody can check it before it airs. Graphics teams build lower-thirds by hand. And most fans
+around the world follow a match in a language that is not English, often new to the game's rules.
+
+## What it does
+
+**For the studio** (commentators, editors):
+
+- **Claim check.** Type or speak a claim, in Vietnamese or English ("Đội nhà áp đảo hiệp 2",
+  "Kestrel took more shots than Harbor"). The answer is a verdict (true, partly true, false, not
+  enough data) with the numbers behind it and the event IDs they come from.
+- **Talking points** at every key moment: two or three verified lines, to approve, pin or dismiss.
+- **Lower-thirds** that go on air by themselves (take, hold, clear by hand), as a transparent
+  overlay page for OBS or vMix.
+- **Why · Evidence · Agent Trace** for every item: the facts, the events on a pitch map, and
+  which agent did what, with timings.
+
+**For fans**:
+
+- **Live commentary in Vietnamese or English**, read aloud (Vietnamese neural voice), faster and
+  higher on a goal.
+- **Beginner mode** explains offside, VAR, penalties… the first time they happen.
+- **Personalised**: analyst (dense numbers) or casual (plain words), a favourite club, one player
+  followed all match, one metric only. The same moment, written two ways: see the compare page.
+- **Recaps** at half-time and full time, text and audio.
+
+**For AI assistants**: the match statistics as a read-only **MCP server** (stdio and
+`/mcp`), so GitHub Copilot, Claude or a broadcaster's system can ask the same tools the studio
+uses ([docs/mcp.md](docs/mcp.md)).
+
+## The rule: no evidence, no number
+
+Every number a user sees comes from deterministic statistics tools, never from a language model.
+The model only reads the claim and writes sentences; a **guardrail** checks each sentence before
+it is published (every number must match a fact, comparisons and attributions must hold, a model
+may not invent a minute or a ratio) and falls back to a template when the model fails. An
+independent audit counts the numbers in published text that have no source: **0** in every
+evaluation run.
+
+## How it works
+
+The hackathon's pipeline, end to end:
+
+| Step | In Pundit Copilot |
+|---|---|
+| **Ingest** | A synthetic match engine generates realistic event streams (passes, shots, cards, VAR, substitutions) from a seed, replayed live at 1x–1000x |
+| **Interpret** | Match state, 33 deterministic metrics (possession by ball-in-play time, xG, PPDA, momentum, control vs chaos, tempo…), moment detection |
+| **Explain** | Agents turn moments and claims into verified sentences with their evidence |
+| **Render** | Timestamped, machine-readable output over WebSocket: studio dashboard, overlay page, fan player, recaps, audio clips |
+| **Personalize** | Each viewer's connection gets its own rendering: register, language, club, player, beginner mode, voice |
+
+```mermaid
+flowchart LR
+  E[Synthetic match engine] --> S[Match state + Stats Tools]
+  S --> CW
+  S --> SW
+  subgraph CW[Claim workflow]
+    CI[ClaimIntake] --> CA[ClaimAnalyst<br/>LLM] --> RA[RuleAnalyst] --> EC[EvidenceCollector] --> J[Judge] --> X[Explainer<br/>LLM] --> G1[Guardrail]
+  end
+  subgraph SW[Studio workflow]
+    MD[Moment detector] --> FB[FactPackBuilder] --> TP[TalkingPointWriter] & GD[GraphicsDesigner] & CM[Commentator] --> G2[Studio guardrail] --> P[StudioPublisher]
+  end
+  G1 --> API[API + WebSocket]
+  P --> API
+  P --> N[Narrator<br/>Vietnamese voice]
+  N --> API
+  S --> MCP[MCP server]
+  API --> UI1[Studio] & UI2[Overlay] & UI3[Fan player]
+```
+
+### The agents
+
+| Agent | Role | Model |
+|---|---|---|
+| ClaimIntake | Language, time scope, the match at that minute | No |
+| ClaimAnalyst | Reads the claim into a typed spec (subjects, metrics, windows) | LLM, within a budget |
+| RuleAnalyst | A rule parser that always cross-checks the model's reading; the rules win when they disagree, and a reading only the model made must be said by the claim's words | No |
+| EvidenceCollector | Calls the Stats Tools for every assertion | No |
+| Judge | Verdict from the facts with written tolerances | No |
+| Explainer | Writes the explanation from the facts | LLM, within a budget |
+| Guardrail | Rejects any sentence whose numbers, relations, minutes or tone do not hold; template fallback | No |
+| Moment detector | Goals, big chances, VAR, momentum swings, half-time… | No |
+| FactPackBuilder | The facts a moment may cite | No |
+| TalkingPointWriter · GraphicsDesigner · Commentator | Talking points, lower-thirds, commentary in four versions (VI / EN × analyst / casual), in parallel | LLM, within budgets |
+| RecapWriter | Half-time and full-time recaps | LLM |
+| Narrator | Spoken script (numbers written as words, checked back), prosody, audio clips | No (speech service) |
+
+**Multi-agent design.** The agents share one match state pinned at an event (`as_of`), hand off
+typed messages through **Microsoft Agent Framework** workflows (sequential for claims, fan-out /
+fan-in for the studio), and recover from failure: per-role budgets, circuit breakers that open
+and close again, deterministic templates, a plain asyncio runner if the workflow itself fails.
+Every run leaves a trace shown in the UI. A fault-injection proxy in front of the model checks
+13 failure modes (hangs, 500s, 429s, garbage, content filters, flaky answers): the studio and
+the claim checker keep answering, on time, in all of them.
+
+## Results
+
+From [docs/eval.md](docs/eval.md): 100 claims on three matches (72 labelled, 28 held-out written
+apart and frozen before any parser change).
+
+| Measure | Target | Rules + templates (mock model) | Local model (qwen2.5:3b, CPU) |
+|---|---|---|---|
+| Accuracy, labelled set | ≥ 85 % | 96 % | 97 % |
+| Wrong verdicts | 0 | 0 | 0 |
+| Held-out coverage | ≥ 70 % | 64 % | 75 % |
+| Numbers with no source in published text | 0 | 0 of 274 | 0 of 188 |
+| Prompt injections judged true | 0 | 0 | 0 |
+
+Refusing is allowed, misleading is not: a claim the system cannot read is answered "not enough
+data". The notes of docs/eval.md keep the first measurements and every fix a wrong verdict led to.
+
+Quality gates: 2,600+ backend tests (95 % coverage), 178 frontend unit and component tests, 42
+end-to-end tests, the judge's demo path run three times in a row, accessibility (axe) on every
+page in both themes and languages, secret and Official Rules scans on the whole git history.
+
+## Microsoft technologies
+
+| Technology | How it is used | Status |
+|---|---|---|
+| **Microsoft Agent Framework** | The claim and studio workflows (executors, typed messages, fan-out / fan-in) | In use |
+| **Microsoft Foundry** | The agents' model provider, through an OpenAI-compatible client with Entra ID | Built and tested with mocks; the same client was evaluated with a local model while the Azure subscription was pending |
+| **Azure AI Speech** | Vietnamese neural voices (HoaiMy, NamMinh) by REST with SSML prosody; speech to text for spoken claims | Built and tested against a deterministic mock voice; live run pending |
+| **GitHub Actions** | Tests, the evaluation gate, secret and compliance scans | Workflow in the repository |
+| **GitHub Copilot Agent Mode** | A client of the MCP server ([docs/copilot.md](docs/copilot.md)) | Setup ready; runs pending |
+
+## Run it locally
+
+Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node.js 22.
+
+```bash
+cd frontend && npm ci && npm run build && cd ..
+uv run --project backend pundit serve --ui frontend/out    # http://127.0.0.1:8000
+```
+
+Or with Docker:
+
+```bash
+docker build -t pundit-copilot .
+docker run -p 8000:8000 pundit-copilot
+```
+
+Open the landing page and press **Start my demo match**. No account is needed. The default runs
+with a deterministic mock model and mock voice; real models are switched on by environment
+variables (names in [backend/.env.example](backend/.env.example)).
+
+Useful commands:
+
+```bash
+uv run --project backend pundit claim --scenario dominant_loser --seed 42 "Đội nhà áp đảo hiệp 2"
+uv run --project backend pundit eval --min-accuracy 0.85
+uv run --project backend pundit mcp                 # the MCP server over stdio
+```
+
+## Repository
+
+| Path | What |
+|---|---|
+| `backend/` | Python 3.12: match engine, Stats Tools, agents, workflows, API, speech, MCP server |
+| `frontend/` | Next.js (static export): landing page, studio, overlay, fan player, compare page |
+| `packages/schemas/` | JSON Schemas shared by both sides |
+| `docs/` | Designs and as-built notes per day, evaluation, MCP, Copilot |
+| `tools/security/` | Secret and Official Rules scanners |
+
+## Synthetic data and responsible use
+
+- No real league, club, player or referee name, logo or data; a scanner checks the product code
+  and data for real names on every CI run, and every screen carries a "Synthetic data" label.
+- Unsafe or demeaning language about players, clubs or officials is blocked by the guardrail and
+  the provider's content filter; a filtered text is never published.
+- Most of the code was written with Claude Code (Anthropic).
