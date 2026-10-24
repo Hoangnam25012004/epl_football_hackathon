@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { formatMinute } from "@/lib/clock";
 import type { ScenarioInfo } from "@/lib/contracts";
 import { EVENT_ICONS, eventDetail, eventType, isKeyEvent } from "@/lib/events";
-import { useT, type Key } from "@/lib/i18n";
+import { hasKey, useT, type Key } from "@/lib/i18n";
 import type { MatchEvent } from "@/lib/ws-types";
 import { teamCard } from "@/hooks/useScenarios";
 import { playerName } from "@/hooks/usePlayers";
@@ -32,6 +32,11 @@ export function EventFeed({
   const { t } = useT();
   const [filter, setFilter] = useState<"all" | "key">("all");
   const [backfill, setBackfill] = useState<MatchEvent[]>([]);
+  // "blocked" / "yellow" / "stands" in the page's language; a value with no word, as it is
+  const detailText = (detail: string) => {
+    const key = `detail.${detail}`;
+    return hasKey(key) ? t(key) : detail;
+  };
 
   useEffect(() => {
     if (helloCount === 0) return;
@@ -97,7 +102,7 @@ export function EventFeed({
               <span className="truncate">
                 {label}
                 {event.player ? ` · ${playerName(players, event.player)}` : ""}
-                {detail && type !== "pass" ? ` · ${detail}` : ""}
+                {detail && type !== "pass" ? ` · ${detailText(detail)}` : ""}
               </span>
             </li>
           );

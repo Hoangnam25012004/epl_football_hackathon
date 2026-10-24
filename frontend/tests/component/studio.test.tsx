@@ -308,4 +308,33 @@ describe("EventFeed", () => {
       key.every((row) => row.dataset.type !== "pass" || row.textContent?.includes("Corner")),
     ).toBe(true);
   });
+
+  it("says an outcome or a card colour in the page's language, not as a raw value (Day 6)", () => {
+    const pick = (type: string, field: "outcome" | "color", value: string) => {
+      const found = events.find((e) => e.type === type && Reflect.get(e, field) === value);
+      if (!found) throw new Error(`no ${type} ${value} in the fixture`);
+      return found;
+    };
+    const live = [
+      pick("shot", "outcome", "blocked"),
+      pick("shot", "outcome", "off_target"),
+      pick("card", "color", "yellow"),
+      pick("tackle", "outcome", "won"),
+    ];
+    const cases = [
+      ["vi", ["bị chặn", "ra ngoài", "· vàng", "thành công"]],
+      ["en", ["blocked", "off target", "· yellow", "won"]],
+    ] as const;
+    for (const [lang, words] of cases) {
+      const { unmount } = renderWith(
+        <EventFeed matchId="m" live={live} helloCount={0} scenario={null} players={new Map()} />,
+        lang,
+      );
+      const text = screen.getByTestId("event-feed").textContent ?? "";
+      for (const word of words) expect(text, lang).toContain(word);
+      expect(text).not.toContain("off_target");
+      if (lang === "vi") expect(text).not.toMatch(/\b(blocked|yellow|won)\b/);
+      unmount();
+    }
+  });
 });
