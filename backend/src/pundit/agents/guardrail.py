@@ -202,13 +202,7 @@ def _number_violations(
             if number.value not in minute_ok and not _matches(number, minute_facts, _Hint(None)):
                 flag(number, "is not a minute of this claim")
             continue
-        hint = _hint(text, number)
-        matched = [
-            f
-            for f in facts
-            if (hint.units is None or f.unit in hint.units)
-            and rounding_match(number.signed, number.decimals, f.value)
-        ]
+        matched = _facts_for(text, number, facts)
         if matched:
             used.extend(matched)
         else:
@@ -282,6 +276,22 @@ def _stat_numbers(numbers: Sequence[Num]) -> list[Num]:
     return [n for n in numbers if not n.minute and not n.period and n.pair is None]
 
 
+_DISPLAY_NUMBER = re.compile(r"-?\d+(?:[.,](\d+))?")
+
+
+def _precise_enough(number: Num, fact: Fact) -> bool:
+    """Day 6: a number is written at least as precisely as its fact is shown, or as the shown
+    number itself. "a 0.4 chance" for an xG shown 0.44 rounds coarser than the screen does;
+    the studio oracle and the independent number audit both refused it in Ollama's texts. A
+    number written as a word cannot carry decimals (ratio words have WRONG_RATIO)."""
+    shown = _DISPLAY_NUMBER.search(fact.display)
+    if number.word or shown is None:
+        return True
+    decimals = len(shown.group(1) or "")
+    value = float(shown.group(0).replace(",", "."))
+    return number.decimals >= decimals or abs(abs(number.signed) - abs(value)) < 1e-9
+
+
 def _facts_for(text: Text, number: Num, facts: Sequence[Fact]) -> list[Fact]:
     hint = _hint(text, number)
     return [
@@ -289,6 +299,7 @@ def _facts_for(text: Text, number: Num, facts: Sequence[Fact]) -> list[Fact]:
         for f in facts
         if (hint.units is None or f.unit in hint.units)
         and rounding_match(number.signed, number.decimals, f.value)
+        and _precise_enough(number, f)
     ]
 
 

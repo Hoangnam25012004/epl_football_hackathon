@@ -549,3 +549,34 @@ def test_fuzz_the_studio_guard_never_crashes(words: list[str], noise: str, langu
             model_text=True,
         )
         assert report.passed == (not report.violations)
+
+
+# ------------------------------------------- Day 6: precision (studio audit with Ollama)
+
+
+@pytest.mark.parametrize(
+    ("trigger", "text", "language", "product", "mode"),
+    [
+        ("red_card_swing-7-m0040", "Goalie saved the shooter's shot. The shot had a 0.4 chance "
+         "of going in.", "en", "commentary", "casual"),
+        ("red_card_swing-7-m0040", "Lindqvist's shot was a 0.4 xG chance.", "en", "commentary",
+         "analyst"),
+    ],
+)  # fmt: skip
+def test_a_number_coarser_than_its_fact_on_screen_is_refused(
+    trigger: str, text: str, language: Lang, product: StudioProduct, mode: Register
+) -> None:
+    """What Ollama published in the studio audit of Day 6: the xG on screen is 0.44; the studio
+    oracle and the independent number audit refused the coarser 0.4, so the guardrail does too."""
+    built = pack("red_card_swing", 7, trigger)
+    assert "UNVERIFIED_NUMBER" in codes(text, built, language=language, product=product, mode=mode)
+
+
+def test_the_number_as_shown_passes() -> None:
+    built = pack("red_card_swing", 7, "red_card_swing-7-m0040")
+    text = "M. Holub saved O. Lindqvist's shot. The shot had an xG of 0.44."
+    assert "UNVERIFIED_NUMBER" not in codes(text, built, language="en")
+    # "1.5" for an xG shown 1.50 is the same number: the oracle flagged it, wrongly
+    talk = "Kestrel Athletic đã có 1.5 bàn thắng kỳ vọng trong trận đấu."
+    built = pack("red_card_swing", 7, "red_card_swing-7-m0005")
+    assert "UNVERIFIED_NUMBER" not in codes(talk, built, language="vi", product="talking_point")
