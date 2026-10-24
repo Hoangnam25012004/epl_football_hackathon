@@ -49,6 +49,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the one image (API + static UI)
+        run: docker build -t pundit-copilot:ci .
+      - name: smoke the container
+        run: |
+          docker run -d --name app -p 8000:8000 pundit-copilot:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 2; done
+          curl -fsS -o /dev/null http://127.0.0.1:8000/
+          test "$(docker exec app id -un)" = pundit
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

@@ -1,0 +1,48 @@
+name: deploy
+
+# Provision and deploy to Azure Container Apps with azd (azure.yaml, infra/). Run by hand only,
+# after CI is green. Signs in with GitHub OIDC (a federated credential on an Entra app): no
+# secret is stored. Repository variables: AZURE_CLIENT_ID, AZURE_TENANT_ID,
+# AZURE_SUBSCRIPTION_ID, AZURE_ENV_NAME, AZURE_LOCATION (and optionally FOUNDRY_LOCATION,
+# BUDGET_EMAIL, NEXT_PUBLIC_REPO_URL, NEXT_PUBLIC_VIDEO_URL).
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      FOUNDRY_LOCATION: ${{ vars.FOUNDRY_LOCATION }}
+      BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Azure/setup-azd@v2
+      - name: sign in (OIDC)
+        run: |
+          azd auth login --client-id "$AZURE_CLIENT_ID" --federated-credential-provider github \
+            --tenant-id "$AZURE_TENANT_ID"
+      - name: environment
+        run: |
+          azd env new "$AZURE_ENV_NAME" --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --location "$AZURE_LOCATION" --no-prompt || azd env select "$AZURE_ENV_NAME"
+      - name: provision and deploy
+        run: azd up --no-prompt
+        env:
+          # the landing page's links, baked into the UI at build time
+          NEXT_PUBLIC_REPO_URL: ${{ vars.NEXT_PUBLIC_REPO_URL }}
+          NEXT_PUBLIC_VIDEO_URL: ${{ vars.NEXT_PUBLIC_VIDEO_URL }}
+      - name: smoke
+        run: |
+          url=$(azd env get-value SERVICE_APP_URL)
+          for i in $(seq 1 30); do curl -fsS "$url/healthz" && exit 0; sleep 10; done
+          exit 1

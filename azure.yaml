@@ -1,0 +1,19 @@
+# Azure Developer CLI: `azd up` provisions infra/ and deploys the one image of the Dockerfile
+# to Azure Container Apps (docs/day5-design.md, claude.md section 6). Synthetic data only.
+name: pundit-copilot
+metadata:
+  template: pundit-copilot@0.1.0
+services:
+  app:
+    project: .
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      buildArgs: # the landing page's links (empty: "coming soon")
+        - NEXT_PUBLIC_REPO_URL=${NEXT_PUBLIC_REPO_URL}
+        - NEXT_PUBLIC_VIDEO_URL=${NEXT_PUBLIC_VIDEO_URL}
+infra:
+  provider: bicep
+  path: infra
