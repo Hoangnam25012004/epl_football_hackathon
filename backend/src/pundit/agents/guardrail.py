@@ -14,6 +14,7 @@ True numbers can still be put together wrongly, so two more checks read the rela
   fact has that value ("HAR 39%" when HAR had 61% and KES 39%).
 """
 
+import itertools
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from pundit.agents.contracts import (
     MatchContext,
     Verdict,
 )
-from pundit.agents.entities import find_entities
+from pundit.agents.entities import Mention, find_entities
 from pundit.agents.explain_templates import MAX_TEXT_CHARS
 from pundit.agents.language import Term, Text, find_terms, vi_mode
 from pundit.agents.lexicon import RATIO_PATTERNS, ratio_value
@@ -527,6 +528,7 @@ def _scoreline_violations(
             elif any(before[0].end <= p < before[-1].start for p in pivots):
                 one, two = before[0], before[-1]
             else:
+                violations += _lone_team_pair(text, (left, right), before, facts, match)
                 continue
             first, second = one.team, two.team
             if first is None or second is None or first == second:
@@ -543,6 +545,144 @@ def _scoreline_violations(
                     span=text.raw[one.start : max(two.end, right.end)],
                 )
             )
+    return violations
+
+
+GOALS = frozenset({"score"})  # goals: a scoreline has its own word order
+
+
+def _is_score(pair: tuple[Num, Num], teams: tuple[str, str], match: MatchContext) -> bool:
+    (left, right), (first, second) = pair, teams
+    score = (match.score.get(first), match.score.get(second))
+    return (left.value, right.value) in (score, score[::-1])
+
+
+def _sides(facts: Sequence[Fact], first: str, second: str) -> list[tuple[Fact, Fact]]:
+    """Pairs of the two teams' facts of one metric over one window (no goals: scores follow
+    their own word order)."""
+    return [
+        (a, b)
+        for a in facts
+        if not a.derived and a.player is None and a.team == first and a.metric not in GOALS
+        for b in facts
+        if not b.derived
+        and b.player is None
+        and b.team == second
+        and b.metric == a.metric
+        and window_of(b) == window_of(a)
+    ]
+
+
+def _lone_team_pair(
+    text: Text, pair: tuple[Num, Num], before: list[Mention], facts: Sequence[Fact],
+    match: MatchContext,
+) -> list[GuardrailViolation]:  # fmt: skip
+    """Day 6 (M5): one team named, then a pair: the first number is that team's. Flagged
+    only when the two numbers are the two sides the other way round ("Saltmarsh had a slight
+    advantage in possession (52% vs. 48%)" when Saltmarsh had 48%)."""
+    teams = {m.team for m in before if m.team is not None}
+    if len(teams) != 1:
+        return []
+    (first,) = teams
+    second = match.opponent(first)
+    left, right = pair
+    if _is_score(pair, (first, second), match):
+        return []  # "lost 2-1": a score puts the winner first
+    sides = _sides(facts, first, second)
+    forward = any(
+        rounding_match(left.value, left.decimals, a.value)
+        and rounding_match(right.value, right.decimals, b.value)
+        for a, b in sides
+    )
+    reverse = [
+        (a, b)
+        for a, b in sides
+        if rounding_match(left.value, left.decimals, b.value)
+        and rounding_match(right.value, right.decimals, a.value)
+    ]
+    if forward or not reverse:
+        return []
+    own = reverse[0][0]
+    shown = text.raw[left.start : right.end]
+    return [
+        GuardrailViolation(
+            code="WRONG_ATTRIBUTION",
+            detail=f"{shown} is the wrong way round: {match.team(first).name} had {own.display}",
+            span=shown,
+        )
+    ]
+
+
+_VERSUS = re.compile(r"^\s*%?\s*(?:vs\.?|versus|so với|against|to)\s*$", re.IGNORECASE)
+
+
+def _versus_violations(
+    text: Text, numbers: Sequence[Num], facts: Sequence[Fact], match: MatchContext
+) -> list[GuardrailViolation]:
+    """ "Saltmarsh had a slight advantage in possession (52% vs. 48%)": two numbers joined by
+    "vs" / "so với" / "to" after the only team a sentence names, read like a pair."""
+    violations: list[GuardrailViolation] = []
+    mentions = [m for m in find_entities(text, match) if m.kind == "team" and not m.ambiguous]
+    sentences = _sentences(text)
+    for left, right in itertools.pairwise(numbers):
+        if left.minute or right.minute or left.pair is not None or right.pair is not None:
+            continue
+        if not _VERSUS.match(text.lower[left.end : right.start]):
+            continue  # (the "." of "vs." may end a sentence for the splitter: the gap decides)
+        start, end = next(((s, e) for s, e in sentences if s <= left.start < e), (0, len(text.raw)))
+        named = [m for m in mentions if start <= m.start < end]
+        if any(m.start > left.start for m in named) or any(
+            right.end <= m.start < right.end + 40
+            and text.lower[right.end : m.start].strip() in ("của", "for", "of")
+            for m in mentions
+        ):
+            continue  # a team after the numbers ("51% so với 49% của Harbor") says whose
+        violations += _lone_team_pair(text, (left, right), named, facts, match)
+    return violations
+
+
+_GAP_BEFORE = re.compile(r"(?:hơn|than)\s*$", re.IGNORECASE)
+_GAP_BETWEEN = re.compile(r"^\s*(?:by\s+)?$", re.IGNORECASE)
+
+
+def _gap_violations(
+    text: Text, numbers: Sequence[Num], facts: Sequence[Fact], match: MatchContext
+) -> list[GuardrailViolation]:
+    """Day 6 (M5): a number right after "hơn / than <team>" is the gap between the two sides
+    ("hơn KES 14 cú sút", "higher than KES by 4%"), never one side's value ("Ironvale kiểm soát
+    bóng cao hơn SAL 52%" when Ironvale had 52% and Saltmarsh 48%)."""
+    violations: list[GuardrailViolation] = []
+    for mention in find_entities(text, match):
+        team = mention.team
+        if mention.kind != "team" or mention.ambiguous or team is None:
+            continue
+        if not _GAP_BEFORE.search(text.lower[max(0, mention.start - 8) : mention.start]):
+            continue
+        after = [n for n in numbers if n.start >= mention.end and not n.minute]
+        if not after or after[0].pair is not None:
+            continue
+        number = after[0]
+        if not _GAP_BETWEEN.match(text.lower[mention.end : number.start]):
+            continue
+        sides = _sides(facts, match.opponent(team), team)
+        gaps = [abs(a.value - b.value) for a, b in sides]
+        gaps += [f.value for f in facts if f.derived and "|diff|" in f.key]
+        if any(rounding_match(number.value, number.decimals, gap) for gap in gaps):
+            continue
+        values = [f for pair in sides for f in pair]
+        if not any(rounding_match(number.value, number.decimals, f.value) for f in values):
+            continue  # not a side's value either: the number rules judge it
+        shown = text.raw[number.start : number.end]
+        violations.append(
+            GuardrailViolation(
+                code="WRONG_COMPARISON",
+                detail=(
+                    f"{shown} after a comparison with {match.team(team).name} reads as the gap "
+                    "between the two sides, but it is one side's value"
+                ),
+                span=text.raw[mention.start : number.end],
+            )
+        )
     return violations
 
 
@@ -663,6 +803,8 @@ def check(
     if context.match is not None:
         violations += _side_comparison_violations(claim, numbers, facts, context.match)
         violations += _attribution_violations(claim, numbers, facts, context.match)
+        violations += _gap_violations(claim, numbers, facts, context.match)
+        violations += _versus_violations(claim, numbers, facts, context.match)
     if context.verdict not in (None, "INSUFFICIENT_DATA"):
         for fact in dict.fromkeys(used):
             if not fact.evidence_event_ids:

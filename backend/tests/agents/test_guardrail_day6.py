@@ -155,3 +155,53 @@ def test_templates_still_pass(claim: str) -> None:
     text = render(result)  # in the claim's language
     assert ratio_violations(Text.of(text), result.all_facts()) == [], text
     assert check_judged(text, result).passed, text
+
+
+# ------------------------------------------------- relations read by hand in M5 (Ollama)
+
+POSSESSION = "Harbor kiểm soát bóng nhiều hơn Kestrel ở hiệp 2"  # 61% to 39%, not an eval claim
+
+
+def codes(text: str) -> list[str]:
+    return [v.code for v in check_judged(text, judged(POSSESSION), model_text=True).violations]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kestrel had the edge in possession (61% vs. 39%) in the second half.",
+        "Kestrel kiểm soát bóng 61% so với 39% trong hiệp 2.",
+        "Kestrel led the possession count 61-39 in the second half.",
+    ],
+)
+def test_a_pair_after_the_only_team_named_is_that_team_first(text: str) -> None:
+    """M5 found "Saltmarsh had a slight advantage in possession (52% vs. 48%)" published while
+    Saltmarsh had 48%: both numbers are true, so the number audit could not see it."""
+    assert "WRONG_ATTRIBUTION" in codes(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Harbor had the edge in possession (61% vs. 39%) in the second half.",
+        "Kestrel kiểm soát bóng 39% so với 61% của Harbor trong hiệp 2.",
+        "Harbor Lions FC kiểm soát bóng 61%, còn Kestrel Athletic 39% trong hiệp 2.",
+    ],
+)
+def test_a_pair_in_the_right_order_passes(text: str) -> None:
+    assert "WRONG_ATTRIBUTION" not in codes(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "wrong"),
+    [
+        ("Harbor kiểm soát bóng cao hơn Kestrel 61% trong hiệp 2.", True),
+        ("Harbor kept the ball more than Kestrel by 61% in the second half.", True),
+        ("Harbor kiểm soát bóng cao hơn Kestrel 22% trong hiệp 2, 61% so với 39%.", False),
+        ("Harbor kiểm soát bóng nhiều hơn Kestrel, 61% so với 39%, trong hiệp 2.", False),
+    ],
+)
+def test_a_number_after_than_a_team_is_the_gap(text: str, wrong: bool) -> None:
+    """M5 found "Ironvale kiểm soát bóng cao hơn SAL 52%" (52% was Ironvale's share, the gap
+    was 4 points)."""
+    assert ("WRONG_COMPARISON" in codes(text)) is wrong
