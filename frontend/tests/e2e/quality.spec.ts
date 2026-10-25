@@ -43,6 +43,8 @@ test("F6 the overlay is transparent outside the lower-third", async ({ page, req
   await page.goto(`/overlay/?match=${matchId}&lang=en`);
   const lowerThird = page.getByTestId("lower-third");
   await expect(lowerThird).toBeVisible({ timeout: 45_000 });
+  // the enter animation fades and slides it in; sample only once it has settled
+  await lowerThird.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const box = (await lowerThird.boundingBox())!;
   const png = await page.screenshot({ omitBackground: true });
   const samples = await page.evaluate(
