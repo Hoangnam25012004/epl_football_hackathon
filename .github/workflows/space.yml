@@ -1,0 +1,143 @@
+name: space
+
+# The public demo on a Hugging Face Space (docs/day7-design.md section 2.3): once `ci` is green on
+# main, build the main image and the Space image, push both to GHCR, point the Space at the Space
+# image by digest, then smoke-test the public URL. Run by hand from the Actions tab too.
+#
+# Repository settings: secret HF_TOKEN (write access to the Space); variables HF_SPACE
+# (owner/name), DEMO_URL (https://owner-name.hf.space), and optionally NEXT_PUBLIC_REPO_URL and
+# NEXT_PUBLIC_VIDEO_URL for the landing page's links.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Deploy even if nothing the image is built from has changed
+        type: boolean
+        default: false
+
+concurrency:
+  group: space
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      HF_SPACE: ${{ vars.HF_SPACE }}
+      DEMO_URL: ${{ vars.DEMO_URL }}
+      REPO_URL: ${{ vars.NEXT_PUBLIC_REPO_URL || format('https://github.com/{0}', github.repository) }}
+      VIDEO_URL: ${{ vars.NEXT_PUBLIC_VIDEO_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      - name: settings of the repository
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$HF_TOKEN" ] || missing="$missing secret HF_TOKEN,"
+          [ -n "$HF_SPACE" ] || missing="$missing variable HF_SPACE,"
+          [ -n "$DEMO_URL" ] || missing="$missing variable DEMO_URL,"
+          if [ -n "$missing" ]; then
+            echo "::error::set${missing%,} (docs/day7-design.md section 3.3)"
+            exit 1
+          fi
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo "SHORT=${SHA::7}" >> "$GITHUB_ENV"
+          echo "MAIN_IMAGE=ghcr.io/$owner/pundit-copilot" >> "$GITHUB_ENV"
+          echo "SPACE_IMAGE=ghcr.io/$owner/pundit-copilot-space" >> "$GITHUB_ENV"
+
+      - name: anything to deploy?
+        id: changes
+        env:
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          # the commit the Space runs now, from its /healthz; none (first deploy, Space asleep): deploy
+          running=$(curl -fsS --max-time 20 "$DEMO_URL/healthz" | python3 -c \
+            "import json,sys; print(json.load(sys.stdin).get('build') or '')" 2>/dev/null || true)
+          echo "the Space runs: ${running:-unknown}"
+          deploy=true
+          if [ "$FORCE" != true ] && [ -n "$running" ] && git cat-file -e "$running^{commit}" 2>/dev/null; then
+            if git diff --quiet "$running" "$SHA" -- backend frontend deploy Dockerfile .dockerignore; then
+              deploy=false
+              echo "::notice::nothing the image is built from changed since $running: no deploy"
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+      - name: log in to GHCR
+        if: steps.changes.outputs.deploy == 'true'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: build and push the main image
+        if: steps.changes.outputs.deploy == 'true'
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_REPO_URL="$REPO_URL" \
+            --build-arg NEXT_PUBLIC_VIDEO_URL="$VIDEO_URL" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$SHA" \
+            -t "$MAIN_IMAGE:sha-$SHORT" -t "$MAIN_IMAGE:latest" .
+          docker push --all-tags "$MAIN_IMAGE"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$MAIN_IMAGE:sha-$SHORT")
+          echo "MAIN_DIGEST=$digest" >> "$GITHUB_ENV"
+
+      - name: build and push the Space image
+        if: steps.changes.outputs.deploy == 'true'
+        run: |
+          docker build -f deploy/space/Dockerfile \
+            --build-arg BASE="$MAIN_DIGEST" \
+            --build-arg PUNDIT_BUILD="$SHORT" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$SHA" \
+            -t "$SPACE_IMAGE:sha-$SHORT" -t "$SPACE_IMAGE:latest" .
+          docker push --all-tags "$SPACE_IMAGE"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$SPACE_IMAGE:sha-$SHORT")
+          echo "SPACE_DIGEST=$digest" >> "$GITHUB_ENV"
+          docker image inspect "$SPACE_IMAGE:sha-$SHORT" --format 'size {{.Size}} bytes'
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: point the Space at the image
+        if: steps.changes.outputs.deploy == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: >
+          uv run --no-project --with huggingface_hub==2.2.0 python tools/ops/deploy_space.py
+          --space "$HF_SPACE" --image "$SPACE_DIGEST" --repo-url "$REPO_URL"
+
+      - name: smoke test of the public URL
+        run: |
+          build="$SHORT"
+          [ "${{ steps.changes.outputs.deploy }}" = true ] || build=""
+          uv run --no-project python tools/ops/smoke_space.py "$DEMO_URL" ${build:+--build "$build"}
+
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "### Space deploy of \`$SHORT\`"
+            echo ""
+            echo "- demo: $DEMO_URL"
+            echo "- main image: \`${MAIN_DIGEST:-not built}\`"
+            echo "- Space image: \`${SPACE_DIGEST:-not built}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

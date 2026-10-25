@@ -399,7 +399,7 @@ Gặp `os error 4551` khi `uv run`: báo Claude (Windows chặn `.venv`), không
 
    Hoặc bằng lệnh: `gh secret set HF_TOKEN` (dán token khi được hỏi), `gh variable set HF_SPACE --body "<username>/pundit-copilot"`, `gh variable set DEMO_URL --body "https://<username>-pundit-copilot.hf.space"`.
 5. Báo Claude đã xong M1 + M2 để chạy `space.yml` lần đầu (C3).
-6. **Sau lần chạy đầu của `space.yml`:** `https://github.com/dnam2501?tab=packages` → `pundit-copilot-space` (và `pundit-copilot`) → **Package settings** → **Change visibility → Public** (Space phải kéo được image mà không đăng nhập). Bảo Claude chạy lại `space.yml`.
+6. **Sau lần chạy đầu của `space.yml`:** `https://github.com/Hoangnam25012004?tab=packages` → `pundit-copilot-space` (và `pundit-copilot`) → **Package settings** → **Change visibility → Public** (Space phải kéo được image mà không đăng nhập). Bảo Claude chạy lại `space.yml`.
 7. **Kiểm tra:**
    - Space → tab **Logs** chuyển **Running**;
    - mở **link trực tiếp** `https://<username>-pundit-copilot.hf.space` (nút ⋮ → Embed this Space → Direct URL). Đây là link demo nộp bài; không dùng link `huggingface.co/spaces/…` vì app nằm trong iframe.
@@ -590,7 +590,7 @@ Kịch bản: `docs/video/script.md` bản mới (C11). Quay **từng cảnh m�
 3. Edge **InPrivate**, zoom 100 %, `F11` khi quay (không lộ thanh địa chỉ / logo trình duyệt).
 4. **App:**
    - quay trên **link Space** (đúng thứ giám khảo thấy);
-   - mạng chậm thì chạy cùng image ở máy: `docker run --cpus 2 -p 8000:8000 ghcr.io/dnam2501/pundit-copilot-space:latest` (Claude đưa lệnh đủ biến);
+   - mạng chậm thì chạy cùng image ở máy: `docker run --cpus 2 -p 8000:8000 ghcr.io/hoangnam25012004/pundit-copilot-space:latest` (Claude đưa lệnh đủ biến);
    - với cảnh 2, đợi model đã nóng (gửi một claim thử trước khi quay).
 5. **OBS** (profile `Pundit` 1920 × 1080, mở bằng PowerShell `Start-Process`):
    - Output → Recording: `mkv`, encoder phần cứng nếu có, "High Quality, Medium File Size";
@@ -626,7 +626,7 @@ Kịch bản: `docs/video/script.md` bản mới (C11). Quay **từng cảnh m�
 3. **Subtitles** → English → **Upload file → With timing** → `docs/video/subtitles.srt`.
 4. **Checks**: "No issues found". **Visibility: Public** → Publish. Chép `https://youtu.be/<id>`.
 5. Mở link trong InPrivate: phát được, có phụ đề, thời lượng < 2:00.
-6. Đặt biến repo `NEXT_PUBLIC_VIDEO_URL` = link video, `NEXT_PUBLIC_REPO_URL` = `https://github.com/dnam2501/pundit-copilot` (`gh variable set …`), rồi bảo Claude chạy `space.yml` để trang đầu có link.
+6. Đặt biến repo `NEXT_PUBLIC_VIDEO_URL` = link video, `NEXT_PUBLIC_REPO_URL` = URL của repo (`https://github.com/Hoangnam25012004/<tên repo>`; không đặt thì `space.yml` tự dùng URL của repo), rồi bảo Claude chạy `space.yml` để trang đầu có link.
 
 ### 3.17. M15: kiểm tra cuối (go / no-go)
 
@@ -733,3 +733,30 @@ Kịch bản: `docs/video/script.md` bản mới (C11). Quay **từng cảnh m�
 ## 7. As-built
 
 _(Claude điền khi làm: kết quả S1 / S2, khác biệt so với thiết kế, kết quả kiểm thử, số đo trên Space, lịch sử keepalive.)_
+
+### 7.1. C1 / S1 (25/10, máy dev, `docker run --cpus 2 --memory 7g`)
+
+Docker Desktop trên máy này chỉ có 8 GB RAM nên không chạy được `--memory 16g`; model 1,5B dùng dưới 2 GB nên không ảnh hưởng.
+
+| Lượt | Cấu hình | Model pass p50 / p95 | Model dùng được | Verdict sai | Số không nguồn |
+|---|---|---|---|---|---|
+| 1 | `qwen2.5:1.5b`, llama.cpp tự chọn 8 luồng | 136 s / 198 s | 0 / 20 (hết giờ 90 s) | 0 | 0 |
+| 2 | như trên, **2 luồng** | 114 s / 160 s | 8 / 20 (4 spec đều bị luật bác; 7 lời giải thích qua Guardrail, 24 bản nháp bị chặn) | 0 | 0 |
+
+- **Lỗi thật tìm ra:** llama.cpp đếm số lõi của máy (16), không theo hạn mức 2 CPU của container, nên chạy 8 luồng trên 2 CPU. Space cũng giới hạn bằng cgroup, nên sẽ gặp đúng lỗi này. Sửa: `warm_model.py` đọc `/sys/fs/cgroup/cpu.max` và đặt `num_thread` cho model (cùng tên, qua `/api/create`), vì Ollama 0.40 không có biến môi trường cho số luồng. Test: `tools/ops/test_ops.py`.
+- **Tốc độ:** sinh chữ 3,5–6 token/s, đọc prompt 15–30 token/s. Sinh chữ thường (không JSON schema) cũng chỉ 5,1 token/s, nên chỗ nghẽn là CPU mà Docker Desktop cấp, không phải ràng buộc schema.
+- **Gate S1: không đạt** ở máy dev (p95 160 s so với ngưỡng 45 s). Theo §2.1 phải đo lại trên Space thật (C10) trước khi chốt. Nếu Space cũng không đạt, chọn giữa `qwen2.5:0.5b` (nhanh hơn, nhưng 1,5B đã có 10/20 câu trả lời không dùng được) và chỉ dùng luật + bản ghi Foundry Local (C7 thành P0).
+- **Tạm thời, tới khi có C4:** `env.space` đặt `LLM_TIMEOUT_S=40`, `CLAIM_BUDGET_S=45`. Đo thật: một claim trả lời sau 45,2 s, verdict `TRUE` theo luật, cờ `analyst_fallback` + `explainer_fallback`. Đổi được bằng biến của Space mà không build lại.
+
+### 7.2. C2 / C3 (25/10)
+
+- **Image Space:** 2,58 GB (mục tiêu ≤ 4 GB). Ollama **v0.40.2** (08/10, kiểm SHA-256 của bản phát hành; bản 0.40.10 trên máy dev mới ra 2 ngày) chỉ giữ thư viện CPU, giữ nguyên các file license đi kèm; model nạp sẵn 941 MB; chạy dưới uid 1000, thư mục model thuộc uid 1000 (Ollama ghi manifest lúc khởi động). Khởi động lạnh tới `/healthz` OK: 26 s (mục tiêu ≤ 90 s); model nạp trong 15–19 s, chạy nền, không chặn server.
+- **Khác thiết kế:**
+  - Biến phụ thuộc host (`KEEPALIVE_URL`, `CORS_ORIGINS`, `MCP_ALLOWED_HOSTS`) lấy từ `SPACE_HOST` mà Hugging Face đặt sẵn trong container, không đặt qua API, nên `deploy_space.py` không cần quyền sửa biến của Space. Biến của Space vẫn thắng mọi giá trị mặc định trong `env.space`.
+  - `LLM_LIVE_SCOPE` (`all` / `claims`) làm trong C2 thay vì C4: với `claims`, studio và recap dùng template, recap theo luật.
+  - Thêm `build` vào `/healthz` (`PUNDIT_BUILD` = commit rút gọn): smoke chờ đến khi Space trả lời bằng đúng commit vừa deploy, không bị container cũ đánh lừa. `space.yml` cũng dùng nó để bỏ qua deploy khi từ commit Space đang chạy tới giờ không đổi gì trong `backend`, `frontend`, `deploy`, `Dockerfile`.
+  - Không thêm job build image Space vào `ci.yml` (2,6 GB, thêm vài phút mỗi push): image Space được build và smoke trong `space.yml` trên URL public. Test của `tools/ops` chạy trong job `security`.
+  - Piper chưa có (C8): `TTS_PROVIDER=browser`.
+- **`space.yml`:** chạy sau khi `ci` xanh trên `main` (`workflow_run`) hoặc chạy tay (`force`). Build image chính rồi image Space, push GHCR (`sha-<commit>` + `latest`, label `org.opencontainers.image.source`), `deploy_space.py` (`huggingface_hub==2.2.0`) ghi `README.md` + `Dockerfile` `FROM …@sha256:…` lên Space và chờ `RUNNING`, rồi `smoke_space.py`: `/healthz` đúng build, `/`, `/scenarios`, MCP `tools/list` = 9, `verify_claim` "Đội nhà áp đảo hiệp 2" = `TRUE` < 5 s. Smoke chạy với container local: đạt, claim 0,11 s.
+- **Space hiện có là `static`** (tạo nhầm loại), host `hnam2501-pundit-copilot.static.hf.space`. `deploy_space.py` ghi `sdk: docker` vào README; nếu sau commit Space vẫn không phải Docker thì script dừng và báo tạo lại Space loại Docker → Blank.
+- **Keepalive lớp 1:** container local với `KEEPALIVE_INTERVAL_S=60`: lượt ping đầu sau 60 s, HTTP 200, `/healthz` ghi `last_ok_at`.
