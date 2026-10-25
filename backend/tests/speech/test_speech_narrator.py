@@ -211,8 +211,11 @@ def test_gate_throttles_live_lines(tmp_path: Path) -> None:
         second = cue(narrator, line(20), priority=0)  # no token for 60 s, waits 1.5 s at most
         await narrator.idle()
         assert first.audio is not None and second.audio is not None
-        assert isinstance(await narrator.wait(first.audio.clip_id, "wav", 1), ClipFile)
-        assert await narrator.wait(second.audio.clip_id, "wav", 1) == ClipFailure("throttled")
+        # both look in the durable store on a thread first, so either may reach the gate first
+        clip_ids = (first.audio.clip_id, second.audio.clip_id)
+        results = [await narrator.wait(clip_id, "wav", 1) for clip_id in clip_ids]
+        assert sum(isinstance(r, ClipFile) for r in results) == 1
+        assert results.count(ClipFailure("throttled")) == 1
         assert narrator.breaker.state == "closed"  # the gate is not a failure of the service
         await narrator.aclose()
 
