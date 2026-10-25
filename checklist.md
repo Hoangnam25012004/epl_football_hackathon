@@ -226,6 +226,7 @@
 ## Ngày 7 — 27/10: Quay video, viết README, nộp bài
 
 > Toàn bộ tài liệu nộp phải bằng **tiếng Anh** (Rules mục 4.9).
+> Đã chốt không có Azure. Thiết kế phần còn lại, phân công Claude / bạn và hướng dẫn từng bước (Hugging Face Space, keepalive, Copilot, video, nộp bài): [docs/day7-design.md](docs/day7-design.md).
 
 **README & pitch**
 
