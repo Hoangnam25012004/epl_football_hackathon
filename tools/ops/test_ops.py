@@ -110,6 +110,7 @@ def test_the_space_name_is_owner_slash_name() -> None:
         ("RUNTIME_ERROR", "failed"),
         ("CONFIG_ERROR", "failed"),
         ("NO_APP_FILE", "failed"),
+        ("PAUSED", "failed"),  # waiting never ends it: seen with "Quota exceeded ... limit=0"
     ],
 )
 def test_the_stages_waited_for(stage: str, verdict: str) -> None:

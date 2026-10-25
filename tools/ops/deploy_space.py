@@ -22,13 +22,21 @@ ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "deploy" / "space" / "hf" / "README.md"
 IMAGE = re.compile(r"^[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$")
 SPACE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
-FAILED = {"BUILD_ERROR", "RUNTIME_ERROR", "CONFIG_ERROR", "NO_APP_FILE", "DELETING", "STOPPED"}
+# PAUSED does not end by waiting: the owner paused the Space, or the account has no quota for
+# its hardware (a new account can get `limit=0` for the free cpu-basic)
+FAILED = {
+    "BUILD_ERROR", "RUNTIME_ERROR", "CONFIG_ERROR", "NO_APP_FILE", "DELETING", "STOPPED", "PAUSED",
+}  # fmt: skip
 POLL_S = 10.0
 FIRST_POLL_S = 20.0  # the Space takes a few seconds to notice a new commit
 PRIVATE_HINT = (
     "on a first deploy, the GHCR packages are private and the Space cannot pull them: make "
     "pundit-copilot-space and pundit-copilot public, then run space.yml again "
     "(docs/day7-design.md section 3.3, step 6)"
+)
+QUOTA_HINT = (
+    "the Hugging Face account may not run this hardware: see Settings -> Billing of the account; "
+    "the image is in GHCR and a new run of space.yml deploys it once the Space can start"
 )
 
 
@@ -69,7 +77,7 @@ def stage_verdict(stage: str) -> str:
         return "done"
     if stage in FAILED:
         return "failed"
-    return "wait"  # BUILDING, APP_STARTING, RUNNING_BUILDING, RUNNING_APP_STARTING, PAUSED...
+    return "wait"  # BUILDING, APP_STARTING, RUNNING_BUILDING, RUNNING_APP_STARTING
 
 
 def deploy(space: str, image: str, repo_url: str, timeout_s: float) -> dict[str, Any]:
@@ -95,20 +103,23 @@ def deploy(space: str, image: str, repo_url: str, timeout_s: float) -> dict[str,
             "(docs/day7-design.md section 3.3)"
         )
     changed = info.sha != before
-    print(f"commit {commit.oid} on {space} ({'new image' if changed else 'image unchanged'})")
+    changes = "new image" if changed else "image unchanged"
+    print(f"commit {commit.oid} on {space} ({changes})", flush=True)
     deadline = time.monotonic() + timeout_s
     time.sleep(FIRST_POLL_S if changed else 0)
     while True:
         runtime = api.get_space_runtime(space)
         stage = str(getattr(runtime.stage, "value", runtime.stage))  # a str, or a SpaceStage
         verdict = stage_verdict(stage)
-        print(f"stage {stage}")
+        print(f"stage {stage}", flush=True)  # in order with the error on stderr
         if verdict == "done":
             return {"space": space, "image": image, "commit": commit.oid, "stage": stage}
         if verdict == "failed":
             message = runtime.raw.get("errorMessage") or "see the Logs tab of the Space"
             if stage == "BUILD_ERROR":
                 message += f" ({PRIVATE_HINT})"
+            elif "quota" in message.lower():
+                message += f" ({QUOTA_HINT})"
             raise DeployError(f"the Space is {stage}: {message}")
         if time.monotonic() > deadline:
             raise DeployError(f"the Space is still {stage} after {timeout_s:.0f} s")
