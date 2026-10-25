@@ -156,6 +156,18 @@ class SpeechHealth(BaseModel):
     stt: str
 
 
+class KeepaliveHealth(BaseModel):
+    """The app's ping of its own public URL (docs/day7-design.md section 2.2)."""
+
+    url: str
+    interval_s: float
+    checks: int
+    failures: int
+    last_ok_at: str | None
+    last_status: int | None
+    last_error: str | None
+
+
 class Health(BaseModel):
     status: Literal["ok"]
     llm_provider: str
@@ -166,6 +178,8 @@ class Health(BaseModel):
     studio: StudioHealth | None = None  # absent when STUDIO_ENABLED=false (the Day 2 shape)
     speech: SpeechHealth | None = None  # absent when TTS_PROVIDER=off (the Day 4 shape)
     mcp: McpHealth | None = None  # absent when MCP_ENABLED=false (the Day 5 shape)
+    keepalive: KeepaliveHealth | None = None  # only with KEEPALIVE_URL (the public host)
+    build: str | None = None  # only with PUNDIT_BUILD: the commit the image was built from
 
 
 class TalkingPointStatusBody(BaseModel):
@@ -268,6 +282,12 @@ async def healthz(request: Request) -> Health:
     mcp = getattr(request.app.state, "mcp", None)
     if mcp is not None and mcp.status != "disabled":
         blocks["mcp"] = McpHealth.model_validate(mcp.health())
+    keepalive = getattr(request.app.state, "keepalive", None)
+    if keepalive is not None:
+        blocks["keepalive"] = KeepaliveHealth.model_validate(keepalive.health())
+    build = request.app.state.settings.build
+    if build is not None:
+        blocks["build"] = build
     return Health(
         status="ok",
         llm_provider=service.provider,

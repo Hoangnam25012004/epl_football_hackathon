@@ -1272,7 +1272,9 @@ export interface PlayerBrief {
  * via the `definition` "Health".
  */
 export interface Health {
+  build?: string | null;
   degraded: string[];
+  keepalive?: KeepaliveHealth | null;
   llm_provider: string;
   mcp?: McpHealth | null;
   model: string;
@@ -1281,6 +1283,21 @@ export interface Health {
   status: "ok";
   studio?: StudioHealth | null;
   synthetic?: boolean;
+}
+/**
+ * The app's ping of its own public URL (docs/day7-design.md section 2.2).
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "KeepaliveHealth".
+ */
+export interface KeepaliveHealth {
+  checks: number;
+  failures: number;
+  interval_s: number;
+  last_error: string | null;
+  last_ok_at: string | null;
+  last_status: number | null;
+  url: string;
 }
 /**
  * MCP on /mcp (docs/day6-design.md section 3.7).

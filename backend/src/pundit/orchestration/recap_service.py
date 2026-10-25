@@ -76,9 +76,11 @@ def recap_llm_writer(settings: Settings) -> RecapWriterFactory:
 
 
 def default_recap_writer(settings: Settings) -> RecapWriterFactory:
-    return (
-        recap_mock_writer(settings) if settings.provider == "mock" else recap_llm_writer(settings)
-    )
+    if settings.provider == "mock":
+        return recap_mock_writer(settings)
+    if not settings.studio_uses_model:  # LLM_LIVE_SCOPE=claims: the deterministic recap
+        return lambda: None
+    return recap_llm_writer(settings)
 
 
 def check_parts(

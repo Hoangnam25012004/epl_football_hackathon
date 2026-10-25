@@ -1,5 +1,70 @@
 {
   "$defs": {
+    "KeepaliveHealth": {
+      "description": "The app's ping of its own public URL (docs/day7-design.md section 2.2).",
+      "properties": {
+        "checks": {
+          "title": "Checks",
+          "type": "integer"
+        },
+        "failures": {
+          "title": "Failures",
+          "type": "integer"
+        },
+        "interval_s": {
+          "title": "Interval S",
+          "type": "number"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Error"
+        },
+        "last_ok_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Ok At"
+        },
+        "last_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Status"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "interval_s",
+        "checks",
+        "failures",
+        "last_ok_at",
+        "last_status",
+        "last_error"
+      ],
+      "title": "KeepaliveHealth",
+      "type": "object"
+    },
     "McpHealth": {
       "description": "MCP on /mcp (docs/day6-design.md section 3.7).",
       "properties": {
@@ -218,12 +283,35 @@
     }
   },
   "properties": {
+    "build": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Build"
+    },
     "degraded": {
       "items": {
         "type": "string"
       },
       "title": "Degraded",
       "type": "array"
+    },
+    "keepalive": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/KeepaliveHealth"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "llm_provider": {
       "title": "Llm Provider",

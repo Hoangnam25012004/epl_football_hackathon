@@ -36,6 +36,10 @@ DEFAULT_MCP_RATE = 60
 
 Provider = Literal["mock", "ollama", "openai", "foundry"]
 RealProvider = Literal["ollama", "openai", "foundry"]
+# Day 7: who calls the live model. "claims" keeps it to the claim checker; the studio and the
+# recaps then write from their templates (a CPU model misses their 2.5-3 s budgets)
+LiveScope = Literal["all", "claims"]
+DEFAULT_KEEPALIVE_S = 1200.0
 REAL_PROVIDERS: tuple[RealProvider, ...] = ("ollama", "openai", "foundry")
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
@@ -70,6 +74,7 @@ class Settings(BaseModel):
     foundry_model_deployment: str | None = None
     # dev only; Entra ID (az login / managed identity) otherwise
     foundry_api_key: SecretStr | None = None
+    llm_live_scope: LiveScope = "all"
     llm_timeout_s: float = Field(default=DEFAULT_TIMEOUTS[0], gt=0)
     claim_budget_s: float = Field(default=DEFAULT_TIMEOUTS[1], gt=0)
     mock_llm_faults: str = ""
@@ -127,6 +132,15 @@ class Settings(BaseModel):
     private_idle_s: float = Field(default=900.0, gt=0)  # unwatched private session: removed
     shared_idle_s: float = Field(default=3600.0, gt=0)  # unwatched shared session: removed
     private_per_ip: int = Field(default=3, ge=1, le=100)  # new private sessions per 10 minutes
+    # Day 7: the app pings its own public URL so the free host does not put it to sleep
+    keepalive_url: str | None = None
+    keepalive_interval_s: float = Field(default=DEFAULT_KEEPALIVE_S, ge=60)
+    build: str | None = None  # PUNDIT_BUILD: the commit of the image, shown in /healthz
+
+    @property
+    def studio_uses_model(self) -> bool:
+        """The studio and the recaps call the live model (LLM_LIVE_SCOPE=all, not the mock)."""
+        return self.provider != "mock" and self.llm_live_scope == "all"
 
     @property
     def speech_enabled(self) -> bool:
@@ -178,6 +192,7 @@ class Settings(BaseModel):
         return {
             "llm_provider": self.provider,
             "model": self.model_name,
+            "llm_live_scope": self.llm_live_scope,
             "llm_timeout_s": self.llm_timeout_s,
             "claim_budget_s": self.claim_budget_s,
             "mock_llm_faults": self.mock_llm_faults or None,
@@ -208,6 +223,7 @@ class Settings(BaseModel):
                 "shared_idle_s": self.shared_idle_s,
                 "private_per_ip": self.private_per_ip,
             },
+            "keepalive": {"url": self.keepalive_url, "interval_s": self.keepalive_interval_s},
         }
 
     @classmethod
@@ -290,6 +306,18 @@ class Settings(BaseModel):
             problems.append("STUDIO_DROP_AT must not exceed STUDIO_QUEUE_SIZE")
         speech = _speech_values(get, number, integer, problems)
         hosts = _hosts(get("MCP_ALLOWED_HOSTS"), problems)
+        scope = (get("LLM_LIVE_SCOPE") or "all").lower()
+        if scope not in get_args(LiveScope):
+            problems.append(f"LLM_LIVE_SCOPE must be all or claims, got {scope!r}")
+            scope = "all"
+        keepalive_url = get("KEEPALIVE_URL")
+        if keepalive_url is not None and not keepalive_url.startswith(("http://", "https://")):
+            problems.append(f"KEEPALIVE_URL must be an http(s) URL, got {keepalive_url!r}")
+            keepalive_url = None
+        keepalive_s = number("KEEPALIVE_INTERVAL_S", DEFAULT_KEEPALIVE_S)
+        if keepalive_s < 60:
+            problems.append(f"KEEPALIVE_INTERVAL_S must be at least 60, got {keepalive_s:g}")
+            keepalive_s = DEFAULT_KEEPALIVE_S
         settings_values: dict[str, object] = {
             "use_mock_llm": use_mock,
             "llm_provider": provider if provider in REAL_PROVIDERS else None,
@@ -299,6 +327,7 @@ class Settings(BaseModel):
             "foundry_endpoint": get("FOUNDRY_ENDPOINT"),
             "foundry_model_deployment": get("FOUNDRY_MODEL_DEPLOYMENT"),
             "foundry_api_key": SecretStr(fkey) if (fkey := get("FOUNDRY_API_KEY")) else None,
+            "llm_live_scope": scope,
             "llm_timeout_s": number("LLM_TIMEOUT_S", timeout),
             "claim_budget_s": number("CLAIM_BUDGET_S", budget),
             "mock_llm_faults": faults,
@@ -326,6 +355,9 @@ class Settings(BaseModel):
             "private_idle_s": number("PRIVATE_IDLE_S", 900.0),
             "shared_idle_s": number("SHARED_IDLE_S", 3600.0),
             "private_per_ip": integer("PRIVATE_PER_IP", 3, 1, 100),
+            "keepalive_url": keepalive_url,
+            "keepalive_interval_s": keepalive_s,
+            "build": get("PUNDIT_BUILD"),
         }
         if problems:
             raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))

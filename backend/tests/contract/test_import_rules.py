@@ -5,7 +5,8 @@ domain <- stats <- state <- engine <- agents <- llm <- orchestration <- speech <
 
 Agents never import Microsoft Agent Framework, FastAPI or HTTP clients (principle L6); MAF lives
 in orchestration and llm.maf_backend only; FastAPI in api only; HTTP and the Azure SDK of the
-voice in the speech modules that talk to Azure; the MCP SDK in mcp_server.server only.
+voice in the speech modules that talk to Azure; the MCP SDK in mcp_server.server only. Day 7:
+HTTP also in api.keepalive, which pings the app's own public URL (docs/day7-design.md 2.2).
 """
 
 import ast
@@ -21,7 +22,13 @@ PACKAGE = Path(pundit.__file__).parent
 EXTERNAL = {
     "agent_framework": {"orchestration", "llm.maf_backend"},
     "openai": {"llm.maf_backend"},
-    "httpx": {"llm.maf_backend", "speech.azure_tts", "speech.azure_stt", "speech.auth"},
+    "httpx": {
+        "llm.maf_backend",
+        "speech.azure_tts",
+        "speech.azure_stt",
+        "speech.auth",
+        "api.keepalive",
+    },
     "azure": {"llm.maf_backend", "speech.auth", "speech.durable"},
     "fastapi": {"api"},
     "starlette": {"api", "mcp_server.server"},  # the SDK's HTTP transport is Starlette

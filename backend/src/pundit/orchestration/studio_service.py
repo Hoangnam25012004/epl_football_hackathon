@@ -72,6 +72,8 @@ def default_studio_ports(
 ) -> StudioPortsFactory:
     if settings.provider == "mock":
         return studio_mock_ports(settings)
+    if not settings.studio_uses_model:  # LLM_LIVE_SCOPE=claims: the templates write
+        return lambda: StudioPorts()
     return studio_llm_ports(settings, timeout_s=timeout_s)
 
 

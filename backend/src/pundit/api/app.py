@@ -15,6 +15,7 @@ from starlette.types import Scope
 
 from pundit.api import audio, routes, ws
 from pundit.api.hub import DEFAULT_QUEUE_SIZE
+from pundit.api.keepalive import Keepalive
 from pundit.api.mcp_mount import mount_mcp
 from pundit.api.sessions import SessionManager
 from pundit.api.studio import StudioCrew
@@ -71,6 +72,7 @@ def create_app(
     queue_size: int = DEFAULT_QUEUE_SIZE,
     narrator: Narrator | None = None,
     transcriber: Transcriber | None = None,
+    keepalive: Keepalive | None = None,
 ) -> FastAPI:
     """Build the app. Tests inject services (fault plans, fake clocks) and a replay clock.
     The studio runs unless STUDIO_ENABLED=false (then the app is exactly the Day 2 one); the
@@ -85,6 +87,8 @@ def create_app(
         narrator = build_narrator(settings)
     if transcriber is None:
         transcriber = build_transcriber(settings)  # P2: None unless STT_PROVIDER is set
+    if keepalive is None and settings.keepalive_url:  # Day 7: only on the public host
+        keepalive = Keepalive(settings.keepalive_url, settings.keepalive_interval_s)
     sessions = SessionManager(
         service,
         clock_factory=clock_factory,
@@ -102,11 +106,16 @@ def create_app(
         log.info("pundit api starting: %s", settings.describe())
         # a mounted app's lifespan never runs: the MCP session manager is started here
         janitor = asyncio.create_task(sessions.run_janitor(), name="session-janitor")
+        tasks = [janitor]
+        if keepalive is not None:
+            tasks.append(asyncio.create_task(keepalive.run(), name="keepalive"))
         async with app.state.mcp.run():
             yield
-            janitor.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await janitor
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
             await sessions.shutdown()
         if narrator is not None:
             await narrator.aclose()
@@ -126,6 +135,7 @@ def create_app(
     app.state.settings = settings
     app.state.narrator = narrator
     app.state.transcriber = transcriber
+    app.state.keepalive = keepalive
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
