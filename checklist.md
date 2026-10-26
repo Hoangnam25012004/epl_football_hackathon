@@ -14,17 +14,12 @@
 
 - [x] **P0** Đăng ký hackathon trên Innovation Studio trước hạn
 - [x] **P0** Đọc Official Rules và cập nhật vào `claude.md` (mục 1.1)
-- [ ] **P0** Tạo GitHub repo (public khi nộp), thêm `.gitignore`, `.env.example`, `README.md` khung
-- [ ] **P0** Tạo **Azure Free Account** (thẻ Visa, 200 USD) làm subscription chính, xem `claude.md` mục 6.0
-- [ ] **P0** Kích hoạt **Azure for Students** (email trường, 100 USD) làm dự phòng
-- [ ] **P0** Đặt budget alert 50% / 80% trên subscription chính. **Không** nâng cấp lên Pay-As-You-Go
-- [ ] **P0** Kiểm tra quota model trên Foundry của subscription vừa tạo. Nếu bị chặn, xử lý ngay trong ngày 0
-- [ ] **P0** Tạo Resource Group, Microsoft Foundry project + deploy 1 model "mini"; gọi thử 1 request thành công
-- [ ] **P0** Tạo Azure AI Speech; đọc thử 1 câu tiếng Việt bằng `vi-VN-HoaiMyNeural`
-- [ ] **P1** Cài đủ công cụ local: Python 3.12, `uv`, Node 20+, Docker, Azure CLI, `azd`
-- [ ] **P0** Chốt stack, model, region và ghi vào mục 8 của `claude.md`
+- [x] **P0** Tạo GitHub repo, thêm `.gitignore`, `.env.example`, `README.md` khung (repo `Hoangnam25012004/epl_football_hackathon`, push 25/10; đặt public khi `security` xanh)
+- [x] ~~**P0** Tạo Azure Free Account / Azure for Students, budget alert, quota Foundry, Resource Group, Foundry project + model, Azure AI Speech~~ **Huỷ (25/10): không có Azure.** Free Account bị từ chối ("not eligible", 20/10); thay bằng Hugging Face Space + model mở trong container + Foundry Local, xem [docs/day7-design.md](docs/day7-design.md) §0.1
+- [x] **P1** Cài công cụ local: Python 3.12, `uv`, Node 22, Docker, Ollama (không cần Azure CLI / `azd`; `gh` chưa cài, thao tác GitHub làm trên web)
+- [x] **P0** Chốt stack, model và ghi vào mục 8 của `claude.md` (không có region Azure)
 
-**Hoàn thành khi:** gọi được Foundry và Speech từ máy local.
+**Hoàn thành khi:** ~~gọi được Foundry và Speech từ máy local~~ gọi được model thật từ máy local (Ollama, 21/10).
 
 ---
 
@@ -79,7 +74,7 @@
 
 - [x] **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
 - [x] **B1 (LLM thật, local):** Ollama `qwen2.5:3b` (21/10): bộ eval 20 claim đúng 20/20, 0 verdict sai, held-out 10/10, không câu sai nào lọt Guardrail.
-- [ ] **B2 (Foundry):** chạy lại `pundit eval --provider foundry` khi có Azure (GitHub Models đã ngừng 30/07/2026).
+- [ ] **B2 (Foundry):** ~~`pundit eval --provider foundry` trên Azure~~ không có Azure; thay bằng eval với **Foundry Local** (`phi-4-mini`, cùng client OpenAI-compatible) ở Ngày 7 (C10, cần M3).
 
 **Kết quả (20/10):** 1210 test xanh (không cần mạng), coverage 94,9%; eval mock: 20/20 đúng, 0 verdict sai trên cả 2 bộ, held-out 9/10 có verdict (claim còn lại được từ chối an toàn), p95 36 ms. Chi tiết: day2-design §19.
 
@@ -171,9 +166,9 @@
 
 ---
 
-## Ngày 5 — 25/10: Azure Speech TTS + deploy lên Container Apps + App Insights
+## Ngày 5 — 25/10: Giọng đọc tiếng Việt + deploy (kế hoạch ban đầu: Azure Speech, Container Apps, App Insights)
 
-> Phần giọng đọc: thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day5-design.md](docs/day5-design.md). Chưa có Azure nên làm **mock-first**: WAV tất định cho dev / CI, giọng của trình duyệt để nghe tiếng Việt; Azure Speech gắn sau bằng cấu hình. Phần triển khai Azure có tài liệu riêng.
+> Phần giọng đọc: thiết kế chi tiết, thứ tự thực hiện và kế hoạch test ở [docs/day5-design.md](docs/day5-design.md). Làm **mock-first**: WAV tất định cho dev / CI, giọng của trình duyệt để nghe tiếng Việt; adapter Azure Speech có sẵn nhưng **không deploy** vì không có Azure. Trên Space: giọng trình duyệt, Piper nếu qua spike S2 (Ngày 7, C8).
 
 **Giọng đọc tiếng Việt**
 - [x] **P0** Tích hợp Azure AI Speech TTS cho bình luận real-time (stream audio về Fan VN Player): mỗi câu một clip qua `/audio`, Fan đọc lần lượt, bàn thắng chen ngang; adapter Azure REST + Managed Identity xong, chạy bằng mock và giọng trình duyệt, **Azure: chờ key**
@@ -184,16 +179,13 @@
 
 - Kết quả kiểm thử, khác biệt so với thiết kế và việc còn lại (tầng B Azure, nghe bằng tai): [docs/day5-design.md](docs/day5-design.md) §19.
 
-**Triển khai Azure**
+**Triển khai**
 - [x] **P0** Dockerfile cho backend + frontend (một image: FastAPI phục vụ UI tĩnh trên một origin; 542 MB, user không phải root, `HEALTHCHECK`; demo S1–S7, phiên riêng, `/mcp` chạy trên container; job CI `image` build + smoke)
-- [ ] **P0** Bicep / `azd`: Container Apps Env, Container Registry, Storage, Key Vault, App Insights (đã viết `azure.yaml` + `infra/`, biên dịch sạch bằng Bicep CLI 0.48.1; **chưa `azd up`**: chưa có subscription, máy chưa có `az` / `azd`)
-- [ ] **P0** Managed Identity truy cập Foundry, Speech, Storage (không để key trong code) (code đã dùng Entra ID; Bicep gán role cho user-assigned identity; chờ deploy)
-- [ ] **P0** Deploy lên **Azure Container Apps**, có URL public, `min replicas = 1` (Bicep đặt min = max = 1 vì phiên nằm trong bộ nhớ; chờ Azure)
-- [x] **P0** Health endpoint `/healthz` (có từ Ngày 2; `HEALTHCHECK` của image và probe trong Bicep dùng nó)
-- [ ] **P0** App Insights: log + trace cho từng agent call, đo độ trễ (mới có resource + connection string trong Bicep; code chưa gửi log / trace)
-- [ ] **P1** GitHub Actions: test → build image → deploy (test + build / smoke image trong `ci.yml`; `deploy.yml` bằng OIDC + `azd` đã viết, chưa chạy)
+- [x] **P0** Health endpoint `/healthz` (có từ Ngày 2; thêm `keepalive` và `build` ở Ngày 7)
+- [x] ~~**P0** Bicep / `azd`, Managed Identity, Azure Container Apps, App Insights~~ **Không deploy (không có Azure).** `azure.yaml` + `infra/` (biên dịch sạch) và `deploy.yml` giữ trong repo, README ghi "Azure-ready, not deployed". Thay bằng Hugging Face Space ở Ngày 7 (C2, C3)
+- [x] **P1** GitHub Actions: test → build image → deploy (`ci.yml` + `space.yml`: build → GHCR → Space → smoke; chạy lần đầu 25/10, xem Ngày 7)
 
-**Hoàn thành khi:** URL public chạy được demo đầy đủ, có audio tiếng Việt và log hiện trong App Insights.
+**Hoàn thành khi:** URL public chạy được demo đầy đủ, có giọng đọc tiếng Việt. (Chuyển sang Ngày 7: Space.)
 
 ---
 
@@ -208,7 +200,7 @@
 - [ ] **P0** Ghi kết quả eval vào README (bảng số liệu) (`docs/eval.md` tiếng Anh đã sẵn; chép vào README ở Ngày 7)
 
 **Độ trễ**
-- [ ] **P0** Đo trên bản deploy: event → talking point (< 3s), event → audio (< 5s) (chờ Azure, tầng B)
+- [ ] **P0** Đo trên bản deploy: event → talking point (< 3s), event → audio (< 5s) (đo trên Hugging Face Space ở Ngày 7, C10)
 - [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS (chưa cần: số đo local đạt; song song agent đã có từ Ngày 3)
 
 **Ổn định & UI**
@@ -219,7 +211,7 @@
 - [ ] **P1** Đóng gói Stats Tools thành **MCP server** read-only, demo gọi thử từ GitHub Copilot (điểm cộng cho tiêu chí Agentic) (MCP xong: stdio + `/mcp`, 9 tool; demo Copilot chờ M1)
 - [ ] **P1** Ghi lại cách đã dùng GitHub Copilot Agent Mode trong quá trình phát triển (hero technology) (`docs/copilot.md` có cấu hình và 6 câu; chỉ ghi việc đã làm thật, hiện chưa có)
 
-**Hoàn thành khi:** demo chạy trơn 3 lần liên tiếp trên URL public, không lỗi. (Bản local: 3/3 trên bản build production; URL public chờ Azure.)
+**Hoàn thành khi:** demo chạy trơn 3 lần liên tiếp trên URL public, không lỗi. (Bản local: 3/3 trên bản build production; URL public: Hugging Face Space, Ngày 7.)
 
 ---
 
@@ -228,22 +220,42 @@
 > Toàn bộ tài liệu nộp phải bằng **tiếng Anh** (Rules mục 4.9).
 > Đã chốt không có Azure. Thiết kế phần còn lại, phân công Claude / bạn và hướng dẫn từng bước (Hugging Face Space, keepalive, Copilot, video, nộp bài): [docs/day7-design.md](docs/day7-design.md).
 
+**Hạ tầng & tính năng bù khi không có Azure** (mã C = Claude, M = bạn; thiết kế: day7-design §0.5, as-built: §7)
+
+- [x] **P0** C1 / S1: đo model trên 2 CPU (25/10). **Gate chưa đạt ở máy dev:** `qwen2.5:1.5b` p95 160 s (ngưỡng 45 s), 0 verdict sai; sửa lỗi llama.cpp chạy 8 luồng trên 2 CPU. Đo lại trên Space thật (C10)
+- [ ] **P0** C1 / S2: Piper (license engine + giọng vi-VN, chất lượng 30 câu, RTF ≤ 0,5)
+- [x] **P0** C2: image Space (Ollama v0.40.2 CPU + model, uid 1000, `start.sh`, keepalive lớp 1 trong app; 2,58 GB, `/healthz` sau 26 s)
+- [x] **P0** C3: `space.yml` (sau `ci` xanh: build → GHCR → Space theo digest → smoke). Lần chạy đầu: build + push xong, **Space PAUSED vì tài khoản Hugging Face mới có hạn mức cpu-basic = 0** → chờ M2b
+- [ ] **P0** M2b: nâng Hugging Face PRO (hoặc tài khoản cũ hơn), đặt 2 package GHCR public, chạy lại `space` (`force`)
+- [ ] **P0** C4: claim progressive (rev.1 theo luật < 1 s, rev.2 do model). Tới khi có C4, claim trên Space chờ tối đa 45 s
+- [ ] **P0** C5: luồng `agent_event` + trang Agent Ops
+- [ ] **P1** C6: công tắc Chaos theo phiên riêng (có "model nói dối" để Guardrail chặn)
+- [ ] **P1** C7: ghi / phát lại phiên model bằng **Foundry Local** (`phi-4-mini`), nhãn "recorded" (cần M3)
+- [ ] **P0** M3: cài Foundry Local + model
+- [ ] **P0** C8: Piper TTS provider (nếu S2 đạt; không đạt thì giữ giọng trình duyệt)
+- [ ] **P0** C9: đánh bóng UX bản public (không còn chữ "mock", nhãn nguồn câu chữ đúng)
+- [ ] **P0** C10: eval với model của Space và Foundry Local + đo độ trễ trên Space
+- [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review · M5: UptimeRobot (lớp 3)
+- [ ] **P0** M6 + C13: duyệt bảng nhãn eval, chạy gate
+- [ ] **P1** Thêm file `LICENSE` cho repo public
+- [ ] **P2** Đổi tên repo thành `pundit-copilot` (tuỳ bạn; "EPL" nằm trong danh sách tên thật cần tránh của dự án)
+
 **README & pitch**
 
-> Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Hoàn thiện khi đã deploy và quay video (danh sách việc ở comment đầu README).
+> Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Cập nhật 26/10 theo hướng không có Azure (C11 hoàn thiện khi Space chạy và đã quay video).
 
-- [ ] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft / Azure nào, giải quyết vấn đề gì
+- [ ] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft nào, giải quyết vấn đề gì
 - [ ] **P0** Vấn đề → giải pháp → người dùng (studio + fan toàn cầu, ví dụ fan Việt)
 - [ ] **P0** Sơ đồ kiến trúc + bảng agent
-- [ ] **P0** Công nghệ Microsoft đã dùng (Foundry, Agent Framework, Speech, Container Apps, App Insights…)
+- [ ] **P0** Công nghệ Microsoft đã dùng, ghi đúng sự thật: Agent Framework, Foundry Local, GitHub Actions / GHCR, Copilot Agent Mode, MCP; Foundry cloud, Azure AI Speech, Bicep / `azd`: "Azure-ready, not deployed"
 - [ ] **P0** Bảng mapping **5 tiêu chí chấm**: tính năng nào đáp ứng tiêu chí nào
-- [ ] **P0** Hướng dẫn chạy local + `azd up`
-- [ ] **P0** Kết quả eval + số đo độ trễ
+- [ ] **P0** Hướng dẫn chạy local + image Space (Docker)
+- [ ] **P0** Kết quả eval + số đo độ trễ (trên Space)
 - [ ] **P0** Ghi rõ: chỉ dùng dữ liệu tổng hợp, không liên kết với Premier League / CLB nào
 - [ ] **P1** Ảnh chụp màn hình / GIF
 
 **Video demo (bắt buộc DƯỚI 2 phút)**
-- [x] **P0** (nháp `docs/video/script.md`, 1:55) Kịch bản khoảng 1:50: vấn đề (10s) → claim sai bị bắt kèm bằng chứng (25s) → talking point + lower-third (20s) → Analyst và Casual xem cùng một moment (20s) → bình luận tiếng Việt có giọng đọc + "Người mới xem" (20s) → kiến trúc multi-agent trên Azure (15s) → kết (5s)
+- [x] **P0** (nháp `docs/video/script.md`, 1:55; sửa đoạn kiến trúc theo Space + Foundry Local) Kịch bản khoảng 1:50: vấn đề (10s) → claim sai bị bắt kèm bằng chứng (25s) → talking point + lower-third (20s) → Analyst và Casual xem cùng một moment (20s) → bình luận tiếng Việt có giọng đọc + "Người mới xem" (20s) → kiến trúc multi-agent (Agent Framework, một container CPU, Foundry Local) (15s) → kết (5s)
 - [ ] **P0** Quay cảnh sản phẩm chạy thật trên bản deploy
 - [ ] **P0** Phụ đề tiếng Anh cho mọi đoạn tiếng Việt
 - [ ] **P0** Không dùng nhạc có bản quyền hay logo / thương hiệu bên thứ ba
@@ -260,17 +272,19 @@
 
 ## Sau khi nộp (27/10 → 10/11)
 
-- [ ] Giữ URL demo chạy miễn phí, không giới hạn tới hết **10/11** (Rules mục 4.8); theo dõi credit Azure
-- [ ] Sau 10/11: scale về 0 hoặc xoá Resource Group
+- [ ] Giữ URL demo chạy miễn phí, không giới hạn tới hết **10/11** (Rules mục 4.8): Space + 3 lớp keepalive; xem issue do watchdog mở
+- [ ] Sau 10/11: pause Space, tắt workflow watchdog, xoá token `github-actions-pundit`, pause UptimeRobot (day7-design §3)
 - [ ] Người thắng được công bố chậm nhất 20/11. Nếu thắng, phải nộp giấy tờ xác minh trong 10 ngày làm việc
 
 ## Thứ tự cắt phạm vi khi trễ
 
 Cắt theo thứ tự: STT (P2) → kịch bản 3 → sơ đồ sân → recap song ngữ → template lower-third phụ → CI/CD tự động.
-**Không cắt:** Claim Check + Guardrail, bình luận tiếng Việt + TTS, deploy Azure, README + video.
+**Không cắt:** Claim Check + Guardrail, bình luận tiếng Việt + giọng đọc, Space + keepalive, claim progressive, Agent Ops tối thiểu, README + video. Thứ tự cắt riêng của Ngày 7: day7-design §4.
 
 ## Chuyển sang ngày sau
 
 | Ngày | Mục chưa xong | Lý do | Xử lý |
 |---|---|---|---|
-| | | | |
+| 5 → 7 | Deploy URL public | Không có Azure | Hugging Face Space (C2, C3 xong; chờ hạn mức cpu-basic) |
+| 5 → 7 | Giọng neural tiếng Việt trên server | Không có Azure Speech | Piper nếu qua S2, không thì giọng trình duyệt |
+| 6 → 7 | Đo độ trễ trên bản deploy | Chưa có URL public | C10 trên Space |

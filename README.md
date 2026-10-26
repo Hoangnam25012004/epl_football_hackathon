@@ -1,9 +1,10 @@
 <!--
-Draft of 24/10/2026. To finish on Day 7, once the app is deployed:
+Draft of 26/10/2026 (no Azure: the public demo is a Hugging Face Space). To finish on Day 7:
 - the live demo and video links (top), and NEXT_PUBLIC_REPO_URL / NEXT_PUBLIC_VIDEO_URL at build;
-- "Microsoft technologies": Foundry and Azure AI Speech once they run live, the Azure resources
-  once `azd up` has deployed them, Copilot Agent Mode once docs/copilot.md has its runs;
-- the latency table on the deployed app (event -> talking point, event -> audio);
+- "Microsoft technologies": Foundry Local once sessions are recorded and evaluated with it,
+  Copilot Agent Mode once docs/copilot.md has its runs, Piper once spike S2 passes;
+- the model and latency measured on the Space (claim, event -> talking point, event -> audio);
+- the progressive claim, Agent Ops and Chaos once they are built;
 - screenshots.
 -->
 
@@ -21,7 +22,7 @@ Prize, Best Multi-Agent System).
 
 | | |
 |---|---|
-| Live demo | _added at submission_ |
+| Live demo | _added at submission_ (one container on a free Hugging Face Space, no login) |
 | Demo video (< 2 min) | _added at submission_ |
 | Results | [docs/eval.md](docs/eval.md) |
 
@@ -46,8 +47,9 @@ around the world follow a match in a language that is not English, often new to 
 
 **For fans**:
 
-- **Live commentary in Vietnamese or English**, read aloud (Vietnamese neural voice), faster and
-  higher on a goal.
+- **Live commentary in Vietnamese or English**, read aloud from a spoken script the server
+  checks (numbers written as words), faster and higher on a goal. In the public demo the
+  browser's Vietnamese voice reads it.
 - **Beginner mode** explains offside, VAR, penalties… the first time they happen.
 - **Personalised**: analyst (dense numbers) or casual (plain words), a favourite club, one player
   followed all match, one metric only. The same moment, written two ways: see the compare page.
@@ -112,7 +114,7 @@ flowchart LR
 | FactPackBuilder | The facts a moment may cite | No |
 | TalkingPointWriter · GraphicsDesigner · Commentator | Talking points, lower-thirds, commentary in four versions (VI / EN × analyst / casual), in parallel | LLM, within budgets |
 | RecapWriter | Half-time and full-time recaps | LLM |
-| Narrator | Spoken script (numbers written as words, checked back), prosody, audio clips | No (speech service) |
+| Narrator | Spoken script (numbers written as words, checked back), prosody, audio clips | No (a voice: the browser's in the demo; Azure AI Speech supported) |
 
 **Multi-agent design.** The agents share one match state pinned at an event (`as_of`), hand off
 typed messages through **Microsoft Agent Framework** workflows (sequential for claims, fan-out /
@@ -144,13 +146,28 @@ page in both themes and languages, secret and Official Rules scans on the whole 
 
 ## Microsoft technologies
 
+This project had **no Azure subscription** (the free offer was refused for the account), so
+nothing below runs on Azure. The table says what runs and where.
+
 | Technology | How it is used | Status |
 |---|---|---|
-| **Microsoft Agent Framework** | The claim and studio workflows (executors, typed messages, fan-out / fan-in) | In use |
-| **Microsoft Foundry** | The agents' model provider, through an OpenAI-compatible client with Entra ID | Built and tested with mocks; the same client was evaluated with a local model while the Azure subscription was pending |
-| **Azure AI Speech** | Vietnamese neural voices (HoaiMy, NamMinh) by REST with SSML prosody; speech to text for spoken claims | Built and tested against a deterministic mock voice; live run pending |
-| **GitHub Actions** | Tests, the evaluation gate, secret and compliance scans | Workflow in the repository |
-| **GitHub Copilot Agent Mode** | A client of the MCP server ([docs/copilot.md](docs/copilot.md)) | Setup ready; runs pending |
+| **Microsoft Agent Framework** | The claim and studio workflows (executors, typed messages, fan-out / fan-in) | In use, in the public demo |
+| **Microsoft Foundry Local** | Runs a model on the developer's machine through the same OpenAI-compatible client as Foundry: records model sessions that the demo replays through the full pipeline and guardrail, and evaluates the claim checker | Planned for Day 7 |
+| **MCP** | The read-only statistics server (stdio and `/mcp`, 9 tools) | In use, in the public demo |
+| **GitHub Actions + GHCR** | Tests, the evaluation gate, secret and compliance scans; builds the images, pushes them to GHCR and deploys the Space by image digest, then smoke-tests it | In use |
+| **GitHub Copilot Agent Mode** | A client of the MCP server, and the author of the keepalive watchdog ([docs/copilot.md](docs/copilot.md)) | Setup ready; runs pending |
+| Microsoft Foundry (cloud), Azure AI Speech, Azure Container Apps, Application Insights | Foundry client with Entra ID, Vietnamese neural voices by REST with SSML, Bicep / `azd` infrastructure (`infra/`, `azure.yaml`) | **Azure-ready, not deployed**: built and tested against deterministic mocks only |
+
+## Deployment
+
+The public demo is **one container on a free Hugging Face Space** (2 vCPU, no GPU), built from
+this repository by GitHub Actions ([.github/workflows/space.yml](.github/workflows/space.yml)):
+the API, the static UI, `/mcp` and an open model on the CPU (Ollama, `qwen2.5:1.5b`, Apache-2.0)
+for the claim checker only. The studio writes from its templates there: a CPU model cannot meet
+its 2.5–3 s budgets. The app pings its own public URL so the Space does not sleep. A broadcaster
+could run the same image on premises or in an outside-broadcast truck: the data never leaves the
+machine and nothing needs a cloud account. Design and measurements:
+[docs/day7-design.md](docs/day7-design.md).
 
 ## Run it locally
 
@@ -166,6 +183,10 @@ Or with Docker:
 ```bash
 docker build -t pundit-copilot .
 docker run -p 8000:8000 pundit-copilot
+
+# the image of the public demo: the same app plus Ollama and its model on the CPU
+docker build -f deploy/space/Dockerfile -t pundit-copilot-space .
+docker run --cpus 2 -p 8000:8000 pundit-copilot-space
 ```
 
 Open the landing page and press **Start my demo match**. No account is needed. The default runs
@@ -187,13 +208,17 @@ uv run --project backend pundit mcp                 # the MCP server over stdio
 | `backend/` | Python 3.12: match engine, Stats Tools, agents, workflows, API, speech, MCP server |
 | `frontend/` | Next.js (static export): landing page, studio, overlay, fan player, compare page |
 | `packages/schemas/` | JSON Schemas shared by both sides |
+| `deploy/space/` | The Hugging Face Space image: Ollama on the CPU, start script, defaults |
+| `infra/`, `azure.yaml` | Bicep / `azd` for Azure (not deployed) |
 | `docs/` | Designs and as-built notes per day, evaluation, MCP, Copilot |
 | `tools/security/` | Secret and Official Rules scanners |
+| `tools/ops/` | Deploy and smoke-test scripts of the Space |
 
 ## Synthetic data and responsible use
 
 - No real league, club, player or referee name, logo or data; a scanner checks the product code
   and data for real names on every CI run, and every screen carries a "Synthetic data" label.
-- Unsafe or demeaning language about players, clubs or officials is blocked by the guardrail and
-  the provider's content filter; a filtered text is never published.
+- Unsafe or demeaning language about players, clubs or officials is blocked by the guardrail
+  (and by the provider's content filter when the model runs on Foundry); a blocked text is never
+  published.
 - Most of the code was written with Claude Code (Anthropic).
