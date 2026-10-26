@@ -295,6 +295,18 @@
       "default": null,
       "title": "Build"
     },
+    "claim_progressive": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Claim Progressive"
+    },
     "degraded": {
       "items": {
         "type": "string"
@@ -312,6 +324,19 @@
         }
       ],
       "default": null
+    },
+    "llm_live_scope": {
+      "anyOf": [
+        {
+          "const": "claims",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Llm Live Scope"
     },
     "llm_provider": {
       "title": "Llm Provider",

@@ -2,6 +2,7 @@
 item, 422 bad input or profile, 409 a recap that is not ready yet. An LLM problem is never a
 5xx: the claim (or the studio item) is answered by the deterministic path and flagged."""
 
+import time
 from typing import Annotated, Any, Literal, get_args
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -9,6 +10,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from pundit.agents.contracts import (
+    AgentOpsSnapshot,
+    ChaosCommand,
+    ChaosStatus,
     ClaimRequest,
     ClaimResult,
     CommentaryView,
@@ -29,6 +33,7 @@ from pundit.agents.voices import voice_list
 from pundit.api.onair import OnAirCommand, OnAirError, OnAirState
 from pundit.api.panels import MAX_IDS, MAX_LAST, EventsPage, Period, StatsPanel, TimelineView
 from pundit.api.sessions import (
+    ChaosRefused,
     MatchSession,
     SessionManager,
     SessionsFull,
@@ -180,6 +185,10 @@ class Health(BaseModel):
     mcp: McpHealth | None = None  # absent when MCP_ENABLED=false (the Day 5 shape)
     keepalive: KeepaliveHealth | None = None  # only with KEEPALIVE_URL (the public host)
     build: str | None = None  # only with PUNDIT_BUILD: the commit the image was built from
+    # Day 7, only when switched on (the Day 6 shape otherwise): the model writes claims only;
+    # claims answer from the rules first, the model pass follows
+    llm_live_scope: Literal["claims"] | None = None
+    claim_progressive: bool | None = None
 
 
 class TalkingPointStatusBody(BaseModel):
@@ -285,9 +294,13 @@ async def healthz(request: Request) -> Health:
     keepalive = getattr(request.app.state, "keepalive", None)
     if keepalive is not None:
         blocks["keepalive"] = KeepaliveHealth.model_validate(keepalive.health())
-    build = request.app.state.settings.build
-    if build is not None:
-        blocks["build"] = build
+    settings = request.app.state.settings
+    if settings.build is not None:
+        blocks["build"] = settings.build
+    if settings.llm_live_scope == "claims":
+        blocks["llm_live_scope"] = "claims"
+    if settings.claim_progressive:
+        blocks["claim_progressive"] = True
     return Health(
         status="ok",
         llm_provider=service.provider,
@@ -509,6 +522,33 @@ async def get_moments(
 ) -> list[Moment]:
     session = _session(request, match_id)
     return [m for m in session.moments if since is None or m.seq > since]
+
+
+@router.get("/matches/{match_id}/agents", response_model=AgentOpsSnapshot)
+async def get_agents(match_id: str, request: Request) -> AgentOpsSnapshot:
+    """Agent Ops (Day 7): every agent of the session, its calls, p95, sources and breaker;
+    the latest events. Live updates: /ws/agents/{match_id}."""
+    return _session(request, match_id).agent_ops.snapshot()
+
+
+@router.get("/matches/{match_id}/chaos", response_model=ChaosStatus)
+async def get_chaos(match_id: str, request: Request) -> ChaosStatus:
+    """Chaos (Day 7): what is broken in this private session; `available` is false on a
+    shared one."""
+    return _session(request, match_id).chaos_status()
+
+
+@router.post("/matches/{match_id}/chaos", response_model=ChaosStatus)
+async def post_chaos(match_id: str, body: ChaosCommand, request: Request) -> ChaosStatus:
+    """Break the model of your own demo match for a while (one fault at a time, off after
+    `duration_s`, at most 300 s); `fault: null` resets it. 403 on a shared match, 429 when
+    switched more than 10 times a minute."""
+    session = _session(request, match_id)
+    try:
+        return session.switch_chaos(body, time.monotonic())
+    except ChaosRefused as exc:
+        code = 403 if not session.private else 429
+        raise HTTPException(status_code=code, detail=str(exc)) from None
 
 
 @router.post("/claims/verify", response_model=ClaimResult)

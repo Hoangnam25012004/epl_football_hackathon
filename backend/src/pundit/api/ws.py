@@ -14,7 +14,7 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from pundit.agents.contracts import Profile
+from pundit.agents.contracts import AgentOpsMessage, Profile
 from pundit.agents.personalize import ProfileError, parse_profile
 from pundit.api.hub import Client
 from pundit.api.sessions import MatchSession, SessionManager
@@ -97,3 +97,47 @@ async def match_stream(websocket: WebSocket, match_id: str) -> None:
         pass
     finally:
         session.hub.unsubscribe(client)
+
+
+async def _send_agents(websocket: WebSocket, queue: "asyncio.Queue[AgentOpsMessage]") -> None:
+    while True:
+        message = await queue.get()
+        await websocket.send_text(message.model_dump_json())
+
+
+@router.websocket("/ws/agents/{match_id}")
+async def agents_stream(websocket: WebSocket, match_id: str) -> None:
+    """Agent Ops (Day 7, docs/day7-design.md section 2.5): `hello` with the snapshot, then
+    batches of agent events at most every 100 ms. Its own stream: the match's WebSocket and its
+    message numbers are untouched."""
+    sessions: SessionManager = websocket.app.state.manager
+    session = sessions.get(match_id)
+    await websocket.accept()
+    if session is None:
+        await websocket.close(code=UNKNOWN_MATCH, reason=close_reason(f"unknown match {match_id}"))
+        return
+    ops = session.agent_ops
+    if ops.clients >= MAX_CLIENTS:
+        await websocket.close(code=TOO_MANY, reason=close_reason("too many Agent Ops viewers"))
+        return
+    queue = ops.subscribe()
+    try:
+        hello = AgentOpsMessage(type="hello", payload=ops.snapshot())
+        await websocket.send_text(hello.model_dump_json())
+        tasks = [
+            asyncio.create_task(_send_agents(websocket, queue)),
+            asyncio.create_task(_receive(websocket)),
+        ]
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        for task in pending:
+            with contextlib.suppress(asyncio.CancelledError, WebSocketDisconnect):
+                await task
+        for task in done:
+            with contextlib.suppress(WebSocketDisconnect, RuntimeError):
+                task.result()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ops.unsubscribe(queue)

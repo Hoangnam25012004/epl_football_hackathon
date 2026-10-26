@@ -112,6 +112,16 @@ def test_the_health_page_names_the_build_only_when_the_image_has_one() -> None:
         assert "build" not in client.get("/healthz").json()
 
 
+def test_the_health_page_says_how_the_model_is_used_only_when_it_changed() -> None:
+    settings = api_settings(llm_live_scope="claims", claim_progressive=True)
+    with TestClient(create_app(settings)) as client:
+        body = client.get("/healthz").json()
+    assert (body["llm_live_scope"], body["claim_progressive"]) == ("claims", True)
+    with TestClient(create_app(api_settings())) as client:
+        body = client.get("/healthz").json()
+    assert "llm_live_scope" not in body and "claim_progressive" not in body  # the Day 6 shape
+
+
 def test_settings_build_the_task_from_the_environment() -> None:
     settings = Settings.from_env({"KEEPALIVE_URL": URL, "KEEPALIVE_INTERVAL_S": "900"})
     assert (settings.keepalive_url, settings.keepalive_interval_s) == (URL, 900)

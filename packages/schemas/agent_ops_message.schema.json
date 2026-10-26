@@ -1,0 +1,499 @@
+{
+  "$defs": {
+    "AgentEvent": {
+      "additionalProperties": false,
+      "description": "An agent of a run started or ended (docs/day7-design.md section 2.5), on /ws/agents.",
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "as_of_display": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of Display"
+        },
+        "as_of_seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of Seq"
+        },
+        "breaker": {
+          "anyOf": [
+            {
+              "enum": [
+                "closed",
+                "open",
+                "half_open"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Breaker"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "guardrail": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Guardrail",
+          "type": "array"
+        },
+        "handoff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Handoff"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "tool",
+            "llm",
+            "guardrail",
+            "fallback"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "start",
+            "end"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "enum": [
+                "llm_live",
+                "llm_recorded",
+                "rules",
+                "template"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "ok",
+                "error",
+                "retry",
+                "fallback",
+                "rejected"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "workflow": {
+          "enum": [
+            "claim",
+            "studio",
+            "narrator"
+          ],
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "run_id",
+        "workflow",
+        "agent",
+        "kind",
+        "name",
+        "phase"
+      ],
+      "title": "AgentEvent",
+      "type": "object"
+    },
+    "AgentEventBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "dropped": {
+          "default": 0,
+          "title": "Dropped",
+          "type": "integer"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "title": "AgentEventBatch",
+      "type": "object"
+    },
+    "AgentOpsSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentStat"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "breakers": {
+          "additionalProperties": {
+            "enum": [
+              "closed",
+              "open",
+              "half_open"
+            ],
+            "type": "string"
+          },
+          "title": "Breakers",
+          "type": "object"
+        },
+        "chaos": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChaosStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "match_id": {
+          "title": "Match Id",
+          "type": "string"
+        },
+        "recent": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "title": "Recent",
+          "type": "array"
+        },
+        "synthetic": {
+          "default": true,
+          "title": "Synthetic",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "match_id",
+        "agents",
+        "breakers",
+        "recent"
+      ],
+      "title": "AgentOpsSnapshot",
+      "type": "object"
+    },
+    "AgentStat": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "calls": {
+          "title": "Calls",
+          "type": "integer"
+        },
+        "errors": {
+          "title": "Errors",
+          "type": "integer"
+        },
+        "fallbacks": {
+          "title": "Fallbacks",
+          "type": "integer"
+        },
+        "last_input": {
+          "additionalProperties": true,
+          "title": "Last Input",
+          "type": "object"
+        },
+        "last_output": {
+          "additionalProperties": true,
+          "title": "Last Output",
+          "type": "object"
+        },
+        "last_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Run Id"
+        },
+        "last_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "ok",
+                "error",
+                "retry",
+                "fallback",
+                "rejected"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Status"
+        },
+        "p95_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "P95 Ms"
+        },
+        "rejected": {
+          "title": "Rejected",
+          "type": "integer"
+        },
+        "sources": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Sources",
+          "type": "object"
+        },
+        "workflow": {
+          "enum": [
+            "claim",
+            "studio",
+            "narrator"
+          ],
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow",
+        "agent",
+        "calls",
+        "fallbacks",
+        "rejected",
+        "errors",
+        "p95_ms",
+        "sources",
+        "last_status",
+        "last_run_id",
+        "last_input",
+        "last_output"
+      ],
+      "title": "AgentStat",
+      "type": "object"
+    },
+    "ChaosStatus": {
+      "additionalProperties": false,
+      "description": "The chaos of a session (docs/day7-design.md section 2.6); only private ones have it.",
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "calls": {
+          "default": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "claim_breaker": {
+          "anyOf": [
+            {
+              "enum": [
+                "closed",
+                "open",
+                "half_open"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Claim Breaker"
+        },
+        "fault": {
+          "anyOf": [
+            {
+              "enum": [
+                "model_down",
+                "model_slow",
+                "model_garbage",
+                "rate_limited",
+                "content_filter",
+                "model_lies"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fault"
+        },
+        "lies_published": {
+          "default": 0,
+          "title": "Lies Published",
+          "type": "integer"
+        },
+        "lies_told": {
+          "default": 0,
+          "title": "Lies Told",
+          "type": "integer"
+        },
+        "seconds_left": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seconds Left"
+        },
+        "studio_breaker": {
+          "anyOf": [
+            {
+              "enum": [
+                "closed",
+                "open",
+                "half_open"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Studio Breaker"
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "title": "ChaosStatus",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "payload": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentOpsSnapshot"
+        },
+        {
+          "$ref": "#/$defs/AgentEventBatch"
+        }
+      ],
+      "title": "Payload"
+    },
+    "type": {
+      "enum": [
+        "hello",
+        "events"
+      ],
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "payload"
+  ],
+  "title": "AgentOpsMessage",
+  "type": "object"
+}

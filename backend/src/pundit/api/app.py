@@ -22,6 +22,7 @@ from pundit.api.studio import StudioCrew
 from pundit.domain.meta import DISCLAIMER
 from pundit.engine.replay import Clock, RealClock
 from pundit.llm.settings import Settings
+from pundit.orchestration.progressive import ModelPassQueue
 from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.service import ClaimService
 from pundit.orchestration.studio_service import StudioService
@@ -89,6 +90,15 @@ def create_app(
         transcriber = build_transcriber(settings)  # P2: None unless STT_PROVIDER is set
     if keepalive is None and settings.keepalive_url:  # Day 7: only on the public host
         keepalive = Keepalive(settings.keepalive_url, settings.keepalive_interval_s)
+    model_passes = (  # Day 7: rev.1 from the rules at once, the model pass on one worker
+        ModelPassQueue(
+            service,
+            max_waiting=settings.model_queue_max,
+            budget_s=settings.model_pass_budget_s,
+        )
+        if settings.claim_progressive
+        else None
+    )
     sessions = SessionManager(
         service,
         clock_factory=clock_factory,
@@ -99,6 +109,7 @@ def create_app(
         private_idle_s=settings.private_idle_s,
         shared_idle_s=settings.shared_idle_s,
         private_per_ip=settings.private_per_ip,
+        model_passes=model_passes,
     )
 
     @asynccontextmanager

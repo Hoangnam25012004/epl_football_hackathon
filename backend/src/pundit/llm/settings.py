@@ -75,6 +75,10 @@ class Settings(BaseModel):
     # dev only; Entra ID (az login / managed identity) otherwise
     foundry_api_key: SecretStr | None = None
     llm_live_scope: LiveScope = "all"
+    # Day 7: the claim answers from the rules at once, the model pass follows (section 2.4)
+    claim_progressive: bool = False
+    model_pass_budget_s: float = Field(default=60.0, gt=0)
+    model_queue_max: int = Field(default=4, ge=0, le=64)
     llm_timeout_s: float = Field(default=DEFAULT_TIMEOUTS[0], gt=0)
     claim_budget_s: float = Field(default=DEFAULT_TIMEOUTS[1], gt=0)
     mock_llm_faults: str = ""
@@ -193,6 +197,11 @@ class Settings(BaseModel):
             "llm_provider": self.provider,
             "model": self.model_name,
             "llm_live_scope": self.llm_live_scope,
+            "claim_progressive": {
+                "enabled": self.claim_progressive,
+                "model_pass_budget_s": self.model_pass_budget_s,
+                "model_queue_max": self.model_queue_max,
+            },
             "llm_timeout_s": self.llm_timeout_s,
             "claim_budget_s": self.claim_budget_s,
             "mock_llm_faults": self.mock_llm_faults or None,
@@ -328,6 +337,9 @@ class Settings(BaseModel):
             "foundry_model_deployment": get("FOUNDRY_MODEL_DEPLOYMENT"),
             "foundry_api_key": SecretStr(fkey) if (fkey := get("FOUNDRY_API_KEY")) else None,
             "llm_live_scope": scope,
+            "claim_progressive": flag("CLAIM_PROGRESSIVE", False),
+            "model_pass_budget_s": number("MODEL_PASS_BUDGET_S", 60.0),
+            "model_queue_max": integer("MODEL_QUEUE_MAX", 4, 0, 64),
             "llm_timeout_s": number("LLM_TIMEOUT_S", timeout),
             "claim_budget_s": number("CLAIM_BUDGET_S", budget),
             "mock_llm_faults": faults,

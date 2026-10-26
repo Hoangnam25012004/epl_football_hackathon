@@ -32,6 +32,7 @@ const SCHEMAS = [
   "claim_request",
   "speech_voice", // Day 5: the voices of the fan player
   "recognition_result", // Day 5: speech to text of a spoken claim
+  "agent_ops_message", // Day 7: Agent Ops (hello with the snapshot, batches of events)
 ];
 
 const BANNER = `/* eslint-disable */

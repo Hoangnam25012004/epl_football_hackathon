@@ -137,7 +137,13 @@ class StudioDirector:
     async def _process(self, trigger: Trigger, offered: float) -> None:
         first = tuple(rule for rule in trigger.rules if rule not in self.seen_rules)
         view = self.host.view_at(trigger.seq)
-        output = await self.crew.service.run(StudioJob(trigger=trigger, first_rules=first), view)
+        ops = getattr(self.host, "agent_ops", None)  # Day 7: the session's Agent Ops, if any
+        listen = (lambda seq: ops.listener("studio", trigger.id, seq)) if ops is not None else None
+        # Day 7: a private session whose chaos was switched on has its own service
+        service = getattr(self.host, "studio_service_override", None) or self.crew.service
+        output = await service.run(
+            StudioJob(trigger=trigger, first_rules=first), view, listen=listen
+        )
         # the trace first: the Narrator places its spans after the job's (Day 5)
         _put(self.traces, trigger.id, output.trace or (), MAX_TRACES)
         # a rule is met once an item carried it (a statistics rule only where a text names it)

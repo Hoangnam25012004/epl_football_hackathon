@@ -6,12 +6,25 @@ summaries of at most 2 KB with secrets removed; prompts are recorded by version 
 """
 
 import json
+import logging
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from pundit.agents.contracts import SpanKind, SpanStatus, TraceSpan
+
+log = logging.getLogger("pundit.trace")
+
+
+class TraceListener(Protocol):
+    """Told when a span starts and ends (Day 7: the live Agent Ops view). It must not raise; a
+    listener that does is logged and the run goes on."""
+
+    def started(self, handle: "SpanHandle") -> None: ...
+
+    def finished(self, span: TraceSpan) -> None: ...
+
 
 MAX_SUMMARY_BYTES = 2048
 SECRET_KEYS = frozenset(
@@ -77,13 +90,26 @@ class SpanHandle:
 class TraceRecorder:
     """Collects the spans of one claim. Not shared between claims."""
 
-    def __init__(self, trace_id: str, *, clock: Callable[[], float] = time.perf_counter) -> None:
+    def __init__(
+        self,
+        trace_id: str,
+        *,
+        clock: Callable[[], float] = time.perf_counter,
+        listener: TraceListener | None = None,
+    ) -> None:
         self.trace_id = trace_id
         self._clock = clock
         self._origin = clock()
         self._count = 0
         self._spans: dict[str, TraceSpan] = {}
         self._order: list[str] = []
+        self._listener = listener
+
+    def _tell(self, call: Callable[[], None]) -> None:
+        try:
+            call()
+        except Exception:  # the view of a run never breaks the run
+            log.exception("trace listener failed on %s", self.trace_id)
 
     def elapsed_ms(self) -> float:
         return (self._clock() - self._origin) * 1000
@@ -106,7 +132,7 @@ class TraceRecorder:
         self._count += 1
         span_id = f"{self.trace_id}-s{self._count:02d}"
         self._order.append(span_id)
-        return SpanHandle(
+        handle = SpanHandle(
             recorder=self,
             span_id=span_id,
             parent_id=parent.span_id if parent is not None else None,
@@ -118,6 +144,10 @@ class TraceRecorder:
             model=model,
             started=self._clock(),
         )
+        if self._listener is not None:
+            listener = self._listener
+            self._tell(lambda: listener.started(handle))
+        return handle
 
     def _close(
         self, handle: SpanHandle, output: dict[str, Any], status: SpanStatus, error: str | None
@@ -140,6 +170,9 @@ class TraceRecorder:
             error=error,
         )
         self._spans[handle.span_id] = span
+        if self._listener is not None:
+            listener = self._listener
+            self._tell(lambda: listener.finished(span))
         return span
 
     def event(

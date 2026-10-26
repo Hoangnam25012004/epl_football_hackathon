@@ -686,6 +686,24 @@
       "title": "Model",
       "type": "string"
     },
+    "model_pass": {
+      "anyOf": [
+        {
+          "enum": [
+            "queued",
+            "running",
+            "done",
+            "skipped"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Pass"
+    },
     "reason_code": {
       "enum": [
         "ok",
@@ -699,6 +717,48 @@
       ],
       "title": "Reason Code",
       "type": "string"
+    },
+    "rev1_verdict": {
+      "anyOf": [
+        {
+          "enum": [
+            "TRUE",
+            "PARTLY_TRUE",
+            "FALSE",
+            "INSUFFICIENT_DATA"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rev1 Verdict"
+    },
+    "revision": {
+      "default": 1,
+      "maximum": 2,
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "skip_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "busy",
+            "circuit_open",
+            "no_answer"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skip Reason"
     },
     "text": {
       "title": "Text",

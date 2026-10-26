@@ -105,6 +105,12 @@ class CircuitBreaker:
         if self._failures >= self.threshold and self._opened_at is None:
             self._opened_at = now
 
+    def half_open_now(self) -> None:
+        """An open breaker lets its trial call through at once (Day 7: Chaos reset)."""
+        if self._opened_at is not None:
+            self._opened_at = self._clock() - self.cooldown_s
+            self._trial_since = None
+
     def trip(self, cooldown_s: float | None = None) -> None:
         """Open now, for `cooldown_s` (default: the usual cooldown): a failure no retry can fix,
         such as bad credentials (Day 5 voice)."""

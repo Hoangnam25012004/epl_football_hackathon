@@ -229,6 +229,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _schemas() -> dict[str, str]:
+    from pundit.agents.contracts import AgentOpsMessage
     from pundit.api.onair import OnAirCommand, OnAirState
     from pundit.api.panels import EventsPage, StatsPanel, TimelineView
     from pundit.api.payloads import WsPayloads
@@ -289,6 +290,8 @@ def _schemas() -> dict[str, str]:
             ),
             "recap_view.schema.json": dump(RecapView.model_json_schema(mode="serialization")),
             "profile.schema.json": dump(Profile.model_json_schema(mode="validation")),
+            # Day 7: Agent Ops (docs/day7-design.md section 2.5)
+            "agent_ops_message.schema.json": serialized(AgentOpsMessage),
         }
     )
 

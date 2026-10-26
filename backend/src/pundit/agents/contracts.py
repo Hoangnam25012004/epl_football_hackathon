@@ -43,6 +43,14 @@ Degraded = Literal[
     "writer_fallback",  # studio: a model text failed or was rejected; the template was used
     "llm_skipped",  # studio: no model call (no time left in the budget)
 ]
+# Day 7, the progressive claim (docs/day7-design.md section 2.4): rev.1 from the rules at once,
+# then the model pass on one worker; rev.2 replaces rev.1 when the pass ends
+ModelPass = Literal["queued", "running", "done", "skipped"]
+SkipReason = Literal[
+    "busy",  # the queue of model passes was full
+    "circuit_open",  # the model failed too often lately: no call
+    "no_answer",  # the model was too slow or gave nothing usable; the rules' answer stands
+]
 Op = Literal[">", ">=", "<", "<=", "==", "~"]
 AssertionKind = Literal["dominance", "compare", "value"]
 SubjectKind = Literal["team", "player", "both_teams"]
@@ -517,11 +525,106 @@ class ClaimResult(Contract):
     degraded: tuple[Degraded, ...]
     timings_ms: dict[str, float]
     trace: tuple[TraceSpan, ...] | None = None
+    # Day 7: None for a one-pass answer (CLAIM_PROGRESSIVE=false, the CLI, MCP, the eval)
+    revision: int = Field(default=1, ge=1, le=2)
+    model_pass: ModelPass | None = None
+    skip_reason: SkipReason | None = None
+    rev1_verdict: Verdict | None = None  # on rev.2: the verdict rev.1 gave
 
     @model_validator(mode="after")
     def _check_result(self) -> Self:
         _sorted_unique(self.evidence_event_ids, "evidence ids")
+        if (self.model_pass == "skipped") != (self.skip_reason is not None):
+            raise ValueError("skip_reason is set exactly when the model pass was skipped")
+        if (self.revision == 2) != (self.rev1_verdict is not None):
+            raise ValueError("rev1_verdict is set exactly on rev.2")
+        if self.revision == 2 and self.model_pass not in ("done", "skipped"):
+            raise ValueError("rev.2 ends the model pass")
         return self
+
+
+# --------------------------------------------------------------------------- Agent Ops (Day 7)
+
+AgentWorkflow = Literal["claim", "studio", "narrator"]
+AgentSource = Literal["llm_live", "llm_recorded", "rules", "template"]
+AgentBreaker = Literal["closed", "open", "half_open"]
+
+ChaosFaultName = Literal[
+    "model_down", "model_slow", "model_garbage", "rate_limited", "content_filter", "model_lies"
+]
+
+
+class ChaosStatus(Contract):
+    """The chaos of a session (docs/day7-design.md section 2.6); only private ones have it."""
+
+    available: bool  # false on a shared session: start your own demo match to try it
+    fault: ChaosFaultName | None = None
+    seconds_left: float | None = None
+    calls: int = 0  # model calls the fault played on
+    lies_told: int = 0  # texts "the model lies" changed
+    lies_published: int = 0  # of those, how many reached a screen (the guardrail keeps it 0)
+    claim_breaker: AgentBreaker | None = None
+    studio_breaker: AgentBreaker | None = None
+
+
+class ChaosCommand(Contract):
+    fault: ChaosFaultName | None  # None: reset (the fault off, the breakers' trial at once)
+    duration_s: float = Field(default=300.0, gt=0, le=300.0)
+
+
+class AgentEvent(Contract):
+    """An agent of a run started or ended (docs/day7-design.md section 2.5), on /ws/agents."""
+
+    seq: int  # per session, increasing
+    run_id: str  # the claim id (with "#rules" / "#model") or the studio trigger id
+    workflow: AgentWorkflow
+    agent: str
+    kind: SpanKind
+    name: str
+    phase: Literal["start", "end"]
+    status: SpanStatus | None = None  # at the end
+    source: AgentSource | None = None  # at the end of a span that wrote or decided something
+    duration_ms: float | None = None
+    handoff: str | None = None  # the typed message the agent hands on
+    as_of_seq: int | None = None  # the shared state the run reads, pinned at this event
+    as_of_display: str | None = None
+    breaker: AgentBreaker | None = None
+    guardrail: tuple[str, ...] = ()  # violation codes when the guardrail rejected a text
+    model: str | None = None
+
+
+class AgentStat(Contract):
+    workflow: AgentWorkflow
+    agent: str
+    calls: int
+    fallbacks: int
+    rejected: int
+    errors: int
+    p95_ms: float | None
+    sources: dict[str, int]
+    last_status: SpanStatus | None
+    last_run_id: str | None
+    last_input: dict[str, Any]  # summary of the latest span, at most 2 KB, secrets removed
+    last_output: dict[str, Any]
+
+
+class AgentOpsSnapshot(Contract):
+    match_id: str
+    synthetic: bool = True
+    agents: tuple[AgentStat, ...]
+    breakers: dict[str, AgentBreaker]  # "claim", "studio"
+    recent: tuple[AgentEvent, ...]  # the latest events, oldest first
+    chaos: ChaosStatus | None = None
+
+
+class AgentEventBatch(Contract):
+    events: tuple[AgentEvent, ...]
+    dropped: int = 0  # events left out of this batch to keep the stream light
+
+
+class AgentOpsMessage(Contract):
+    type: Literal["hello", "events"]
+    payload: AgentOpsSnapshot | AgentEventBatch
 
 
 # --------------------------------------------------------------------------- moments and websocket

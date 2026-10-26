@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from typing import Protocol
 
 from pundit.agents.contracts import ClaimRequest, ClaimResult, Degraded
-from pundit.agents.trace import TraceRecorder
+from pundit.agents.trace import TraceListener, TraceRecorder
 from pundit.domain.events import Event
 from pundit.domain.log import EventLog, LogView
 from pundit.domain.meta import MatchMeta
@@ -28,6 +28,7 @@ log = logging.getLogger("pundit.claims")
 
 Ports = tuple[ClaimAnalystPort | None, ExplainerPort | None]
 PortsFactory = Callable[[], Ports]
+Listen = Callable[[int], TraceListener]  # as_of_seq -> the listener of the run
 
 
 class MatchSource(Protocol):
@@ -108,6 +109,11 @@ class ClaimService:
         self._use_workflow = use_workflow
 
     @property
+    def ports_factory(self) -> PortsFactory:
+        """The model ports of each claim (Day 7: a session's chaos wraps them)."""
+        return self._ports
+
+    @property
     def provider(self) -> str:
         return self.settings.provider
 
@@ -126,10 +132,13 @@ class ClaimService:
         *,
         deterministic: bool,
         degraded: Sequence[Degraded] = (),
+        budget_s: float | None = None,
+        listen: Listen | None = None,
     ) -> ClaimRun:
         latest = source.latest_seq()
         seq = latest if request.as_of_seq is None else request.as_of_seq
         analyst, explainer = (None, None) if deterministic else self._ports()
+        budget = self.settings.claim_budget_s if budget_s is None else budget_s
         return ClaimRun(
             claim_id=claim_id,
             request=request,
@@ -138,18 +147,61 @@ class ClaimService:
             analyst=analyst,
             explainer=explainer,
             breaker=self.breaker,
-            budget=Budget(self.settings.claim_budget_s, clock=self._clock),
+            budget=Budget(budget, clock=self._clock),
             llm_timeout_s=self.settings.llm_timeout_s,
-            trace=TraceRecorder(claim_id, clock=self._trace_clock),
+            trace=TraceRecorder(
+                claim_id,
+                clock=self._trace_clock,
+                listener=listen(min(seq, latest)) if listen is not None else None,
+            ),
             model=self.model,
             degraded=list(degraded),
         )
 
     async def verify(
-        self, request: ClaimRequest, source: MatchSource, *, claim_id: str
+        self,
+        request: ClaimRequest,
+        source: MatchSource,
+        *,
+        claim_id: str,
+        budget_s: float | None = None,
+        listen: Listen | None = None,
     ) -> ClaimResult:
-        """Always returns a result (with its trace); LLM failures only add `degraded` flags."""
-        run = self._run(request, source, claim_id, deterministic=False)
+        """Always returns a result (with its trace); LLM failures only add `degraded` flags.
+        `listen(as_of_seq)` gives the run a trace listener (Day 7: Agent Ops)."""
+        return await self._verify(
+            request, source, claim_id, deterministic=False, budget_s=budget_s, listen=listen
+        )
+
+    async def verify_rules(
+        self,
+        request: ClaimRequest,
+        source: MatchSource,
+        *,
+        claim_id: str,
+        listen: Listen | None = None,
+    ) -> ClaimResult:
+        """The same workflow without a model (rev.1 of a progressive claim): the rule parser,
+        the Stats Tools, the judge and the template; it never waits for a model."""
+        result = await self._verify(request, source, claim_id, deterministic=True, listen=listen)
+        # the template is the design of rev.1, not a fallback
+        degraded = tuple(f for f in result.degraded if f != "explainer_fallback")
+        return result.model_copy(update={"degraded": degraded})
+
+    async def _verify(
+        self,
+        request: ClaimRequest,
+        source: MatchSource,
+        claim_id: str,
+        *,
+        deterministic: bool,
+        budget_s: float | None = None,
+        listen: Listen | None = None,
+    ) -> ClaimResult:
+        run = self._run(
+            request, source, claim_id, deterministic=deterministic, budget_s=budget_s,
+            listen=listen,
+        )  # fmt: skip
         steps = ClaimSteps(run)
         try:
             if self._use_workflow:

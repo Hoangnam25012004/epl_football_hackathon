@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable
 
 from pundit.agents.contracts import Degraded, StudioJob, StudioOutput
-from pundit.agents.trace import TraceRecorder
+from pundit.agents.trace import TraceListener, TraceRecorder
 from pundit.domain.log import LogView
 from pundit.llm.faults import FaultPlan
 from pundit.llm.mock import MockCommentator, MockGraphicsDesigner, MockTalkingPointWriter
@@ -107,6 +107,11 @@ class StudioService:
         self._use_workflow = use_workflow
 
     @property
+    def ports_factory(self) -> StudioPortsFactory:
+        """The model ports of each job (Day 7: a session's chaos wraps them)."""
+        return self._ports
+
+    @property
     def provider(self) -> str:
         return self.settings.provider
 
@@ -124,6 +129,7 @@ class StudioService:
         *,
         deterministic: bool,
         degraded: tuple[Degraded, ...] = (),
+        listen: Callable[[int], TraceListener] | None = None,
     ) -> StudioRun:
         return StudioRun(
             job=job,
@@ -131,22 +137,33 @@ class StudioService:
             ports=StudioPorts() if deterministic else self._ports(),
             breaker=self.breaker,
             budgets=self.budgets,
-            trace=TraceRecorder(job.trigger.id, clock=self._trace_clock),
+            trace=TraceRecorder(
+                job.trigger.id,
+                clock=self._trace_clock,
+                listener=listen(view.last_seq) if listen is not None else None,
+            ),
             model=self.model,
             clock=self._clock,
             llm_min_importance=self.llm_min_importance,
             degraded=list(degraded),
         )
 
-    async def run(self, job: StudioJob, view: LogView) -> StudioOutput:
-        """Always returns an output (with its trace); LLM failures only add `degraded` flags."""
+    async def run(
+        self,
+        job: StudioJob,
+        view: LogView,
+        *,
+        listen: Callable[[int], TraceListener] | None = None,
+    ) -> StudioOutput:
+        """Always returns an output (with its trace); LLM failures only add `degraded` flags.
+        `listen(as_of_seq)` gives the run a trace listener (Day 7: Agent Ops)."""
         trigger = job.trigger
         if view.last_seq != trigger.seq:
             raise ValueError(
                 f"the view ends at seq {view.last_seq}; trigger {trigger.id} is at seq "
                 f"{trigger.seq} (pin the view with view_at(trigger.seq))"
             )
-        steps = StudioSteps(self._run(job, view, deterministic=False))
+        steps = StudioSteps(self._run(job, view, deterministic=False, listen=listen))
         try:
             if self._use_workflow:
                 outputs = (await build_studio_workflow(steps).run(job)).get_outputs()

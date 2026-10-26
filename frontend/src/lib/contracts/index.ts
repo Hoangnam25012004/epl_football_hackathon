@@ -18,6 +18,7 @@ export interface Contracts {
   ClaimRequest: ClaimRequest;
   SpeechVoice: SpeechVoice;
   RecognitionResult: RecognitionResult;
+  AgentOpsMessage: AgentOpsMessage;
 }
 /**
  * This interface was referenced by `Contracts`'s JSON-Schema
@@ -85,6 +86,7 @@ export interface ClaimResult {
   language: "vi" | "en";
   match_id: string;
   model: string;
+  model_pass?: ("queued" | "running" | "done" | "skipped") | null;
   reason_code:
     | "ok"
     | "unsupported_claim"
@@ -94,6 +96,9 @@ export interface ClaimResult {
     | "no_data_in_window"
     | "low_sample"
     | "as_of_out_of_range";
+  rev1_verdict?: ("TRUE" | "PARTLY_TRUE" | "FALSE" | "INSUFFICIENT_DATA") | null;
+  revision?: number;
+  skip_reason?: ("busy" | "circuit_open" | "no_answer") | null;
   text: string;
   timings_ms: {
     [k: string]: number;
@@ -1273,8 +1278,10 @@ export interface PlayerBrief {
  */
 export interface Health {
   build?: string | null;
+  claim_progressive?: boolean | null;
   degraded: string[];
   keepalive?: KeepaliveHealth | null;
+  llm_live_scope?: "claims" | null;
   llm_provider: string;
   mcp?: McpHealth | null;
   model: string;
@@ -1416,4 +1423,107 @@ export interface RecognitionResult {
   provider: "mock" | "azure";
   status: "ok" | "no_match" | "silence" | "error";
   text: string;
+}
+/**
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AgentOpsMessage".
+ */
+export interface AgentOpsMessage {
+  payload: AgentOpsSnapshot | AgentEventBatch;
+  type: "hello" | "events";
+}
+/**
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AgentOpsSnapshot".
+ */
+export interface AgentOpsSnapshot {
+  agents: AgentStat[];
+  breakers: {
+    [k: string]: "closed" | "open" | "half_open";
+  };
+  chaos?: ChaosStatus | null;
+  match_id: string;
+  recent: AgentEvent[];
+  synthetic?: boolean;
+}
+/**
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AgentStat".
+ */
+export interface AgentStat {
+  agent: string;
+  calls: number;
+  errors: number;
+  fallbacks: number;
+  last_input: {
+    [k: string]: unknown;
+  };
+  last_output: {
+    [k: string]: unknown;
+  };
+  last_run_id: string | null;
+  last_status: ("ok" | "error" | "retry" | "fallback" | "rejected") | null;
+  p95_ms: number | null;
+  rejected: number;
+  sources: {
+    [k: string]: number;
+  };
+  workflow: "claim" | "studio" | "narrator";
+}
+/**
+ * The chaos of a session (docs/day7-design.md section 2.6); only private ones have it.
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "ChaosStatus".
+ */
+export interface ChaosStatus {
+  available: boolean;
+  calls?: number;
+  claim_breaker?: ("closed" | "open" | "half_open") | null;
+  fault?:
+    | (
+        | "model_down"
+        | "model_slow"
+        | "model_garbage"
+        | "rate_limited"
+        | "content_filter"
+        | "model_lies"
+      )
+    | null;
+  lies_published?: number;
+  lies_told?: number;
+  seconds_left?: number | null;
+  studio_breaker?: ("closed" | "open" | "half_open") | null;
+}
+/**
+ * An agent of a run started or ended (docs/day7-design.md section 2.5), on /ws/agents.
+ *
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AgentEvent".
+ */
+export interface AgentEvent {
+  agent: string;
+  as_of_display?: string | null;
+  as_of_seq?: number | null;
+  breaker?: ("closed" | "open" | "half_open") | null;
+  duration_ms?: number | null;
+  guardrail?: string[];
+  handoff?: string | null;
+  kind: "agent" | "tool" | "llm" | "guardrail" | "fallback";
+  model?: string | null;
+  name: string;
+  phase: "start" | "end";
+  run_id: string;
+  seq: number;
+  source?: ("llm_live" | "llm_recorded" | "rules" | "template") | null;
+  status?: ("ok" | "error" | "retry" | "fallback" | "rejected") | null;
+  workflow: "claim" | "studio" | "narrator";
+}
+/**
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "AgentEventBatch".
+ */
+export interface AgentEventBatch {
+  dropped?: number;
+  events: AgentEvent[];
 }

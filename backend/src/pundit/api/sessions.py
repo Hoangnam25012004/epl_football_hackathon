@@ -33,6 +33,9 @@ from typing import Any, Literal
 
 from pundit.agents.context import build_match_context
 from pundit.agents.contracts import (
+    AgentBreaker,
+    ChaosCommand,
+    ChaosStatus,
     ClaimRequest,
     ClaimResult,
     CommentaryItem,
@@ -58,6 +61,8 @@ from pundit.agents.personalize import (
 )
 from pundit.agents.spoken import SpokenLexicon
 from pundit.agents.triggers import TriggerFeed
+from pundit.api.agent_ops import AgentOps
+from pundit.api.chaos import SessionChaos
 from pundit.api.hub import DEFAULT_QUEUE_SIZE, Client, Hub
 from pundit.api.onair import OnAirCommand, OnAirState, apply_command
 from pundit.api.panels import (
@@ -76,11 +81,14 @@ from pundit.domain.errors import PunditError
 from pundit.domain.events import EVENT_ADAPTER, Event
 from pundit.domain.ids import new_token, session_id
 from pundit.domain.log import LogView
+from pundit.domain.matchtime import format_minute
 from pundit.domain.meta import MatchMeta
 from pundit.engine.generator import generate
 from pundit.engine.match import GeneratedMatch
 from pundit.engine.replay import Clock, RealClock, replay
-from pundit.orchestration.service import ClaimService
+from pundit.orchestration.progressive import ModelPassQueue
+from pundit.orchestration.service import ClaimService, Listen
+from pundit.orchestration.studio_service import StudioService
 from pundit.speech.narrator import Narrator
 from pundit.state.match_state import MatchSnapshot, MatchState
 
@@ -118,8 +126,10 @@ class MatchSession:
         key: str | None = None,
         private: bool = False,
         now: Callable[[], float] = time.monotonic,
+        model_passes: ModelPassQueue | None = None,
     ) -> None:
         self.match = match
+        self.model_passes = model_passes  # Day 7: progressive claims (CLAIM_PROGRESSIVE)
         # what clients call the session: the match id, or the match id and a token (Day 6)
         self.key = key or match.meta.match_id
         self.private = private
@@ -153,6 +163,14 @@ class MatchSession:
         self._swapping = False  # the replay task is being replaced (new speed): not a stop
         self._claim_count = 0
         self._last_snapshot_bucket = -1
+        # Day 7: the agents of this session, live (docs/day7-design.md section 2.5)
+        self.chaos: SessionChaos | None = None  # Day 7: a private session's chaos
+        breakers = {"claim": lambda: self.claim_service.breaker.state}
+        if studio is not None:
+            breakers["studio"] = lambda: self.studio_breaker_state()
+        self.agent_ops = AgentOps(
+            self.key, display_of=self.display_at, breakers=breakers, chaos=self.chaos_status
+        )
 
     # ------------------------------------------------------------------ MatchSource
 
@@ -171,6 +189,14 @@ class MatchSession:
     def watched(self) -> bool:
         """At least one viewer is connected: such a session is never stopped to make room."""
         return self.hub.clients > 0
+
+    def display_at(self, seq: int) -> str:
+        """The scoreboard minute of the event `seq` ("63'")."""
+        events = self.match.events
+        if not events:
+            return "0'"
+        event = events[max(0, min(seq, len(events) - 1))]
+        return format_minute(event.period, event.clock_ms)
 
     def view_at(self, seq: int) -> LogView:
         """Immutable prefix: the first `seq + 1` applied events."""
@@ -289,7 +315,10 @@ class MatchSession:
             session_speed=self.speed, match_id=self.match_id,
             trace_offset_ms=self._job_end_ms(item.id),
         )  # fmt: skip
-        return view if cue is None else view.model_copy(update={"speech": cue})
+        if cue is None:
+            return view
+        self.agent_ops.cued(item.id, as_of_seq=item.as_of_seq, voice=cue.voice)
+        return view.model_copy(update={"speech": cue})
 
     def recap_view(self, recap: Recap, profile: Profile, *, live: bool) -> RecapView:
         """A recap for one viewer; read aloud (with its key moments) when `live` and the viewer
@@ -332,6 +361,8 @@ class MatchSession:
 
     def publish_studio(self, kind: StudioKind, item: StudioItem) -> None:
         """Broadcast a studio item, rendered once per profile (the director calls this)."""
+        if self.chaos is not None:
+            self.chaos.check_published(item.model_dump(mode="json"))
         if isinstance(item, TalkingPoint):
             self.hub.publish("talking_point", public_talking_point(item).model_dump(mode="json"))
         elif isinstance(item, LowerThird):
@@ -554,6 +585,7 @@ class MatchSession:
                 await task
         if self.director is not None:
             await self.director.stop()
+        await self.agent_ops.aclose()
         # also when the task was cancelled before it ever ran, or the replay was paused
         if self.status in ("running", "paused"):
             self._set_status("stopped")
@@ -571,13 +603,80 @@ class MatchSession:
         return f"{self.key}-c{self._claim_count:04d}"  # unique across private sessions
 
     def add_claim(self, result: ClaimResult) -> None:
+        """Store and broadcast a claim; a progressive claim comes again as it moves on (queued,
+        running, rev.2), always under the same id. An older revision never replaces a newer."""
+        known = self.claims.get(result.claim_id)
+        if known is not None and known.revision > result.revision:
+            return
         self.claims[result.claim_id] = result
         while len(self.claims) > MAX_CLAIMS_PER_SESSION:
             self.claims.popitem(last=False)
-        self.hub.publish("claim", public_claim(result).model_dump(mode="json"))
+        payload = public_claim(result).model_dump(mode="json")
+        if self.chaos is not None:
+            self.chaos.check_published(payload)
+        self.hub.publish("claim", payload)
+
+    # ------------------------------------------------------------------ chaos (Day 7)
+
+    @property
+    def claim_service(self) -> ClaimService:
+        """The session's own service once its chaos was switched on, else the app's."""
+        return self.chaos.claims if self.chaos is not None else self.service
+
+    @property
+    def studio_service_override(self) -> StudioService | None:
+        return self.chaos.studio if self.chaos is not None else None
+
+    def studio_breaker_state(self) -> AgentBreaker:
+        own = self.studio_service_override
+        if own is not None:
+            return own.breaker.state
+        assert self.director is not None
+        return self.director.crew.service.breaker.state
+
+    def chaos_status(self) -> ChaosStatus:
+        if not self.private:
+            return ChaosStatus(available=False)
+        if self.chaos is None:
+            return ChaosStatus(available=True)
+        return self.chaos.status()
+
+    def switch_chaos(self, command: ChaosCommand, now: float) -> ChaosStatus:
+        """Raises ChaosRefused on a shared session or too many switches."""
+        if not self.private:
+            raise ChaosRefused("only your own demo match can be broken: start one first")
+        if self.chaos is None:
+            crew = self.director.crew if self.director is not None else None
+            self.chaos = SessionChaos(self.service, crew.service if crew else None)
+        if not self.chaos.may_switch(now):
+            raise ChaosRefused("too many chaos switches in a minute: wait a little")
+        self.chaos.switch(command.fault, command.duration_s, now)
+        log.info("chaos of %s: %s", self.key, command.fault or "reset")
+        return self.chaos.status()
+
+    def _claim_listen(self, run_id: str) -> Listen:
+        ops = self.agent_ops
+        return lambda seq: ops.listener("claim", run_id, seq)
 
     async def verify(self, request: ClaimRequest) -> ClaimResult:
-        result = await self.service.verify(request, self, claim_id=self.next_claim_id())
+        claim_id = self.next_claim_id()
+        service = self.claim_service
+        if self.model_passes is None:  # one pass (the Day 2 claim)
+            result = await service.verify(
+                request, self, claim_id=claim_id, listen=self._claim_listen(claim_id)
+            )
+        else:  # Day 7: rev.1 from the rules now, the model pass on the queue
+            rev1 = await service.verify_rules(
+                request, self, claim_id=claim_id, listen=self._claim_listen(f"{claim_id}#rules")
+            )
+            result = self.model_passes.submit(
+                rev1,
+                request,
+                self,
+                self.add_claim,
+                self._claim_listen(f"{claim_id}#model"),
+                service=service,
+            )
         self.add_claim(result)
         return result
 
@@ -590,6 +689,10 @@ def public_claim(result: ClaimResult) -> ClaimResult:
 def public_talking_point(item: TalkingPoint) -> TalkingPoint:
     """The talking point as broadcast: without the trace."""
     return item.model_copy(update={"trace": None})
+
+
+class ChaosRefused(PunditError):
+    """Chaos on a shared session, or switched too often (HTTP 403 / 429)."""
 
 
 class SessionsFull(PunditError):
@@ -626,8 +729,10 @@ class SessionManager:
         shared_idle_s: float = 3600.0,
         private_per_ip: int = 3,
         now: Callable[[], float] = time.monotonic,
+        model_passes: ModelPassQueue | None = None,
     ) -> None:
         self.service = service
+        self.model_passes = model_passes  # one queue for every session: one model on the CPU
         self.studio = studio
         self.narrator = narrator  # one for the app: clips are shared by every session
         self.clock_factory = clock_factory
@@ -732,6 +837,7 @@ class SessionManager:
                 key=key,
                 private=token is not None,
                 now=self._now,
+                model_passes=self.model_passes,
             )
             self.sessions[key] = session
         if existing is not None:
@@ -785,3 +891,5 @@ class SessionManager:
         """Cancel every replay task and wait for it (no task left behind)."""
         for session in list(self.sessions.values()):
             await session.stop()
+        if self.model_passes is not None:
+            await self.model_passes.aclose()
