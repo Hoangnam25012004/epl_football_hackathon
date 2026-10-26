@@ -107,6 +107,15 @@ function Studio() {
           >
             {t("landing.compare")} ↗
           </a>
+          <a
+            className="underline"
+            data-testid="studio-agents"
+            href={`/agents/?match=${matchId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t("studio.agents")} ↗
+          </a>
           <HelpButton />
           <LangToggle />
           <PrivateChip matchId={matchId} />

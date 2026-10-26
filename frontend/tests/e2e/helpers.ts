@@ -105,10 +105,17 @@ export function watchErrors(page: Page): string[] {
 }
 
 /** Serious or critical WCAG 2 A/AA violations, measured once the entry animations (fade-ins
- * that lower the contrast while they run) have finished. */
+ * that lower the contrast while they run) have finished. Endless ones (Day 7: the pulse of a
+ * running agent, a model pass's progress strip) never finish and move no colour: not waited for. */
 export async function seriousA11y(page: Page): Promise<string[]> {
   await page.waitForFunction(() =>
-    document.getAnimations().every((animation) => animation.playState !== "running"),
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== "running" ||
+          animation.effect?.getComputedTiming().iterations === Infinity,
+      ),
   );
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   return result.violations

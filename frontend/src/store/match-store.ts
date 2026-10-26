@@ -186,9 +186,15 @@ export function applyBatch(state: MatchState, messages: readonly AnyWsMessage[])
           if (draft.moments.length > LIMITS.moments) draft.moments.shift();
         }
         break;
-      case "claim":
-        upsert(draft.claims, message.payload.claim_id, message.payload, LIMITS.claims);
+      case "claim": {
+        // a progressive claim comes again as it moves on (queued, running, rev.2): an older
+        // revision never replaces a newer one (Day 7)
+        const claim = message.payload;
+        const known = draft.claims.byId[claim.claim_id];
+        if (!known || (known.revision ?? 1) <= (claim.revision ?? 1))
+          upsert(draft.claims, claim.claim_id, claim, LIMITS.claims);
         break;
+      }
       case "status":
         draft.status = message.payload.session;
         draft.speed = message.payload.speed;

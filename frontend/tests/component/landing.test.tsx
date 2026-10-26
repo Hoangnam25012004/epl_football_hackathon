@@ -167,7 +167,10 @@ describe("landing page", () => {
     serve({ status: 200, body: info(MINE) });
     renderWith(<LandingPage />);
     expect(await screen.findByTestId("intro")).toHaveTextContent("Vietnamese commentary");
-    expect(screen.getByTestId("what-to-try").querySelectorAll("li")).toHaveLength(5);
+    // Day 7: Agent Ops and Chaos are on the list, with a way into Agent Ops
+    expect(screen.getByTestId("what-to-try").querySelectorAll("li")).toHaveLength(7);
+    expect(screen.getByTestId("what-to-try")).toHaveTextContent("Chaos");
+    expect(screen.getByTestId("open-agents")).toHaveTextContent("Agent Ops");
     // no address at build time: no dead link, the words say it comes later
     const links = screen.getByTestId("project-links");
     expect(links).toHaveTextContent("Source code: coming soon");

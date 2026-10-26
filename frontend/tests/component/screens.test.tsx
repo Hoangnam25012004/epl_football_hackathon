@@ -129,7 +129,8 @@ describe("fan player", () => {
       for (const view of views) expect(screen.getAllByText(view.text).length).toBeGreaterThan(0);
       unmount();
     }
-  });
+    // two whole feeds of long model texts, every text looked up: about 4.5 s on a busy machine
+  }, 20_000);
 
   it("recap and player tabs", () => {
     const state = applyBatch(initialState, casual);

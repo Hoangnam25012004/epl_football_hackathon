@@ -157,6 +157,34 @@ html.overlay-page body {
   animation: speaking 1.2s ease-in-out infinite;
 }
 
+/* Day 7: the model pass of a progressive claim; the Agent Ops node that runs */
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.progress-strip > span {
+  animation: progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.node-running {
+  animation: node-pulse 1.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lt-enter,
   .item-enter {
@@ -165,7 +193,9 @@ html.overlay-page body {
   .lt-exit {
     animation: fade-in 200ms linear reverse both;
   }
-  .speaking-wave {
+  .speaking-wave,
+  .progress-strip > span,
+  .node-running {
     animation: none;
   }
 }

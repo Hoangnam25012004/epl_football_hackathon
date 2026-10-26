@@ -76,6 +76,8 @@ export function HelpButton() {
               ))}
             </ul>
             <p>{t("help.trust")}</p>
+            <p>{t("help.progressive")}</p>
+            <p>{t("help.sources")}</p>
           </section>
           <section className="flex flex-col gap-2">
             <h3 className="font-semibold">{t("help.shortcuts")}</h3>

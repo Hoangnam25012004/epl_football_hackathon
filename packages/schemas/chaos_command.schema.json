@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "duration_s": {
+      "default": 300.0,
+      "exclusiveMinimum": 0,
+      "maximum": 300.0,
+      "title": "Duration S",
+      "type": "number"
+    },
+    "fault": {
+      "anyOf": [
+        {
+          "enum": [
+            "model_down",
+            "model_slow",
+            "model_garbage",
+            "rate_limited",
+            "content_filter",
+            "model_lies"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Fault"
+    }
+  },
+  "required": [
+    "fault"
+  ],
+  "title": "ChaosCommand",
+  "type": "object"
+}

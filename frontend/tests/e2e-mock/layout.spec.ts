@@ -47,11 +47,23 @@ test("overlay at 1920×1080 (debug): one lower-third in the safe area, the rest 
   const lowerThird = page.getByTestId("lower-third");
   await expect(lowerThird).toBeVisible();
   await expect(lowerThird).toHaveCount(1);
-  // measured at rest, after the entry animation
-  await lowerThird.evaluate((element) =>
-    Promise.all(element.getAnimations().map((animation) => animation.finished)),
-  );
-  const box = (await lowerThird.boundingBox())!;
+  // measured at rest, in the same turn as the check that no animation runs: the stream plays at
+  // once, so another lower-third may start its entry between two separate calls
+  let box = { x: 0, y: 0, width: 0, height: 0 };
+  await expect
+    .poll(
+      async () => {
+        const rest = await lowerThird.first().evaluate((element) => {
+          if (element.getAnimations().some((a) => a.playState === "running")) return null;
+          const r = element.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        });
+        if (rest) box = rest;
+        return rest !== null;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
   // inside the 5 % safe area of a 1920×1080 picture
   expect(box.x).toBeGreaterThanOrEqual(96);
   expect(box.y + box.height).toBeLessThanOrEqual(1080 - 54 + 1);

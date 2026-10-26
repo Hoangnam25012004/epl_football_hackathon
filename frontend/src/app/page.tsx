@@ -14,11 +14,12 @@ import { api, type ApiError } from "@/lib/api";
 import type { CreateMatch, Health, MatchInfo, ScenarioInfo } from "@/lib/contracts";
 import { hasKey, useT } from "@/lib/i18n";
 import { REPO_URL, VIDEO_URL } from "@/lib/links";
+import { serverStatus } from "@/lib/server-status";
 import { forgetSession, mySessions, rememberSession } from "@/lib/sessions";
 import { useScenarios } from "@/hooks/useScenarios";
 
 type CreateBody = Partial<CreateMatch> & { scenario: CreateMatch["scenario"] };
-type DemoPage = "studio" | "fan" | "overlay";
+type DemoPage = "studio" | "fan" | "overlay" | "agents";
 
 // The demo match: "Dominated but lost" at 20x, a private session of the viewer's own
 const DEMO: CreateBody = { scenario: "dominant_loser", seed: 42, speed: 20, private: true };
@@ -28,6 +29,8 @@ const TRY = [
   "landing.try3",
   "landing.try4",
   "landing.try5",
+  "landing.try6",
+  "landing.try7",
 ] as const;
 
 export default function LandingPage() {
@@ -221,6 +224,15 @@ function Landing() {
             <li key={key}>{t(key)}</li>
           ))}
         </ul>
+        <button
+          type="button"
+          data-testid="open-agents"
+          disabled={busy}
+          onClick={() => void openStep("agents")}
+          className="self-start rounded border border-line px-3 py-1.5 text-sm font-semibold text-accent hover:bg-panel-2 disabled:opacity-50"
+        >
+          {t("landing.agents")} →
+        </button>
       </section>
       {mine.length ? (
         <section className="flex flex-col gap-2" data-testid="my-sessions">
@@ -271,9 +283,11 @@ function ServerHealth({ health }: { health: Health }) {
       className="flex flex-wrap items-center gap-2 text-xs text-muted"
     >
       <span>{t("landing.server")}:</span>
-      <Chip tone="accent">
-        {t("landing.llm", { provider: health.llm_provider, model: health.model })}
-      </Chip>
+      {serverStatus(health).map((line) => (
+        <Chip key={line.key} tone={line.tone ?? "neutral"}>
+          {t(line.key, line.vars)}
+        </Chip>
+      ))}
       {health.degraded.map((flag) => {
         // in words ("LLM paused (circuit open)"); an unknown flag as the server wrote it
         const key = `degraded.${flag}`;

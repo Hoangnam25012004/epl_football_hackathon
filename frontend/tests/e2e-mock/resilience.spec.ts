@@ -77,8 +77,10 @@ test("4404: the overlay waits without showing anything, then goes on air", async
   await expect(root).toHaveAttribute("data-connection", "waiting");
   expect((await root.innerText()).trim()).toBe(""); // nothing on the broadcast picture
   exists = true;
-  await expect(root).toHaveAttribute("data-connection", "open", { timeout: 10_000 });
-  await expect(page.getByTestId("lower-third")).toBeVisible({ timeout: 10_000 });
+  // the retry comes 5 s later (WAIT_RETRY_MS), then the whole recorded stream arrives at once:
+  // on a busy machine its first frame takes about 5 s more
+  await expect(root).toHaveAttribute("data-connection", "open", { timeout: 20_000 });
+  await expect(page.getByTestId("lower-third")).toBeVisible({ timeout: 20_000 });
   expect(errors).toEqual([]);
 });
 

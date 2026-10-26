@@ -39,6 +39,8 @@ def test_the_space_defaults_are_a_valid_configuration() -> None:
     assert (settings.provider, settings.model_name) == ("ollama", "qwen2.5:1.5b")
     assert settings.llm_live_scope == "claims" and not settings.studio_uses_model
     assert settings.llm_timeout_s <= settings.claim_budget_s <= 60  # a claim never hangs
+    assert settings.claim_progressive and settings.model_queue_max >= 1
+    assert settings.llm_timeout_s <= settings.model_pass_budget_s
     assert settings.tts_provider == "browser" and settings.stt_provider == "off"
     assert settings.trust_proxy and settings.keepalive_url == f"https://{host}/healthz"
     assert host in settings.mcp_allowed_hosts

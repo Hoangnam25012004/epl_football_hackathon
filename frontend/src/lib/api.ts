@@ -1,5 +1,8 @@
 // REST client: typed results, timeouts, never throws (docs/day4-design.md section 4.3).
 import type {
+  AgentOpsSnapshot,
+  ChaosCommand,
+  ChaosStatus,
   ClaimResult,
   CommentaryView,
   CreateMatch,
@@ -162,6 +165,11 @@ export const api = {
       timeoutMs: CLAIM_TIMEOUT_MS,
     }),
   claim: (claimId: string) => request<ClaimResult>("GET", `/claims/${enc(claimId)}`),
+  // Day 7: Agent Ops and Chaos (docs/day7-design.md sections 2.5, 2.6)
+  agents: (id: string) => request<AgentOpsSnapshot>("GET", `/matches/${enc(id)}/agents`),
+  chaos: (id: string) => request<ChaosStatus>("GET", `/matches/${enc(id)}/chaos`),
+  setChaos: (id: string, command: ChaosCommand) =>
+    request<ChaosStatus>("POST", `/matches/${enc(id)}/chaos`, { body: command }),
   studioItem: (id: string, itemId: string) =>
     request<StudioItemDetail>("GET", `/matches/${enc(id)}/studio/${enc(itemId)}`),
   talkingPointStatus: (id: string, itemId: string, status: TalkingPoint["status"]) =>

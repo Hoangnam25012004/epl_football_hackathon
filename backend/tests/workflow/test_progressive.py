@@ -109,11 +109,15 @@ def test_a_full_queue_skips_the_model_pass_and_keeps_rev1() -> None:
         passes = ModelPassQueue(service, max_waiting=1, budget_s=10.0)
         recorder = Recorder()
         src = source(*DL)
-        answers = []
-        for n in range(3):
-            rev1 = await service.verify_rules(request(), src, claim_id=f"q-c{n:04d}")
-            answers.append(passes.submit(rev1, request(), src, recorder))
-            await asyncio.sleep(0)  # the first one starts running
+        # every rev.1 first: how long the rules take must not decide what the queue sees
+        rev1s = [
+            await service.verify_rules(request(), src, claim_id=f"q-c{n:04d}") for n in range(3)
+        ]
+        answers = [passes.submit(rev1s[0], request(), src, recorder)]
+        await asyncio.sleep(0)  # the first one starts running
+        assert passes.stats()["running"]
+        # the other two at once: one waits, the queue (max 1 waiting) is then full
+        answers += [passes.submit(rev1, request(), src, recorder) for rev1 in rev1s[1:]]
         assert [a.model_pass for a in answers] == ["queued", "queued", "skipped"]
         assert answers[2].skip_reason == "busy" and answers[2].revision == 1
         while passes.waiting or passes.stats()["running"]:

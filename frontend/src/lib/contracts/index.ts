@@ -19,6 +19,7 @@ export interface Contracts {
   SpeechVoice: SpeechVoice;
   RecognitionResult: RecognitionResult;
   AgentOpsMessage: AgentOpsMessage;
+  ChaosCommand: ChaosCommand;
 }
 /**
  * This interface was referenced by `Contracts`'s JSON-Schema
@@ -1526,4 +1527,21 @@ export interface AgentEvent {
 export interface AgentEventBatch {
   dropped?: number;
   events: AgentEvent[];
+}
+/**
+ * This interface was referenced by `Contracts`'s JSON-Schema
+ * via the `definition` "ChaosCommand".
+ */
+export interface ChaosCommand {
+  duration_s?: number;
+  fault:
+    | (
+        | "model_down"
+        | "model_slow"
+        | "model_garbage"
+        | "rate_limited"
+        | "content_filter"
+        | "model_lies"
+      )
+    | null;
 }

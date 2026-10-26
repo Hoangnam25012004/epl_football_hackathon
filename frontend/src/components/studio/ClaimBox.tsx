@@ -7,6 +7,7 @@ import { useToast } from "@/components/common/Toast";
 import { Chip, EmptyState } from "@/components/common/ui";
 import { MicButton } from "@/components/studio/MicButton";
 import { api } from "@/lib/api";
+import { claimView, type Line } from "@/lib/claim-source";
 import type { ClaimResult, Fact } from "@/lib/contracts";
 import { useT, type Key } from "@/lib/i18n";
 import { VERDICT_STYLE } from "@/lib/verdict";
@@ -58,9 +59,19 @@ export function VerdictCard({
   highlight?: boolean;
 }) {
   const { t } = useT();
+  const view = claimView(claim);
+  const say = (line: Line) =>
+    line.key === "claim.updated" && line.vars
+      ? t(line.key, {
+          from: t(`verdict.${line.vars.from}` as Key),
+          to: t(`verdict.${line.vars.to}` as Key),
+        })
+      : t(line.key, line.vars);
   return (
     <article
       data-testid="verdict-card"
+      data-revision={claim.revision ?? 1}
+      data-model-pass={claim.model_pass ?? "none"}
       className={`item-enter flex flex-col gap-2 rounded-md border p-3 ${highlight ? "border-accent" : "border-line"}`}
       style={{ borderLeft: `4px solid ${VERDICT_STYLE[claim.verdict].color}` }}
     >
@@ -72,15 +83,38 @@ export function VerdictCard({
       </div>
       <p className="font-semibold">“{claim.text}”</p>
       {claim.headline.length ? <FactChips facts={claim.headline} /> : null}
-      <p className="text-sm">{claim.explanation}</p>
+      <p className="text-sm" data-testid="claim-explanation">
+        {claim.explanation}
+      </p>
+      {view.notes.map((note) => (
+        <p key={note.key} data-testid="claim-note" className="text-xs font-semibold text-muted">
+          {say(note)}
+        </p>
+      ))}
+      {view.progress ? (
+        <div role="status" data-testid="claim-progress" className="flex flex-col gap-1 text-xs">
+          <span>{say(view.progress)}</span>
+          <span className="progress-strip h-1 overflow-hidden rounded bg-panel-2" aria-hidden>
+            <span className="block h-full w-1/3 bg-accent" />
+          </span>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-1">
-        <Chip title={t("studio.source")}>{claim.explanation_source}</Chip>
-        <Chip>{claim.analyst_source === "llm" ? "LLM" : "rules"}</Chip>
-        {claim.degraded.map((flag) => (
-          <Chip key={flag} tone="warn">
-            {t(`degraded.${flag}` as Key)}
-          </Chip>
+        {view.chips.map((chip) => (
+          <span key={chip.key} data-testid="claim-source">
+            <Chip tone={chip.tone ?? "neutral"} title={t("studio.source")}>
+              {say(chip)}
+            </Chip>
+          </span>
         ))}
+        {claim.degraded
+          // a progressive claim says it in a note: "the model read it differently"
+          .filter((flag) => !(claim.model_pass && flag === "analyst_disagreement"))
+          .map((flag) => (
+            <Chip key={flag} tone="warn">
+              {t(`degraded.${flag}` as Key)}
+            </Chip>
+          ))}
         <button
           type="button"
           data-testid="claim-details"

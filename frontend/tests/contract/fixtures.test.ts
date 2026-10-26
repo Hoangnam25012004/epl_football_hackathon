@@ -71,22 +71,28 @@ describe("Day 6: the recorded panels of the screenshot set follow their schema",
 describe("fixtures follow the WebSocket contract", () => {
   const validators = new Map<string, ReturnType<typeof validatorFor>>();
   for (const name of NAMES) {
-    it(name, () => {
-      const messages = fixture(name);
-      expect(messages.length).toBeGreaterThan(0);
-      for (const message of messages) {
-        expect(message.v).toBe(1);
-        let validate = validators.get(message.type);
-        if (!validate) {
-          validate = validatorFor(message.type);
-          validators.set(message.type, validate);
+    it(
+      name,
+      () => {
+        const messages = fixture(name);
+        expect(messages.length).toBeGreaterThan(0);
+        for (const message of messages) {
+          expect(message.v).toBe(1);
+          let validate = validators.get(message.type);
+          if (!validate) {
+            validate = validatorFor(message.type);
+            validators.set(message.type, validate);
+          }
+          const ok = validate(message.payload);
+          expect(
+            ok,
+            `${message.type} n=${message.n}: ${JSON.stringify(validate.errors?.[0])}`,
+          ).toBe(true);
         }
-        const ok = validate(message.payload);
-        expect(ok, `${message.type} n=${message.n}: ${JSON.stringify(validate.errors?.[0])}`).toBe(
-          true,
-        );
-      }
-    });
+        // the first one also compiles the validators of every message type it meets
+      },
+      20_000,
+    );
   }
 });
 
