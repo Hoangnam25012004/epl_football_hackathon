@@ -717,8 +717,9 @@ def _result_pair_violations(
     words = [m.end() for m in RESULT_WORDS.finditer(text.lower)]
     if not words:
         return violations
-    score = tuple(match.score.get(team.id, 0) for team in match.teams)
-    allowed = {score, score[::-1]}
+    home, away = (float(match.score.get(team.id, 0)) for team in match.teams)
+    score = (home, away)
+    allowed: set[tuple[float, float]] = {score, (away, home)}
     goals = [f for f in facts if f.metric in GOALS and f.player is None and f.team is not None]
     allowed |= {
         (a.value, b.value)
@@ -738,7 +739,7 @@ def _result_pair_violations(
             GuardrailViolation(
                 code="WRONG_OUTCOME",
                 detail=f"{shown} follows a word of the result but the score is "
-                f"{score[0]}-{score[1]}",
+                f"{home:.0f}-{away:.0f}",
                 span=shown,
             )
         )
