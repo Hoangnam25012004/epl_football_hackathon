@@ -83,6 +83,11 @@ class Hub:
         self._clients.discard(client)
         self.last_change = self._clock()
 
+    def touch(self) -> None:
+        """Someone uses the session without watching it (Day 7: a claim through the API, the
+        model pass that answers it): it is not idle."""
+        self.last_change = self._clock()
+
     def state_message(self, kind: WsType, client: Client | None = None) -> WsMessage:
         if self._state_for is not None and client is not None:
             payload = self._state_for(client)

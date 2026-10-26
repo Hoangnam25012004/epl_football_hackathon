@@ -697,10 +697,59 @@ def _gap_violations(
     return violations
 
 
+# Day 7 (C10, found on the Space): "giành chiến thắng 2-0" for a team that lost 1-2 passed as
+# a stat pair (two sides of one metric were 2 and 0). After a word of the result, a pair is a
+# scoreline and must be the score.
+RESULT_WORDS = re.compile(
+    r"(?<!\w)(?:chiến thắng|thắng|thua|hòa|hoà|tỷ số|dẫn trước|dẫn|won|win|wins|winning|beat|"
+    r"beats|lost|lose|loses|losing|draw|drew|drawn|score|scoreline|led|lead|leads|leading)(?!\w)"
+)
+RESULT_REACH = 40  # characters between the word and the pair
+
+
+def _result_pair_violations(
+    text: Text, numbers: Sequence[Num], facts: Sequence[Fact], match: MatchContext
+) -> list[GuardrailViolation]:
+    """A pair right after a word of the result ("thắng 2-0", "won 2-0") is a scoreline: the
+    score of the match, or the goals of a window the facts give ("the score was 1-1 in the
+    second half")."""
+    violations: list[GuardrailViolation] = []
+    words = [m.end() for m in RESULT_WORDS.finditer(text.lower)]
+    if not words:
+        return violations
+    score = tuple(match.score.get(team.id, 0) for team in match.teams)
+    allowed = {score, score[::-1]}
+    goals = [f for f in facts if f.metric in GOALS and f.player is None and f.team is not None]
+    allowed |= {
+        (a.value, b.value)
+        for a in goals
+        for b in goals
+        if a.team != b.team and window_of(a) == window_of(b)
+    }
+    for index, left in enumerate(numbers):
+        if left.pair != index + 1 or left.minute:
+            continue
+        right = numbers[index + 1]
+        after_word = any(0 <= left.start - end <= RESULT_REACH for end in words)
+        if not after_word or (left.value, right.value) in allowed:
+            continue
+        shown = text.raw[left.start : right.end]
+        violations.append(
+            GuardrailViolation(
+                code="WRONG_OUTCOME",
+                detail=f"{shown} follows a word of the result but the score is "
+                f"{score[0]}-{score[1]}",
+                span=shown,
+            )
+        )
+    return violations
+
+
 def _attribution_violations(
     text: Text, numbers: Sequence[Num], facts: Sequence[Fact], match: MatchContext
 ) -> list[GuardrailViolation]:
     violations = _scoreline_violations(text, numbers, facts, match)
+    violations += _result_pair_violations(text, numbers, facts, match)
     mentions = find_entities(text, match)
     stats = _stat_numbers(numbers)
     cues = [hit.start for hit in find_terms(text, DERIVED_TERMS)]

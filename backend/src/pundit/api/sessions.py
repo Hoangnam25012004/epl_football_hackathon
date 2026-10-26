@@ -608,6 +608,9 @@ class MatchSession:
         known = self.claims.get(result.claim_id)
         if known is not None and known.revision > result.revision:
             return
+        # a claim, or the model pass that answers it, is use: the janitor must not remove a
+        # session an API client works with, even if nobody watches it
+        self.hub.touch()
         self.claims[result.claim_id] = result
         while len(self.claims) > MAX_CLAIMS_PER_SESSION:
             self.claims.popitem(last=False)

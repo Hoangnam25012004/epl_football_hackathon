@@ -14,6 +14,7 @@ from hypothesis import settings as hypothesis_settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
+from pundit.agents.contracts import ClaimRequest
 from pundit.api.app import create_app
 from pundit.api.sessions import (
     PRIVATE_WINDOW_S,
@@ -201,6 +202,21 @@ def test_the_janitor() -> None:
     removed = run(sessions.sweep())
     assert set(removed) == {seen.key, shared.key}
     assert sessions.sessions == {}
+
+
+def test_a_session_used_through_the_api_outlives_the_janitor() -> None:
+    """Day 7: an eval sent 100 claims over two hours to a shared session nobody watched; it was
+    removed an hour after it was made, in the middle of a claim."""
+    now = Now()
+    sessions = manager(now, private_idle_s=900, shared_idle_s=3600)
+    shared = create(sessions)
+    request = ClaimRequest(match_id=shared.key, text="Đội nhà áp đảo hiệp 2")
+    for _ in range(3):
+        now.t += 3000
+        run(shared.verify(request))
+        assert run(sessions.sweep()) == [], "a session with a claim 50 min ago is not idle"
+    now.t += 3601
+    assert run(sessions.sweep()) == [shared.key]  # idle again: removed, as before
 
 
 def test_a_watched_session_outlives_the_janitor() -> None:

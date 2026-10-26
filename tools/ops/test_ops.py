@@ -127,3 +127,32 @@ def test_the_smoke_waits_for_the_expected_build() -> None:
         "build '0ab8de7', expected 'd8e1488'"
     ]
     assert smoke_space.check_health({"status": "ok"}, None) == ["synthetic is not true"]
+
+
+def test_a_space_run_line_is_read_by_the_eval_report(tmp_path: Path) -> None:
+    """measure_space writes `pundit eval --out` lines: `pundit eval --from` scores them."""
+    import asyncio
+    import json
+
+    import measure_space
+    from pundit.agents.contracts import ClaimRequest
+    from pundit.engine.generator import generate
+    from pundit.llm.settings import Settings
+    from pundit.orchestration.evaluation import load_eval, load_run
+    from pundit.orchestration.service import ClaimService, StaticSource
+
+    spec = load_eval(ROOT / "backend" / "evals" / "claims_dominant_loser_42.json")
+    case = spec.claims[0]
+    match = generate(spec.match.scenario, spec.match.seed)
+    request = ClaimRequest(match_id=match.meta.match_id, text=case.text)
+    service = ClaimService(Settings())
+    result = asyncio.run(
+        service.verify_rules(request, StaticSource(match.meta, match.events), claim_id="x-c0001")
+    )
+    info = {"provider": "ollama (Space)", "model": "q", "commit": "abc", "date": "2026-10-27"}
+    line = {"file": spec.name, "case": case.id, **info, "result": result.model_dump(mode="json")}
+    run = tmp_path / "run.jsonl"
+    run.write_text(json.dumps(line, ensure_ascii=False) + "\n", encoding="utf-8")
+    report = load_run(run, [spec])
+    assert len(report.rows) == 1 and report.rows[0].result.verdict == case.expected
+    assert measure_space.p50([3.0, 1.0, 2.0]) == 2.0 and measure_space.summary([]) == "-"
