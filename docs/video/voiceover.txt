@@ -1,0 +1,8 @@
+Live commentary moves too fast to check. Say one wrong number, and it is on air.
+A claim, in English or Vietnamese, gets a verdict from the rules in under a second, with the numbers and the events behind it. Then an open model, running on the same small CPU, refines the explanation. Numbers never come from the model.
+Fourteen agents on Microsoft Agent Framework share one match state and hand off typed messages. Agent Ops shows every handoff, live.
+Break the model yourself. Here it lies: valid answers with one number changed. The guardrail blocks every one, and nothing wrong reaches the screen.
+At every key moment the studio gets verified talking points, and an on-air graphic ready for OBS or vMix.
+For fans everywhere, commentary in their own language: here Vietnamese, read aloud, with a beginner mode that explains offside the first time it happens.
+The same statistics are served over MCP to any AI assistant. The whole stack runs in one CPU container with an open model: no cloud account, the data never leaves the machine.
+Pundit Copilot: never wrong on air. Synthetic data only.

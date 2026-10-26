@@ -1,32 +1,33 @@
 1
-00:00:22,000 --> 00:00:25,000
+00:00:17,000 --> 00:00:20,000
 [claim] "Đội nhà áp đảo hiệp 2"
 The home side dominated the second half
 
 2
-00:00:25,000 --> 00:00:29,000
+00:00:20,000 --> 00:00:24,000
 Verdict: TRUE. Possession 61% to 39%, shots 15 to 1, xG 2.24 to 0.24
 
 3
-00:01:05,000 --> 00:01:10,000
-[Casual, Vietnamese] The same moments, written for a casual fan
+00:00:24,000 --> 00:00:30,000
+[status] "Model đang kiểm tra…" then "Model đọc giống luật"
+The model is checking… then: the model read it as the rules did
 
 4
-00:01:18,000 --> 00:01:21,000
+00:01:22,000 --> 00:01:25,000
 [voice] "Việt vị! M. Ribas đứng sai vị trí."
 Offside! M. Ribas was in an offside position.
 
 5
-00:01:21,000 --> 00:01:27,000
+00:01:25,000 --> 00:01:31,000
 [beginner mode] An attacker is offside when, in the opponents' half, they are nearer the goal
 line than both the ball and the second-last defender as a team-mate passes, and take part in play.
 
 6
-00:01:27,000 --> 00:01:31,000
+00:01:31,000 --> 00:01:35,000
 [voice] "VÀOOO! J. Ellery ghi bàn cho Kestrel Athletic!"
 GOAL! J. Ellery scores for Kestrel Athletic! Harbor Lions FC 1–2 Kestrel Athletic.
 
 7
-00:01:31,000 --> 00:01:34,000
+00:01:35,000 --> 00:01:38,000
 "Tiếc quá, đối thủ vừa có bàn."
 Bad luck: the opponents have just scored.

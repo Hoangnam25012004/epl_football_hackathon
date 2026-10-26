@@ -223,26 +223,26 @@
 **Hạ tầng & tính năng bù khi không có Azure** (mã C = Claude, M = bạn; thiết kế: day7-design §0.5, as-built: §7)
 
 - [x] **P0** C1 / S1: đo model trên 2 CPU (25/10). **Gate chưa đạt ở máy dev:** `qwen2.5:1.5b` p95 160 s (ngưỡng 45 s), 0 verdict sai; sửa lỗi llama.cpp chạy 8 luồng trên 2 CPU. Đo lại trên Space thật (C10)
-- [ ] **P0** C1 / S2: Piper (license engine + giọng vi-VN, chất lượng 30 câu, RTF ≤ 0,5)
+- [x] **P0** C1 / S2: Piper (26/10). License: engine MIT (+ espeak-ng GPL, chạy process riêng), giọng `vais1000` CC BY 4.0 đạt, hai giọng còn lại bị loại. **RTF 1 CPU 0,77 > 0,5: gate không đạt ở máy dev** → C8 không làm, giữ giọng trình duyệt. S1 với `qwen2.5:0.5b`: p95 58 s, cũng không đạt → giữ 1.5b
 - [x] **P0** C2: image Space (Ollama v0.40.2 CPU + model, uid 1000, `start.sh`, keepalive lớp 1 trong app; 2,58 GB, `/healthz` sau 26 s)
 - [x] **P0** C3: `space.yml` (sau `ci` xanh: build → GHCR → Space theo digest → smoke). Lần chạy đầu: build + push xong, **Space PAUSED vì tài khoản Hugging Face mới có hạn mức cpu-basic = 0** → chờ M2b
 - [ ] **P0** M2b: nâng Hugging Face PRO (hoặc tài khoản cũ hơn), đặt 2 package GHCR public, chạy lại `space` (`force`)
-- [ ] **P0** C4: claim progressive (rev.1 theo luật < 1 s, rev.2 do model). Tới khi có C4, claim trên Space chờ tối đa 45 s
-- [ ] **P0** C5: luồng `agent_event` + trang Agent Ops
-- [ ] **P1** C6: công tắc Chaos theo phiên riêng (có "model nói dối" để Guardrail chặn)
+- [x] **P0** C4: claim progressive (26/10): rev.1 theo luật ngay, rev.2 = workflow một lượt trên một worker; bất biến kiểm trên 100 claim eval; bật trên Space (`CLAIM_PROGRESSIVE=true`)
+- [x] **P0** C5: luồng `agent_event` (WebSocket riêng `/ws/agents/{id}`) + trang `/agents` (26/10)
+- [x] **P1** C6: Chaos theo phiên riêng (26/10): 6 lỗi, service + breaker riêng; "model nói dối": hơn 100 câu sai, 0 câu lên màn hình
 - [ ] **P1** C7: ghi / phát lại phiên model bằng **Foundry Local** (`phi-4-mini`), nhãn "recorded" (cần M3)
 - [ ] **P0** M3: cài Foundry Local + model
-- [ ] **P0** C8: Piper TTS provider (nếu S2 đạt; không đạt thì giữ giọng trình duyệt)
-- [ ] **P0** C9: đánh bóng UX bản public (không còn chữ "mock", nhãn nguồn câu chữ đúng)
+- [x] ~~**P0** C8: Piper TTS provider~~ không làm: S2 không đạt gate tốc độ; giữ giọng trình duyệt (26/10)
+- [x] **P0** C9: không còn chữ "mock" trên UI, nguồn câu chữ bằng lời, Agent Ops / Chaos trong "Thử gì", HelpDrawer (26/10). Còn: bộ ảnh `shots`, demo-run S1–S9 trên Space
 - [ ] **P0** C10: eval với model của Space và Foundry Local + đo độ trễ trên Space
 - [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review · M5: UptimeRobot (lớp 3)
 - [ ] **P0** M6 + C13: duyệt bảng nhãn eval, chạy gate
-- [ ] **P1** Thêm file `LICENSE` cho repo public
+- [x] **P1** Thêm file `LICENSE` (MIT, Dang Hoang Nam, 26/10)
 - [ ] **P2** Đổi tên repo thành `pundit-copilot` (tuỳ bạn; "EPL" nằm trong danh sách tên thật cần tránh của dự án)
 
 **README & pitch**
 
-> Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Cập nhật 26/10 theo hướng không có Azure (C11 hoàn thiện khi Space chạy và đã quay video).
+> Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Viết lại 26/10 theo hướng không có Azure (C11): pitch, kịch bản (progressive, Agent Ops, Chaos), `docs/video/voiceover.txt`, phụ đề, README. Còn: link demo / video, số đo trên Space, `docs/submission.md`.
 
 - [ ] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft nào, giải quyết vấn đề gì
 - [ ] **P0** Vấn đề → giải pháp → người dùng (studio + fan toàn cầu, ví dụ fan Việt)

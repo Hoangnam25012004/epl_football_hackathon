@@ -2,9 +2,8 @@
 Draft of 26/10/2026 (no Azure: the public demo is a Hugging Face Space). To finish on Day 7:
 - the live demo and video links (top), and NEXT_PUBLIC_REPO_URL / NEXT_PUBLIC_VIDEO_URL at build;
 - "Microsoft technologies": Foundry Local once sessions are recorded and evaluated with it,
-  Copilot Agent Mode once docs/copilot.md has its runs, Piper once spike S2 passes;
+  Copilot Agent Mode once docs/copilot.md has its runs;
 - the model and latency measured on the Space (claim, event -> talking point, event -> audio);
-- the progressive claim, Agent Ops and Chaos once they are built;
 - screenshots.
 -->
 
@@ -38,12 +37,18 @@ around the world follow a match in a language that is not English, often new to 
 
 - **Claim check.** Type or speak a claim, in Vietnamese or English ("Đội nhà áp đảo hiệp 2",
   "Kestrel took more shots than Harbor"). The answer is a verdict (true, partly true, false, not
-  enough data) with the numbers behind it and the event IDs they come from.
+  enough data) with the numbers behind it and the event IDs they come from. It comes twice: from
+  the rules in under a second, then refined by the model, which explains it in words; the rules'
+  verdict stands unless the rules could not read the claim.
 - **Talking points** at every key moment: two or three verified lines, to approve, pin or dismiss.
 - **Lower-thirds** that go on air by themselves (take, hold, clear by hand), as a transparent
   overlay page for OBS or vMix.
 - **Why · Evidence · Agent Trace** for every item: the facts, the events on a pitch map, and
   which agent did what, with timings.
+- **Agent Ops**: the agents of the match at work, live: who runs, the typed message each one
+  hands on, the match state the run reads, what the guardrail blocked, the breakers.
+- **Chaos**: in your own demo match, break the model (down, slow, garbage, rate limited,
+  content filter, or lying with one number changed) and watch the system recover.
 
 **For fans**:
 
@@ -120,9 +125,11 @@ flowchart LR
 typed messages through **Microsoft Agent Framework** workflows (sequential for claims, fan-out /
 fan-in for the studio), and recover from failure: per-role budgets, circuit breakers that open
 and close again, deterministic templates, a plain asyncio runner if the workflow itself fails.
-Every run leaves a trace shown in the UI. A fault-injection proxy in front of the model checks
-13 failure modes (hangs, 500s, 429s, garbage, content filters, flaky answers): the studio and
-the claim checker keep answering, on time, in all of them.
+Every run leaves a trace shown in the UI, and the Agent Ops page streams the runs as they happen.
+A fault-injection proxy in front of the model checks 13 failure modes (hangs, 500s, 429s,
+garbage, content filters, flaky answers): the studio and the claim checker keep answering, on
+time, in all of them. The same faults can be switched on by a judge in a private match; another
+match, and its breakers, never see them.
 
 ## Results
 
@@ -139,6 +146,10 @@ apart and frozen before any parser change).
 
 Refusing is allowed, misleading is not: a claim the system cannot read is answered "not enough
 data". The notes of docs/eval.md keep the first measurements and every fix a wrong verdict led to.
+
+**A model that lies.** With Chaos's "the model lies" (valid answers with one number changed), a
+full match and its claims gave over 100 wrong texts: the guardrail rejected every one, and none
+was published (backend/tests/api/test_chaos.py).
 
 Quality gates: 2,600+ backend tests (95 % coverage), 178 frontend unit and component tests, 42
 end-to-end tests, the judge's demo path run three times in a row, accessibility (axe) on every
