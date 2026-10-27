@@ -31,6 +31,8 @@ SHORT: dict[str, str] = {
     "tempo": "tempo",
     "red_cards": "red",
     "yellow_cards": "yellow",
+    "tackles": "tackles",
+    "fouls": "fouls",
 }
 VAR_REASON: dict[str, tuple[str, str]] = {
     "offside": ("vì lỗi việt vị", "for offside"),

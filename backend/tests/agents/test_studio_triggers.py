@@ -7,12 +7,20 @@ from builders import MatchBuilder
 from helpers import SCENARIO_KEYS, generated
 from studio_helpers import MATRIX, SAMPLES, triggers
 
-from pundit.agents.cues import CueDetector, cue_id, detect_cues
+from pundit.agents.cues import PLAY_GAP_MS, CueDetector, cue_id, detect_cues
 from pundit.agents.moments import MomentDetector, detect_all
 from pundit.agents.triggers import TriggerFeed, detect_triggers
-from pundit.domain.events import OffsideEvent, PassEvent, ShotEvent, VarCheckEvent
+from pundit.domain.events import (
+    FoulEvent,
+    OffsideEvent,
+    PassEvent,
+    ShotEvent,
+    TackleEvent,
+    VarCheckEvent,
+)
 from pundit.domain.log import EventLog
 from pundit.domain.matchtime import minute_exact
+from pundit.stats.team import is_box_entry
 
 
 def built_triggers(b: MatchBuilder) -> list:  # type: ignore[type-arg]
@@ -158,7 +166,7 @@ def test_cue_counts_follow_the_events(scenario: str, seed: int) -> None:
     match = generated(scenario, seed)
     cues = detect_cues(match.meta, match.events)
     kinds = [c.kind for c in cues]
-    assert kinds.count("stat_tick") == 4 and kinds.count("added_time") == 2
+    assert kinds.count("stat_tick") == 16 and kinds.count("added_time") == 2  # every 5'
     corners = [e for e in match.events if isinstance(e, PassEvent) and e.play_type == "corner"]
     offsides = [e for e in match.events if isinstance(e, OffsideEvent)]
     assert kinds.count("corner") == len(corners)
@@ -181,24 +189,53 @@ def test_cue_counts_follow_the_events(scenario: str, seed: int) -> None:
 
 
 @pytest.mark.parametrize(("scenario", "seed"), SAMPLES)
-def test_no_silence_longer_than_five_minutes(scenario: str, seed: int) -> None:
-    """S-10: a lull cue keeps the commentary going (every trigger becomes a commentary)."""
+def test_small_plays_fill_the_gaps(scenario: str, seed: int) -> None:
+    """28/10: a won tackle, a foul or a pass into the box, 40 s after the previous line at least,
+    with its team's count so far."""
+    match = generated(scenario, seed)
+    found = detect_triggers(match.meta, match.events)
+    by_id = {e.id: e for e in match.events}
+    small = [t for t in found if t.kind in ("tackle", "foul", "box_entry")]
+    assert len(small) >= 20, len(small)
+    metric = {"tackle": "tackles", "foul": "fouls", "box_entry": "box_entries"}
+    for trigger in small:
+        event = by_id[trigger.trigger_event_ids[0]]
+        assert event.type == {"tackle": "tackle", "foul": "foul", "box_entry": "pass"}[trigger.kind]
+        if isinstance(event, TackleEvent):
+            assert event.outcome == "won" and trigger.roles["tackled"] == event.target_player
+        elif isinstance(event, FoulEvent):
+            assert trigger.roles["fouled"] == event.fouled_player
+        else:
+            assert is_box_entry(event) and trigger.roles["receiver"] == event.recipient
+        (fact,) = trigger.facts
+        assert fact.metric == metric[trigger.kind] and fact.team == trigger.team
+    for previous, current in itertools.pairwise(found):
+        if current.kind in metric and previous.period == current.period:
+            assert current.match_ms - previous.match_ms >= PLAY_GAP_MS, (previous.id, current.id)
+
+
+@pytest.mark.parametrize(("scenario", "seed"), SAMPLES)
+def test_no_silence_longer_than_three_minutes(scenario: str, seed: int) -> None:
+    """S-10: a lull cue keeps the commentary going (every trigger becomes a commentary); 28/10:
+    within 3 minutes (lulls after 1.75', on the next event), was 5."""
     found = triggers(scenario, seed)
     for previous, current in itertools.pairwise(found):
         if previous.period == current.period:
-            assert current.clock_ms - previous.clock_ms <= 5 * 60_000, (previous.id, current.id)
+            assert current.clock_ms - previous.clock_ms <= 3 * 60_000, (previous.id, current.id)
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize(("scenario", "seed"), MATRIX)
 def test_no_long_silence_on_the_matrix(scenario: str, seed: int) -> None:
-    test_no_silence_longer_than_five_minutes(scenario, seed)
+    test_no_silence_longer_than_three_minutes(scenario, seed)
 
 
 def test_stat_ticks_are_the_first_events_after_each_mark() -> None:
     match = generated("dominant_loser", 42)
     ticks = [t for t in triggers("dominant_loser", 42) if t.kind == "stat_tick"]
-    assert [t.details["tick_minute"] for t in ticks] == ["15", "30", "60", "75"]
+    assert [t.details["tick_minute"] for t in ticks] == [
+        f"{m}" for m in (*range(5, 45, 5), *range(50, 90, 5))
+    ]
     for tick in ticks:
         mark = float(tick.details["tick_minute"])
         event = match.events[tick.seq]

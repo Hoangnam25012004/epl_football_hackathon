@@ -58,9 +58,10 @@ from pundit.orchestration.recap_service import RecapService
 from pundit.orchestration.studio_service import StudioService
 
 # items per match with the templates: section 16.7 estimated 60-110 on the four sample
-# matches; the 4 x 3 matrix measured 53-99 (balanced-7 is a quiet match), see section 23
-COMMENTARY_RANGE = (50, 110)
-MAX_SILENCE_MIN = 5.0
+# matches; the 4 x 3 matrix measured 53-99 (balanced-7 is a quiet match), see section 23.
+# 28/10 (day7-design 7.6): stats every 5', small plays, lulls after 1.75' -> 110-154 measured
+COMMENTARY_RANGE = (100, 180)
+MAX_SILENCE_MIN = 3.0  # lulls come after 1.75', on the next event: 2.8' measured on the matrix
 MIN_STRICT_D2 = 0.8
 MAX_LLM_FAILURE_RATE = 0.2
 MIN_LANGUAGE_WORDS = 3

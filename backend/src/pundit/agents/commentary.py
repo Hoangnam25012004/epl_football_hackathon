@@ -615,6 +615,123 @@ BANKS: dict[str, Bank] = {
             ),
         ),
     },
+    "tackle": {
+        ("vi", "analyst"): (
+            (
+                "{minute}: {tackler} tắc bóng thành công; {team} đã có {tackles_team} pha tắc "
+                "bóng.",
+                "Pha tắc bóng gọn gàng của {tackler} ({team}: {tackles_team} pha tắc bóng).",
+                "{tackler} giành lại bóng cho {team}; {team} đã có {tackles_team} pha tắc bóng "
+                "trong trận.",
+            ),
+            ("{tackler} tắc bóng thành công.",),
+            ("{team} giành lại bóng.",),
+        ),
+        ("vi", "casual"): (
+            (
+                "{tackler} tắc bóng rất gọn!",
+                "Pha tắc bóng đẹp của {tackler}!",
+                "{tackler} giành lại bóng cho {team}!",
+            ),
+            ("{team} giành lại bóng!",),
+        ),
+        ("en", "analyst"): (
+            (
+                "{minute}: {tackler} wins the ball with a tackle; tackles for {team}: "
+                "{tackles_team}.",
+                "Strong tackle from {tackler} ({team} tackles: {tackles_team}).",
+                "{tackler} wins it back for {team}; tackles for {team} in the match: "
+                "{tackles_team}.",
+            ),
+            ("{tackler} wins the ball back.",),
+            ("{team} win the ball back.",),
+        ),
+        ("en", "casual"): (
+            (
+                "Great tackle from {tackler}!",
+                "{tackler} wins the ball back!",
+                "{tackler} steps in and takes the ball!",
+            ),
+            ("{team} win the ball back!",),
+        ),
+    },
+    "foul": {
+        ("vi", "analyst"): (
+            (
+                "{minute}: {fouler} phạm lỗi với {fouled}; {team} đã phạm lỗi {fouls_team} lần.",
+                "{fouler} phạm lỗi, trọng tài cho đá phạt ({team}: {fouls_team} lần phạm lỗi).",
+                "Trọng tài thổi phạt {fouler}; {team} đã có {fouls_team} lần phạm lỗi.",
+            ),
+            ("{fouler} phạm lỗi với {fouled}.",),
+            ("Trọng tài thổi phạt, đá phạt cho {opp}.",),
+        ),
+        ("vi", "casual"): (
+            (
+                "Phạm lỗi! Trọng tài thổi phạt {fouler}.",
+                "Trọng tài thổi còi, đá phạt cho {opp}.",
+                "{fouled} bị phạm lỗi, {opp} được đá phạt.",
+            ),
+            ("Trọng tài thổi còi, đá phạt cho {opp}.",),
+        ),
+        ("en", "analyst"): (
+            (
+                "{minute}: foul by {fouler} on {fouled}; fouls by {team}: {fouls_team}.",
+                "{fouler} gives away a free kick ({team} fouls: {fouls_team}).",
+                "The whistle goes against {fouler}; fouls by {team} in the match: {fouls_team}.",
+            ),
+            ("Foul by {fouler} on {fouled}.",),
+            ("The referee blows for a foul: free kick to {opp}.",),
+        ),
+        ("en", "casual"): (
+            (
+                "Foul by {fouler}! The referee stops play.",
+                "Free kick to {opp}.",
+                "{fouled} is brought down: free kick to {opp}.",
+            ),
+            ("Free kick to {opp}.",),
+        ),
+    },
+    "box_entry": {
+        ("vi", "analyst"): (
+            (
+                "{minute}: {passer} đưa bóng vào vòng cấm cho {receiver}; {team} đã {box_team} "
+                "lần đưa bóng vào vòng cấm.",
+                "{team} xâm nhập vòng cấm, {passer} chuyền cho {receiver} ({box_team} lần vào "
+                "vòng cấm).",
+                "Đường chuyền của {passer} tìm tới {receiver} trong vòng cấm; {team} có "
+                "{box_team} lần vào vòng cấm.",
+            ),
+            ("{passer} đưa bóng vào vòng cấm.",),
+            ("{team} đưa bóng vào vòng cấm.",),
+        ),
+        ("vi", "casual"): (
+            (
+                "{passer} chuyền vào vòng cấm cho {receiver}!",
+                "{team} đang tấn công, {receiver} có bóng trong vòng cấm!",
+                "Cơ hội cho {team}, {receiver} nhận bóng trong vòng cấm!",
+            ),
+            ("{team} tấn công vào vòng cấm!",),
+        ),
+        ("en", "analyst"): (
+            (
+                "{minute}: {passer} finds {receiver} in the box; box entries for {team}: "
+                "{box_team}.",
+                "{team} get into the box: {passer} to {receiver} ({box_team} box entries).",
+                "{passer} plays it into the area for {receiver}; box entries for {team}: "
+                "{box_team}.",
+            ),
+            ("{passer} plays it into the box.",),
+            ("{team} get into the box.",),
+        ),
+        ("en", "casual"): (
+            (
+                "{passer} finds {receiver} in the box!",
+                "{team} are attacking: {receiver} has it in the box!",
+                "Into the area for {receiver}!",
+            ),
+            ("{team} are in the box!",),
+        ),
+    },
     "var_review_stands": {
         ("vi", "analyst"): (
             (
@@ -792,7 +909,6 @@ VERSIONS: tuple[tuple[Lang, Register], ...] = (
     ("en", "analyst"),
     ("en", "casual"),
 )
-SPOKEN_KINDS = frozenset({"stat_tick", "added_time", "period_start", "period_end", "full_time"})
 
 
 def bank_key(trigger: Trigger) -> str:
@@ -842,7 +958,9 @@ EXCITEMENT: dict[str, Excitement] = {
     "rocket_shot": 1,
     "momentum_shift": 1,
     "dangerous_spell": 1,
+    "box_entry": 1,
 }
+SHOT_ON_GOAL: frozenset[str | None] = frozenset({"saved", "post"})  # a shot that nearly went in
 
 
 def excitement(pack: FactPack) -> Excitement:
@@ -853,8 +971,13 @@ def excitement(pack: FactPack) -> Excitement:
         tight = abs(pack.match.score.get(home, 0) - pack.match.score.get(away, 0)) <= 1
         late = trigger.period == 2 and trigger.clock_ms >= 35 * 60_000  # from the 80th minute
         return 3 if tight or late else 2
+    if trigger.kind == "shot" and trigger.outcome in SHOT_ON_GOAL:
+        return 1
     return EXCITEMENT.get(trigger.kind, 0)
 
 
 def speak(pack: FactPack) -> bool:
-    return pack.trigger.importance >= 2 or pack.trigger.kind in SPOKEN_KINDS
+    """Every line is read (28/10: reading only the big moments sounded sparse); the fan player
+    drops a line it could not read in time, the calmest first (docs/day5-design.md R-rules)."""
+    del pack
+    return True

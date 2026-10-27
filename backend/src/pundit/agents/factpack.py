@@ -138,6 +138,9 @@ HEADLINE: dict[str, tuple[str, ...]] = {  # kind -> metric / key prefixes, most 
     "shot": ("shot_xg:",),
     "corner": ("corners",),
     "offside": ("offsides",),
+    "tackle": ("tackles",),
+    "foul": ("fouls",),
+    "box_entry": ("box_entries",),
     "stat_tick": ("possession", "shots", "xg"),
     "lull": ("possession",),
 }

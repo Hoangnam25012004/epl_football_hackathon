@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BrowserVoice,
   MAX_CHUNK,
+  hasBothGenders,
   pickVoice,
   splitForSpeech,
   type SynthLike,
@@ -261,6 +262,14 @@ describe("BrowserVoice", () => {
     const other = { name: "Google tiếng Việt", lang: "vi_VN" };
     expect(pickVoice([EN, other], "vi-VN", "male")).toBe(other);
     expect(pickVoice([EN], "vi-VN", "female")).toBeNull();
+  });
+
+  it("offers female / male only when the two voices differ", () => {
+    expect(hasBothGenders([EN, VI_FEMALE, VI_MALE], "vi")).toBe(true); // Edge
+    const linh = { name: "Linh", lang: "vi-VN" }; // an iPhone: one system voice
+    expect(hasBothGenders([EN, linh], "vi")).toBe(false);
+    expect(hasBothGenders([EN, VI_FEMALE], "vi")).toBe(false);
+    expect(hasBothGenders([EN], "vi")).toBe(false);
   });
 
   it("splits long text at sentence ends, then commas, then spaces", () => {

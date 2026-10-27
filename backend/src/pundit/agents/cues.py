@@ -10,16 +10,29 @@ from collections.abc import Sequence
 from pundit.agents.contracts import Cue, CueKind, Fact, Moment
 from pundit.agents.factpack import shot_fact, stat_fact
 from pundit.agents.moments import MomentDetector
-from pundit.domain.events import Event, OffsideEvent, PassEvent, ShotEvent, VarCheckEvent
+from pundit.domain.events import (
+    Event,
+    FoulEvent,
+    OffsideEvent,
+    PassEvent,
+    ShotEvent,
+    TackleEvent,
+    VarCheckEvent,
+)
 from pundit.domain.log import EventLog, LogView
 from pundit.domain.matchtime import MS_PER_MINUTE, format_minute, minute_exact
 from pundit.domain.meta import MatchMeta
 from pundit.stats import MetricParams, compute
+from pundit.stats.team import is_box_entry
 
-TICK_MINUTES: dict[int, tuple[float, ...]] = {1: (15.0, 30.0), 2: (60.0, 75.0)}
+TICK_MINUTES: dict[int, tuple[float, ...]] = {  # a stats update every 5 minutes (28/10)
+    1: tuple(float(m) for m in range(5, 45, 5)),
+    2: tuple(float(m) for m in range(50, 90, 5)),
+}
 ADDED_TIME_FROM: dict[int, float] = {1: 45.0, 2: 90.0}
-LULL_MS = 4.5 * MS_PER_MINUTE  # no trigger for 4.5 minutes of play -> a "lull" cue, so the
-# longest silence, which also waits for the next event, stays within 5 minutes
+LULL_MS = 1.75 * MS_PER_MINUTE  # no trigger for 1.75 minutes of play -> a "lull" cue, so the
+# longest silence, which also waits for the next event, stays within about 2 minutes
+PLAY_GAP_MS = 40_000  # a small play (tackle, foul, box entry) is told 40 s after the last line
 CONTROL_EVENTS = frozenset({"match_start", "period_start", "period_end", "match_end"})
 SHOT_MOMENTS = frozenset({"big_chance", "rocket_shot"})
 
@@ -115,12 +128,39 @@ class CueDetector:
             event.check_type == "goal" and event.decision == "overturned"
         ):
             found.append(self._cue("var_review", event))
+        if (
+            not (moments or found or control)
+            and self._last_trigger_ms is not None
+            and event.match_ms - self._last_trigger_ms >= PLAY_GAP_MS
+        ):
+            play = self._small_play(event, view)
+            if play is not None:
+                found.append(play)
         if moments or found or self._last_trigger_ms is None:
             self._last_trigger_ms = event.match_ms
         elif not control and event.match_ms - self._last_trigger_ms >= LULL_MS:
             found.append(self._cue("lull", event))
             self._last_trigger_ms = event.match_ms
         return found
+
+    def _small_play(self, event: Event, view: LogView) -> Cue | None:
+        """A tackle won, a foul or a pass into the box, with its team's count so far."""
+        if isinstance(event, TackleEvent) and event.outcome == "won":
+            kind: CueKind = "tackle"
+            metric = "tackles"
+        elif isinstance(event, FoulEvent):
+            kind, metric = "foul", "fouls"
+        elif is_box_entry(event):
+            kind, metric = "box_entry", "box_entries"
+        else:
+            return None
+        return self._cue(
+            kind,
+            event,
+            team=event.team,
+            player=event.player,
+            facts=[self._count_fact(view, metric, event)],
+        )
 
 
 def detect_cues(meta: MatchMeta, events: Sequence[Event]) -> list[Cue]:

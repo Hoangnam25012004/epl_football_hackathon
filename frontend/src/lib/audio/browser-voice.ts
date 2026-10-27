@@ -58,6 +58,14 @@ export function pickVoice(
   return ofLanguage.find((voice) => voice.name.includes(NAMES[gender])) ?? ofLanguage[0] ?? null;
 }
 
+/** A female and a male voice that differ (Edge: HoaiMy and NamMinh); one system voice (an
+ * iPhone has one Vietnamese voice) would read both choices the same. */
+export function hasBothGenders(voices: readonly VoiceLike[], lang: string): boolean {
+  const female = pickVoice(voices, lang, "female");
+  const male = pickVoice(voices, lang, "male");
+  return Boolean(female && male && female.name !== male.name);
+}
+
 type Callbacks = { onend: () => void; onerror: (reason: string) => void };
 type Timers = {
   setTimer: (fn: () => void, ms: number) => unknown;

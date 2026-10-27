@@ -805,3 +805,51 @@ Docker Desktop trên máy này chỉ có 8 GB RAM nên không chạy được `-
 - **M10, phần tự động** (`frontend/playwright.space.config.ts`, `tests/e2e-space/`; chạy tay, không chạy trên CI vì phụ thuộc Space thật và giới hạn 3 phiên riêng / 10 phút mỗi IP): Edge 1366 × 768 S1–S9 (có axe ở trang đầu, Fan, Agent Ops), Chrome S1 / S2 / S5, điện thoại giả lập (Pixel 7) trang đầu / Fan bật giọng bằng chạm / Agent Ops không cuộn ngang. Kết quả cuối: xem dòng kiểm thử bên dưới.
 - **M10, kết quả tự động trên build `b70913c`:** Edge S1–S9 qua (2,2 phút, gồm rev.2 thật của model và Chaos "model nói dối": 0 số sai lên màn hình); Chrome S1 / S2 / S5 và điện thoại giả lập qua (1,1 phút). Lượt đầu trên build cũ lộ lỗi 4 ở trên. Edge headless không có giọng vi-VN: trang Fan nói thẳng "Trình duyệt này không có giọng tiếng Việt", nên nghe bằng tai phải làm trên thiết bị thật. Kiểm một claim trên Space sau khi sửa: lượt model trả lời sau 34 s, Guardrail chặn, rev.2 `skip_reason: rejected` kèm trace. Còn chờ bạn: điện thoại thật qua 4G, hai trình duyệt / hai phiên riêng với Chaos (test backend `tests/api/test_chaos.py` đã kiểm phiên khác không đổi).
 - **Kết quả kiểm thử cuối (27/10):** backend 2.667 passed (2 skip: Azurite, azure-identity), ruff / mypy sạch; `tools` 60 passed; Vitest 202 / 202; Playwright local 46 / 46 (e2e, mock, chaos, progressive); Playwright trên Space 3 / 3; CI `8ac8b30`, `b70913c` xanh, `space` xanh.
+
+### 7.5. M5, UptimeRobot (keepalive lớp 3) (27/10)
+
+- **Cấu hình:** monitor **Keyword** `https://hnam2501-pundit-copilot.hf.space/healthz`, keyword `"status":"ok"`, báo khi keyword **không tồn tại**, interval 5 phút (mức miễn phí), alert qua email của chủ tài khoản. Một monitor HTTP tạo trước đó (chỉ kiểm tra mã trả về của trang chủ) đã xoá để một sự cố không gửi hai email.
+- **Đã kiểm chứng (không chỉ cấu hình):**
+  1. kiểm tra đầu tiên Up, phản hồi khoảng 359–553 ms từ Nuremberg / Falkenstein (Đức);
+  2. Test Notification: email về hộp thư chính;
+  3. thử báo động thật: đổi tạm keyword thành `"status":"zzz"` → monitor **Down** lúc 09:18:12 UTC, email "Monitor is DOWN" (root cause "Keyword Does Not Exist");
+  4. đổi lại `"status":"ok"` → **Up** lúc 09:19:18 UTC, email "Monitor is UP", incident 1 phút 6 giây.
+- **Lưu ý:** uptime 24 giờ trên bảng điều khiển ghi 89,1 % vì incident thử nghiệm này, không phải sự cố của Space. Chuỗi keyword khớp từng ký tự với JSON của `/healthz` (không có khoảng trắng sau dấu `:`); nếu `/healthz` đổi định dạng JSON thì phải sửa keyword cho khớp.
+- **Dọn dẹp sau cuộc thi:** pause hoặc xoá monitor này cùng watchdog và token HF (xem §5, mục "Từ 11/11").
+
+### 7.6. M10 trên iPhone thật và C14, giọng bình luận dày và nhanh hơn (28/10)
+
+**M10, phần điện thoại thật (bạn kiểm, iOS Safari, Wi-Fi):** giọng tiếng Việt đọc được, đúng số liệu (sau khi đổi trang Fan sang VI: giọng chỉ đọc bình luận tiếng Việt). Bốn nhận xét:
+
+1. giọng "nam" nghe giống giọng "nữ";
+2. giọng đều, thiếu cảm xúc, chậm;
+3. chỉ đọc ở tình huống đặc biệt, thiếu chi tiết từng pha;
+4. nghe "thuần AI".
+
+**Nguyên nhân (đọc code):**
+
+| Nhận xét | Nguyên nhân |
+|---|---|
+| 1 | iOS chỉ có một giọng vi-VN (Linh). `pickVoice` tìm `HoaiMy` / `NamMinh` (tên giọng Azure, Edge có bản Online Natural), không thấy thì lấy giọng vi đầu tiên: cả hai lựa chọn rơi về cùng một giọng |
+| 2 | Preset Day 5 chênh nhau ít (rate 0 → +16 %), mức `calm` còn giảm volume 15 %; iOS lại co hẹp rate / pitch của giọng hệ thống |
+| 3 | `speak()` chỉ đọc mục importance ≥ 2 và vài loại tóm tắt: cú sút, phạt góc, việt vị, VAR, khoảng lặng có chữ nhưng **không bao giờ được đọc**. Mật độ thiết kế Day 3: mốc thống kê 15', khoảng lặng ≤ 5' |
+| 4 | Giọng hệ thống của trình duyệt; câu là template (đúng nguyên tắc "không có bằng chứng thì không nói") |
+
+**Đã làm (C14):**
+
+- **Đọc mọi câu:** `speak()` trả `True` cho mọi mục; hồ sơ fan của CLB vẫn tắt tiếng mục `low` như trước. Bộ lập lịch của Fan đã bỏ câu cũ theo `STALE_MS` và ưu tiên câu kịch tính, nên không bị dồn hàng.
+- **Pha bóng nhỏ (cue mới):** `tackle` (tắc bóng thắng), `foul` (phạm lỗi, đá phạt cho đội kia), `box_entry` (đường chuyền thành công vào vòng cấm). Chỉ phát khi đã 40 s (`PLAY_GAP_MS`) không có câu nào và sự kiện không sinh moment / cue khác; mỗi cue mang số đếm của đội từ Stats Tools (`tackles`, `fouls`, `box_entries`). Template VI / EN × analyst / casual, ba câu mỗi nhóm cộng bậc dự phòng; không có talking point hay lower-third cho các cue này (importance 1, không thuộc `GRAPHIC_KINDS`).
+- **Mật độ:** mốc thống kê mỗi 5' (16 mốc / trận, lower-third vẫn chỉ ở 30' và 75'); khoảng lặng `LULL_MS` 4,5' → 1,75'. Đo bằng `pundit studio --report`: 110–154 mục bình luận / trận trên 5 trận (trước 53–99), khoảng lặng dài nhất 1,8–2,1' (ma trận 12 trận: tối đa 2,8', vì cue khoảng lặng chờ sự kiện kế tiếp); 0 rò rỉ, 0 lỗi oracle, Guardrail không chặn câu template nào. Ngưỡng báo cáo đổi: 100–180 mục, khoảng lặng ≤ 3'.
+- **Phạm lỗi:** câu chỉ nhắc đội phạm lỗi cạnh con số; bản đầu nhắc cả hai đội ("đá phạt cho {opp} … ({team}: N lần phạm lỗi)") và test đột biến cho thấy nếu tráo tên hai đội thì Guardrail không bắt được.
+- **Nhịp giọng:** preset mới, rate / pitch / volume (%): `calm` +8 / +2 / −5, `lively` +14 / +6 / −3, `excited` +20 / +10 / 0, `peak` +25 / +14 / 0, `burst` +30 / +20 / 0, `tension` −2 / −3 / 0, `recap` +4 / 0 / −8, `greeting` +4 / +2 / −8 (`explainer` giữ chậm hơn). Nghỉ giữa các khoảnh khắc trong recap 400 → 250 ms. Cú sút bị cứu thua / dội cột đọc `lively` (excitement 1); `box_entry` cũng `lively`.
+- **Nam / nữ:** Fan chỉ hiện nút chọn khi hai giọng thực sự khác nhau: giọng của server (Azure / mock), hoặc trình duyệt có cả hai giọng (`hasBothGenders`; Edge desktop có). iPhone: ẩn nút, không còn lựa chọn giả.
+- **Video demo:** quay trang Fan bằng **Edge desktop** (giọng `Microsoft HoaiMy / NamMinh Online (Natural)` qua đúng Web Speech API), không cần đổi code.
+
+Giá trị mới thay cho các con số tương ứng ở day3-design §4 (mốc 15', khoảng lặng ≤ 5') và bảng preset ở day5-design §6.
+
+**Kiểm thử (Windows chặn mọi `python.exe` trên máy dev từ 28/10, kể cả bản base của uv: backend chạy trong image `pundit-copilot` với mã nguồn mount vào, cộng `pytest` / `hypothesis` / `mypy` cài vào một volume riêng):**
+
+- test mới / sửa: cue nhỏ (đúng loại sự kiện, vai trò, số đếm, cách nhau ≥ 40 s), khoảng lặng ≤ 3', 16 mốc thống kê, mọi câu được đọc và cú sút cứu thua đọc lively, preset (golden SSML, clip id, ước lượng thời lượng theo rate); Guardrail kiểm **mọi** câu template mới như câu của model (`model_text=True`) và bắt được câu bị đột biến (số, cầu thủ, tráo đội);
+- eval "Người mới xem": mốc thống kê 5' có thể rơi đúng vào sự kiện VAR (sự kiện đầu tiên sau mốc); test nay bỏ qua dòng theo đồng hồ (`stat_tick`, `lull`) khi tìm "dòng đầu tiên cần giải thích luật", vì dòng đó nói về thống kê;
+- backend: agents, speech, workflow, api, contract, golden, cli, unit, property, replay, scenario, mcp, eval, llm, perf: 2.700+ test qua; thêm `-m slow` cho triggers / templates / studio eval / beginner eval (ma trận 12 trận): qua; ruff, mypy sạch. Bỏ qua: `tests/live` (gọi model thật), Playwright (chưa chạy lại; giao diện chỉ đổi nút nam / nữ, có test component);
+- frontend: `hasBothGenders` (Edge / iPhone / một giọng / không giọng), nút nam / nữ ẩn trên iPhone và hiện trên Edge; Vitest 2 file liên quan, typecheck, eslint, prettier sạch.

@@ -30,7 +30,7 @@ def test_speak_prints_the_spoken_words_and_ssml(capsys: pytest.CaptureFixture[st
     out = capsys.readouterr().out
     assert code == 0
     assert "Vào! Ellery ghi bàn, Harbor Lions một, Kestrel Athletic hai." in out
-    assert '<prosody rate="+16%" pitch="+12%">' in out and "guard   passed" in out
+    assert '<prosody rate="+25%" pitch="+14%">' in out and "guard   passed" in out  # peak
 
 
 def test_speak_writes_audio_and_refuses_unreadable_text(

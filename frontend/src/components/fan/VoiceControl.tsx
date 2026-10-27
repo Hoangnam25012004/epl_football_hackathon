@@ -3,9 +3,11 @@
 // The voice of the fan player (docs/day5-design.md section 10.5): on / off (a tap: browsers only
 // play sound after one), female or male, where the voice comes from, skip the line being read.
 // The voice is AI-generated and reads synthetic data, and the control says so. Keys: V turns the
-// voice on or off, N skips the line (not while typing).
-import { useEffect, useEffectEvent } from "react";
+// voice on or off, N skips the line (not while typing). Female / male is offered only when the
+// two really differ: the server's voices, or a browser with both (an iPhone has one).
+import { useEffect, useEffectEvent, useSyncExternalStore } from "react";
 import type { SpeechProvider } from "@/hooks/useSpeechHealth";
+import { hasBothGenders } from "@/lib/audio/browser-voice";
 import type { AudioSnapshot } from "@/lib/audio/controller";
 import { useT } from "@/lib/i18n";
 import type { Lang, VoiceGender } from "@/lib/profile";
@@ -39,6 +41,24 @@ export function voiceLabelKey(
   return "fan.voiceUnavailable";
 }
 
+const synth = (): SpeechSynthesis | undefined =>
+  typeof window !== "undefined" ? window.speechSynthesis : undefined;
+
+function subscribeVoices(onChange: () => void): () => void {
+  const s = synth();
+  s?.addEventListener?.("voiceschanged", onChange);
+  return () => s?.removeEventListener?.("voiceschanged", onChange);
+}
+
+/** The browser has a female and a male Vietnamese voice that differ (voices load late). */
+function useBrowserGenders(): boolean {
+  return useSyncExternalStore(
+    subscribeVoices,
+    () => hasBothGenders(synth()?.getVoices() ?? [], "vi"),
+    () => false,
+  );
+}
+
 export function VoiceControl({
   on,
   resume,
@@ -62,6 +82,12 @@ export function VoiceControl({
 }) {
   const { t } = useT();
   const usable = language === "vi" && provider !== "off";
+  const browserGenders = useBrowserGenders();
+  const serverVoice =
+    (provider === "azure" || provider === "mock") &&
+    audio.source !== "browser" &&
+    !audio.browserOnly;
+  const genders = serverVoice || browserGenders;
   const onKey = useEffectEvent((event: KeyboardEvent) => {
     if (!isShortcut(event)) return;
     const key = event.key.toLowerCase();
@@ -109,23 +135,25 @@ export function VoiceControl({
       </button>
       {on ? (
         <>
-          <div role="radiogroup" aria-label={t("fan.voice")} className="flex gap-1">
-            {(["female", "male"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={gender === value}
-                data-testid={`voice-${value}`}
-                onClick={() => onGender(value)}
-                className={`rounded-full border px-2 py-1 text-xs ${
-                  gender === value ? "border-accent bg-accent/10 font-bold" : "border-line"
-                }`}
-              >
-                {t(value === "female" ? "fan.voiceFemale" : "fan.voiceMale")}
-              </button>
-            ))}
-          </div>
+          {genders ? (
+            <div role="radiogroup" aria-label={t("fan.voice")} className="flex gap-1">
+              {(["female", "male"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={gender === value}
+                  data-testid={`voice-${value}`}
+                  onClick={() => onGender(value)}
+                  className={`rounded-full border px-2 py-1 text-xs ${
+                    gender === value ? "border-accent bg-accent/10 font-bold" : "border-line"
+                  }`}
+                >
+                  {t(value === "female" ? "fan.voiceFemale" : "fan.voiceMale")}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <span
             data-testid="voice-status"
             className="rounded-full border border-line px-2 py-0.5 text-xs text-muted"

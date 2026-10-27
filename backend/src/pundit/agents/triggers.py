@@ -18,11 +18,13 @@ from pundit.agents.moments import MomentDetector
 from pundit.domain.events import (
     CardEvent,
     Event,
+    FoulEvent,
     GoalEvent,
     OffsideEvent,
     PassEvent,
     ShotEvent,
     SubstitutionEvent,
+    TackleEvent,
     VarCheckEvent,
 )
 from pundit.domain.log import EventLog, LogView
@@ -102,6 +104,21 @@ def _describe(kind: str, event: Event, view: LogView) -> Described:
         details = {"via_var": "true" if event.via_var else "false"}
         rules = ["offside", "var"] if event.via_var else ["offside"]
         return roles, details, "offside", rules
+    if kind == "tackle" and isinstance(event, TackleEvent):
+        roles = {"tackled": event.target_player}
+        if event.player is not None:
+            roles["tackler"] = event.player
+        return roles, {}, None, []
+    if kind == "foul" and isinstance(event, FoulEvent):
+        roles = {"fouled": event.fouled_player}
+        if event.player is not None:
+            roles["fouler"] = event.player
+        return roles, {}, None, []
+    if kind == "box_entry" and isinstance(event, PassEvent):
+        roles = {"passer": event.player} if event.player else {}
+        if event.recipient is not None:
+            roles["receiver"] = event.recipient
+        return roles, {}, None, []
     if kind == "var_review" and isinstance(event, VarCheckEvent):
         details = {
             "check_type": event.check_type,

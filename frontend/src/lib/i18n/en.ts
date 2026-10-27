@@ -374,6 +374,7 @@ export const en = {
 
   "cue.stat_tick": "Stats update",
   "cue.lull": "Quiet spell",
+  "cue.box_entry": "Box entry",
   "cue.added_time": "Added time",
   "cue.var_review": "VAR review",
 

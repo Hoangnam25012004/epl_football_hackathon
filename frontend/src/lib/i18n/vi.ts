@@ -369,6 +369,7 @@ export const vi: Record<Key, string> = {
 
   "cue.stat_tick": "Cập nhật số liệu",
   "cue.lull": "Khoảng lặng",
+  "cue.box_entry": "Vào vòng cấm",
   "cue.added_time": "Bù giờ",
   "cue.var_review": "VAR kiểm tra",
 

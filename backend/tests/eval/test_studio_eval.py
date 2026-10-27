@@ -17,7 +17,7 @@ def test_sample_reports_pass(scenario: str, seed: int) -> None:
     assert report.failures() == [], "\n".join(report.lines())
     assert not report.leaks and not report.oracle and report.drafts_rejected == 0
     assert report.d1.total > 0 and report.d2_strict.total > 0
-    assert report.silence_min <= 5.0
+    assert report.silence_min <= 3.0  # 28/10: was 5
     assert report.counts["recap"] == 2 and report.sources["recap:llm"] == 8
 
 

@@ -106,7 +106,10 @@ WsType = Literal[
     "on_air",  # Day 4: an editor's decision about the lower-third on air
 ]
 # Day 3 studio (docs/day3-design.md section 3)
-CueKind = Literal["shot", "corner", "offside", "var_review", "added_time", "stat_tick", "lull"]
+CueKind = Literal[
+    "shot", "corner", "offside", "var_review", "added_time", "stat_tick", "lull",
+    "tackle", "foul", "box_entry",  # 28/10: small plays between the big ones
+]  # fmt: skip
 RuleId = Literal[
     "offside", "var", "penalty", "second_yellow", "red_card", "yellow_card", "corner",
     "substitution", "added_time",  # football rules

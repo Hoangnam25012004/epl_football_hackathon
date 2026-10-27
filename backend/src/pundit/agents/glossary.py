@@ -67,7 +67,7 @@ FORBIDDEN_BY_OUTCOME: dict[EventOutcome, frozenset[str]] = {
 # Triggers without a goal: goal words there are a hallucination
 NO_GOAL_KINDS = frozenset(
     {"corner", "offside", "added_time", "lull", "momentum_shift", "dangerous_spell",
-     "substitution", "yellow_card", "red_card", "period_start"}
+     "substitution", "yellow_card", "red_card", "period_start", "tackle", "foul", "box_entry"}
 )  # fmt: skip
 
 

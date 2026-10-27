@@ -5,7 +5,15 @@ banks are parallel so both versions of an item cite the same numbers (S-5)."""
 import pytest
 from studio_helpers import MATRIX, SAMPLES, pack, triggers
 
-from pundit.agents.commentary import BANKS, VERSIONS, bank_key, render_texts, render_version
+from pundit.agents.commentary import (
+    BANKS,
+    VERSIONS,
+    bank_key,
+    excitement,
+    render_texts,
+    render_version,
+    speak,
+)
 from pundit.agents.contracts import FactPack
 from pundit.agents.graphics import SUBTITLES, TITLES, texts
 from pundit.agents.language import Text
@@ -27,6 +35,7 @@ TEXTUAL = {
     "team", "opp", "team_s", "opp_s", "home", "away", "home_s", "away_s", "scorer", "assist",
     "keeper", "shooter", "carded", "player_in", "player_out", "taker", "offside_player",
     "minute", "half", "reason", "check", "fate", "last5", "last10", "last15", "tick",
+    "tackler", "tackled", "fouler", "fouled", "passer", "receiver",
 }  # fmt: skip
 
 
@@ -83,6 +92,18 @@ def _check_every_phrasing(scenario: str, seed: int) -> None:
                     if not report.passed:
                         failures.append((trigger.id, text, [v.code for v in report.violations]))
     assert not failures, failures[:5]
+
+
+def test_every_line_is_read_and_near_misses_are_livelier() -> None:
+    """28/10: the voice reads every line, not only the big moments; a saved shot or one off the
+    post is read livelier than one that goes wide."""
+    found = triggers("dominant_loser", 42)
+    assert all(speak(pack("dominant_loser", 42, t.id)) for t in found)
+    shots = [t for t in found if t.kind == "shot"]
+    by_outcome = {t.outcome: excitement(pack("dominant_loser", 42, t.id)) for t in shots}
+    assert by_outcome.get("saved", 1) == 1 and by_outcome.get("off_target", 0) == 0
+    small = [t for t in found if t.kind == "box_entry"]
+    assert small and excitement(pack("dominant_loser", 42, small[0].id)) == 1
 
 
 @pytest.mark.parametrize(("scenario", "seed"), SAMPLES)

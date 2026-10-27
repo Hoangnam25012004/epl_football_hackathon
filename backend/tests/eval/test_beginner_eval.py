@@ -39,6 +39,9 @@ EVENT_OF_RULE: dict[str, Callable[[Event], bool]] = {
     "substitution": lambda e: e.type == "substitution",
 }
 BY_KIND: dict[str, RuleId] = {"added_time": "added_time"}  # a moment of its own, no event
+# Lines of the clock (every 5' since 28/10, after a quiet spell): fired by whatever event comes
+# first, a VAR check too, but about the statistics, so they explain no football rule
+CLOCK_KINDS = frozenset({"stat_tick", "lull"})
 BEGINNERS = (
     Profile(mode="casual", language="vi", beginner=True),
     Profile(mode="casual", language="en", beginner=True),
@@ -113,9 +116,11 @@ def coverage(match: OfflineRun) -> tuple[int, list[Miss]]:
     needed: set[str] = set()
     pending: dict[str, str] = {}  # missed rule -> its first line, until it is explained
     for trigger, output, explanation in follow(match, BEGINNERS[0]):
-        held = trigger_events(match, trigger)
         if explanation is not None and explanation.depth == "full":
             pending.pop(explanation.rule, None)
+        if trigger.kind in CLOCK_KINDS:
+            continue  # its event only crossed a mark of the clock: the line is not about it
+        held = trigger_events(match, trigger)
         for rule, holds in EVENT_OF_RULE.items():
             if not any(map(holds, held)):
                 continue

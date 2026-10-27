@@ -235,8 +235,11 @@
 - [x] ~~**P0** C8: Piper TTS provider~~ không làm: S2 không đạt gate tốc độ; giữ giọng trình duyệt (26/10)
 - [x] **P0** C9: không còn chữ "mock" trên UI, nguồn câu chữ bằng lời, Agent Ops / Chaos trong "Thử gì", HelpDrawer (26/10). Demo-run S1–S9 trên Space tự động qua (Edge, 27/10). Còn: bộ ảnh `shots`
 - [x] **P0** C10 (27/10): eval 100 claim trên Space (96 %, 0 verdict sai, 1 số bịa "2-0" → luật `WRONG_OUTCOME`) và 20 claim với Foundry Local (100 %, 0 số bịa); rev.1 p95 0,3 s (1 người xem) / 1,16 s (3 người xem); **gate S1 trên Space không đạt** (p95 54,8 s), giữ model vì claim là progressive. Lộ thêm 2 lỗi: janitor dọn phiên chung đang được dùng qua API; lượt model bị Guardrail chặn bị báo "không kịp trả lời" (nay `rejected`). Chi tiết: [docs/eval.md](docs/eval.md), day7-design §7.4
-- [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review · M5: UptimeRobot (lớp 3)
-- [ ] **P0** M10: bug bash trên Space. Phần tự động xong 27/10 (`frontend/playwright.space.config.ts`: Edge S1–S9, Chrome S1 / S2 / S5, điện thoại giả lập; lộ 1 lỗi axe, đã sửa). Còn bạn: điện thoại thật qua 4G, nghe giọng bằng tai, hai trình duyệt / hai phiên riêng với Chaos
+- [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review
+- [x] **P0** M5 (27/10): UptimeRobot (lớp 3), monitor Keyword `/healthz`, đã thử báo động Down / Up thật qua email (day7-design §7.5)
+- [ ] **P0** M10: bug bash trên Space. Phần tự động xong 27/10 (`frontend/playwright.space.config.ts`: Edge S1–S9, Chrome S1 / S2 / S5, điện thoại giả lập; lộ 1 lỗi axe, đã sửa). iPhone thật (Wi-Fi) 28/10: giọng Việt đọc đúng, lộ 4 nhận xét về giọng → C14. Còn bạn: điện thoại qua 4G, hai trình duyệt / hai phiên riêng với Chaos
+- [x] **P0** C14 (28/10): giọng bình luận dày và nhanh hơn: đọc mọi câu, cue nhỏ `tackle` / `foul` / `box_entry`, mốc thống kê 5', khoảng lặng thường ≤ 2' (trần 3'), 110–154 câu / trận, preset nhanh hơn, ẩn nút nam / nữ khi chỉ có một giọng (day7-design §7.6)
+- [ ] **P0** Quay đoạn Fan trong video bằng Edge desktop (giọng HoaiMy / NamMinh Online Natural)
 - [ ] **P0** M6 + C13: duyệt bảng nhãn eval, chạy gate
 - [x] **P1** Thêm file `LICENSE` (MIT, Dang Hoang Nam, 26/10)
 - [ ] **P2** Đổi tên repo thành `pundit-copilot` (tuỳ bạn; "EPL" nằm trong danh sách tên thật cần tránh của dự án)

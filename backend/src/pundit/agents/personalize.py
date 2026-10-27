@@ -40,7 +40,9 @@ TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
 FALSE_WORDS = frozenset({"0", "false", "no", "off"})
 MAX_FACTS = 6
 TRACKER_METRICS = ("passes", "shots", "xg", "player_distance", "player_top_speed")
-LOW_FOR_RIVAL_FANS = frozenset({"shot", "corner", "offside", "lull", "substitution"})
+LOW_FOR_RIVAL_FANS = frozenset(
+    {"shot", "corner", "offside", "lull", "substitution", "tackle", "foul", "box_entry"}
+)
 
 # Fixed framing lines for fans of a club (casual only): (kind, side) -> (vi, en)
 FRAMING: dict[tuple[str, str], tuple[str, str]] = {

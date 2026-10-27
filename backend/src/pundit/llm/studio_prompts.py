@@ -51,6 +51,9 @@ KIND_TEXT: dict[str, str] = {
     "added_time": "added time being announced",
     "stat_tick": "a regular statistics update",
     "lull": "a quiet spell: describe the state of the match",
+    "tackle": "a tackle that wins the ball back",
+    "foul": "a foul, and a free kick to the other team",
+    "box_entry": "a pass into the penalty area",
 }
 LANGUAGE_NAME: dict[Lang, str] = {"vi": "Vietnamese", "en": "English"}
 

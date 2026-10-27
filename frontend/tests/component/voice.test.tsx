@@ -105,6 +105,32 @@ describe("VoiceControl", () => {
     expect(screen.getByText("AI-generated voice, reading synthetic data.")).toBeInTheDocument();
   });
 
+  it("hides female / male when the browser reads with its only voice", () => {
+    const voices = [{ name: "Linh", lang: "vi-VN" }]; // an iPhone
+    vi.stubGlobal("speechSynthesis", {
+      getVoices: () => voices,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    controls({ on: true, provider: "browser", audio: { ...idle, on: true, source: "browser" } });
+    expect(screen.queryByTestId("voice-female")).toBeNull();
+    expect(screen.getByTestId("voice-status")).toHaveTextContent("Browser voice");
+  });
+
+  it("keeps female / male when the browser has both (Edge)", () => {
+    const voices = [
+      { name: "Microsoft HoaiMy Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
+      { name: "Microsoft NamMinh Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
+    ];
+    vi.stubGlobal("speechSynthesis", {
+      getVoices: () => voices,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    controls({ on: true, provider: "browser", audio: { ...idle, on: true, source: "browser" } });
+    expect(screen.getByTestId("voice-male")).toBeInTheDocument();
+  });
+
   it("skip is enabled while a line is read", () => {
     const { props } = controls({ on: true, audio: { ...idle, on: true, speakingId: "c1" } });
     fireEvent.click(screen.getByTestId("voice-skip"));

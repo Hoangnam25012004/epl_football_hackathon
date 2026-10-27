@@ -31,16 +31,18 @@ class Prosody:
         return round(min(1.0, 1 + self.volume_pct / 100), 4)
 
 
+# 28/10: a caster's pace, not a reader's: every preset a little faster, wider steps between them,
+# and ordinary lines only slightly quieter (the first presets sounded flat on a phone)
 PRESETS: dict[ProsodyPreset, Prosody] = {
-    "calm": Prosody(0, 0, -15),  # stat ticks, added time, start / end of a half
-    "lively": Prosody(6, 4, -8),  # dangerous spell, momentum shift, rocket shot
-    "excited": Prosody(12, 8, 0),  # big chance, red card, an ordinary goal
-    "peak": Prosody(16, 12, 0),  # equaliser, go-ahead goal, a goal from the 80th minute
-    "burst": Prosody(20, 18, 0),  # the opening exclamation of an excited line: "Vào!"
-    "tension": Prosody(-4, -3, 0),  # VAR
+    "calm": Prosody(8, 2, -5),  # stat ticks, small plays, start / end of a half
+    "lively": Prosody(14, 6, -3),  # dangerous spell, momentum shift, rocket shot, box entry
+    "excited": Prosody(20, 10, 0),  # big chance, red card, an ordinary goal
+    "peak": Prosody(25, 14, 0),  # equaliser, go-ahead goal, a goal from the 80th minute
+    "burst": Prosody(30, 20, 0),  # the opening exclamation of an excited line: "Vào!"
+    "tension": Prosody(-2, -3, 0),  # VAR
     "explainer": Prosody(-6, 0, -10),  # "new to football": the rule, a little slower
-    "recap": Prosody(-2, 0, -10),
-    "greeting": Prosody(0, 2, -10),
+    "recap": Prosody(4, 0, -8),
+    "greeting": Prosody(4, 2, -8),
 }
 KIND_PRESETS: dict[str, ProsodyPreset] = {"goal_overturned": "tension", "var_review": "tension"}
 BY_EXCITEMENT: tuple[ProsodyPreset, ...] = ("calm", "lively", "excited", "peak")
@@ -51,7 +53,7 @@ PAUSE_AFTER_FRAMING_MS = 150
 PAUSE_AFTER_BURST_MS = 250
 PAUSE_BEFORE_EXPLAINER_MS = 600
 PAUSE_BETWEEN_PARAGRAPHS_MS = 700
-PAUSE_BETWEEN_MOMENTS_MS = 400
+PAUSE_BETWEEN_MOMENTS_MS = 250
 
 
 def preset_for(kind: str, excitement: int) -> ProsodyPreset:
