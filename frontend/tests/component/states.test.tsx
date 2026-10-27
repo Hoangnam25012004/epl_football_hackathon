@@ -121,8 +121,12 @@ describe("panel states", () => {
         onTrace={() => {}}
       />,
     );
+    const onlyItems = () =>
+      [...screen.getByTestId("talking-points").children].every((child) => child.tagName === "LI");
     expect(screen.getByText(/come with the key moments/)).toBeInTheDocument();
+    expect(onlyItems()).toBe(true); // axe `list` (M10, on the Space)
     fireEvent.click(screen.getByTestId("tp-tab-dismissed"));
     expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+    expect(onlyItems()).toBe(true);
   });
 });

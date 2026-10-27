@@ -85,7 +85,10 @@ export function TalkingPointQueue({
       </div>
       <ul className="flex-1 overflow-auto p-2" data-testid="talking-points">
         {shown.length === 0 ? (
-          <EmptyState>{t(tab === "new" ? "studio.tpWaiting" : "studio.tpEmpty")}</EmptyState>
+          // a list holds only items (axe `list`, found on the Space at the start of a match)
+          <li>
+            <EmptyState>{t(tab === "new" ? "studio.tpWaiting" : "studio.tpEmpty")}</EmptyState>
+          </li>
         ) : null}
         {shown.map((point) => {
           const status = statusOf(point);
