@@ -17,7 +17,7 @@ from watchdog import GitHubIssues, probe, run
 BASE = "https://owner-name.hf.space"
 HEALTHY = json.dumps({"status": "ok", "build": "abc1234"})
 SCENARIOS = json.dumps([{"key": "balanced"}])
-TOKEN = "hf_secret_token_value"
+TOKEN = "hf_" + "fake" * 6  # built, so the secret scanner sees no literal token
 
 
 class FakeHub:

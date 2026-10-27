@@ -15,3 +15,9 @@ rule = "generic-assignment"
 path = "backend/tests/llm/test_maf_backend.py"
 fingerprint = "e663cf29877ed940"
 reason = "Earlier placeholder of the same offline test (ghp_offline_test_token_123), not a GitHub token."
+
+[[allow]]
+rule = "generic-assignment"
+path = "tools/ops/test_watchdog.py"
+fingerprint = "e8e47c7ccc88227e"
+reason = "Placeholder of an offline unit test in history (hf_secret_token_value), not a Hugging Face token; the file now builds it."
