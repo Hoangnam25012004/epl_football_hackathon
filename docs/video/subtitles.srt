@@ -1,33 +1,115 @@
 1
-00:00:17,000 --> 00:00:20,000
-[claim] "Đội nhà áp đảo hiệp 2"
-The home side dominated the second half
+00:00:00,300 --> 00:00:03,157
+Live commentary moves too fast to check.
 
 2
-00:00:20,000 --> 00:00:24,000
-Verdict: TRUE. Possession 61% to 39%, shots 15 to 1, xG 2.24 to 0.24
+00:00:03,207 --> 00:00:05,991
+Say one wrong number, and it is on air.
 
 3
-00:00:24,000 --> 00:00:30,000
-[status] "Model đang kiểm tra…" then "Model đọc giống luật"
-The model is checking… then: the model read it as the rules did
+00:00:07,600 --> 00:00:12,908
+A claim, in English or Vietnamese, gets a verdict from the rules in under a second,
 
 4
-00:01:22,000 --> 00:01:25,000
-[voice] "Việt vị! M. Ribas đứng sai vị trí."
-Offside! M. Ribas was in an offside position.
+00:00:08,024 --> 00:00:14,524
+“Đội nhà áp đảo hiệp 2” = “The home side dominated the second half”
 
 5
-00:01:25,000 --> 00:01:31,000
-[beginner mode] An attacker is offside when, in the opponents' half, they are nearer the goal
-line than both the ball and the second-last defender as a team-mate passes, and take part in play.
+00:00:12,958 --> 00:00:15,362
+with the numbers and events behind it.
 
 6
-00:01:31,000 --> 00:01:35,000
-[voice] "VÀOOO! J. Ellery ghi bàn cho Kestrel Athletic!"
-GOAL! J. Ellery scores for Kestrel Athletic! Harbor Lions FC 1–2 Kestrel Athletic.
+00:00:15,412 --> 00:00:19,429
+An open model on the same small CPU then writes an explanation,
 
 7
-00:01:35,000 --> 00:01:38,000
-"Tiếc quá, đối thủ vừa có bàn."
-Bad luck: the opponents have just scored.
+00:00:19,479 --> 00:00:21,237
+and the guardrail checks it.
+
+8
+00:00:21,287 --> 00:00:25,240
+Here it refused the model's text, so the rules' answer stands.
+
+9
+00:00:27,833 --> 00:00:34,456
+Fourteen agents on Microsoft Agent Framework share one match state and hand off typed messages.
+
+10
+00:00:34,506 --> 00:00:36,984
+Agent Ops shows every handoff, live.
+
+11
+00:00:38,033 --> 00:00:39,587
+Break the model yourself.
+
+12
+00:00:39,637 --> 00:00:42,924
+Here it lies: valid answers with one number changed.
+
+13
+00:00:42,974 --> 00:00:47,351
+The guardrail blocks every one, and nothing wrong reaches the screen.
+
+14
+00:00:52,033 --> 00:00:56,174
+At every key moment the studio gets verified talking points,
+
+15
+00:00:56,224 --> 00:00:59,247
+and an on-air graphic ready for OBS or vMix.
+
+16
+00:01:03,533 --> 00:01:08,966
+For fans everywhere, commentary in their own language: here Vietnamese, read aloud,
+
+17
+00:01:03,533 --> 00:01:10,833
+Fan view: casual · Vietnamese · a Kestrel fan · beginner mode
+
+18
+00:01:09,016 --> 00:01:13,525
+with a beginner mode that explains offside the first time it happens.
+
+19
+00:01:14,213 --> 00:01:16,363
+M. Ribas is caught offside.
+
+20
+00:01:16,413 --> 00:01:18,034
+Offside: An attacker is offside when, in the opponents' half,
+
+21
+00:01:18,084 --> 00:01:21,293
+they are nearer the goal line than both the ball and the second-last defender at the moment a team-mate plays the ball,
+
+22
+00:01:21,343 --> 00:01:22,493
+and they become involved in play.
+
+23
+00:01:22,543 --> 00:01:24,410
+There is no offside directly from a throw-in, a corner or a goal kick.
+
+24
+00:01:24,460 --> 00:01:25,669
+The defending team gets an indirect free kick.
+
+25
+00:01:26,500 --> 00:01:30,708
+The same statistics are served over MCP to any AI assistant.
+
+26
+00:01:30,758 --> 00:01:36,313
+The whole stack runs in one CPU container with an open model: no cloud account,
+
+27
+00:01:36,363 --> 00:01:38,726
+the data never leaves the machine.
+
+28
+00:01:41,900 --> 00:01:44,590
+Pundit Copilot: never wrong on air.
+
+29
+00:01:44,640 --> 00:01:46,156
+Synthetic data only.

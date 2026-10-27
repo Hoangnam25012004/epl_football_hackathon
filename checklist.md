@@ -239,7 +239,7 @@
 - [x] **P0** M5 (27/10): UptimeRobot (lớp 3), monitor Keyword `/healthz`, đã thử báo động Down / Up thật qua email (day7-design §7.5)
 - [ ] **P0** M10: bug bash trên Space. Phần tự động xong 27/10 (`frontend/playwright.space.config.ts`: Edge S1–S9, Chrome S1 / S2 / S5, điện thoại giả lập; lộ 1 lỗi axe, đã sửa). iPhone thật (Wi-Fi) 28/10: giọng Việt đọc đúng, lộ 4 nhận xét về giọng → C14. Còn bạn: điện thoại qua 4G, hai trình duyệt / hai phiên riêng với Chaos
 - [x] **P0** C14 (28/10): giọng bình luận dày và nhanh hơn: đọc mọi câu, cue nhỏ `tackle` / `foul` / `box_entry`, mốc thống kê 5', khoảng lặng thường ≤ 2' (trần 3'), 110–154 câu / trận, preset nhanh hơn, ẩn nút nam / nữ khi chỉ có một giọng (day7-design §7.6)
-- [ ] **P0** Quay đoạn Fan trong video bằng Edge desktop (giọng HoaiMy / NamMinh Online Natural)
+- [x] **P0** Quay đoạn Fan trong video bằng Edge desktop (giọng Hoài My Online Natural; 28/10)
 - [ ] **P0** M6 + C13: duyệt bảng nhãn eval, chạy gate
 - [x] **P1** Thêm file `LICENSE` (MIT, Dang Hoang Nam, 26/10)
 - [ ] **P2** Đổi tên repo thành `pundit-copilot` (tuỳ bạn; "EPL" nằm trong danh sách tên thật cần tránh của dự án)
@@ -260,10 +260,10 @@
 
 **Video demo (bắt buộc DƯỚI 2 phút)**
 - [x] **P0** (nháp `docs/video/script.md`, 1:55; sửa đoạn kiến trúc theo Space + Foundry Local) Kịch bản khoảng 1:50: vấn đề (10s) → claim sai bị bắt kèm bằng chứng (25s) → talking point + lower-third (20s) → Analyst và Casual xem cùng một moment (20s) → bình luận tiếng Việt có giọng đọc + "Người mới xem" (20s) → kiến trúc multi-agent (Agent Framework, một container CPU, Foundry Local) (15s) → kết (5s)
-- [ ] **P0** Quay cảnh sản phẩm chạy thật trên bản deploy
-- [ ] **P0** Phụ đề tiếng Anh cho mọi đoạn tiếng Việt
-- [ ] **P0** Không dùng nhạc có bản quyền hay logo / thương hiệu bên thứ ba
-- [ ] **P0** Upload **public** lên YouTube hoặc Vimeo
+- [x] **P0** Quay cảnh sản phẩm chạy thật trên bản deploy (28/10, Claude quay bằng `tools/video`: Edge + OBS + ffmpeg trên Space thật, 1:46,6 → `C:/pundit-video/pundit-copilot-demo.mp4`; khác kịch bản: `docs/video/script.md` mục "As recorded")
+- [x] **P0** Phụ đề tiếng Anh cho mọi đoạn tiếng Việt (burn sẵn trong video; `docs/video/subtitles.srt` có cả voice-over để tải lên YouTube)
+- [x] **P0** Không dùng nhạc có bản quyền hay logo / thương hiệu bên thứ ba (không nhạc; toàn màn hình, không thanh trình duyệt)
+- [ ] **P0** Upload **public** lên YouTube hoặc Vimeo (bạn làm; file `C:/pundit-video/pundit-copilot-demo.mp4` + `docs/video/subtitles.srt`)
 
 **Nộp bài**
 - [ ] **P0** Repo public, link demo hoạt động, link video hoạt động (build UI với `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` để trang đầu có link thay cho "sắp có"; job CI `security` + gate eval xanh trước khi push public)

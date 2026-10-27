@@ -1,5 +1,5 @@
 Live commentary moves too fast to check. Say one wrong number, and it is on air.
-A claim, in English or Vietnamese, gets a verdict from the rules in under a second, with the numbers and the events behind it. Then an open model, running on the same small CPU, refines the explanation. Numbers never come from the model.
+A claim, in English or Vietnamese, gets a verdict from the rules in under a second, with the numbers and events behind it. An open model on the same small CPU then writes an explanation, and the guardrail checks it. Here it refused the model's text, so the rules' answer stands.
 Fourteen agents on Microsoft Agent Framework share one match state and hand off typed messages. Agent Ops shows every handoff, live.
 Break the model yourself. Here it lies: valid answers with one number changed. The guardrail blocks every one, and nothing wrong reaches the screen.
 At every key moment the studio gets verified talking points, and an on-air graphic ready for OBS or vMix.
