@@ -113,7 +113,9 @@ test("S1-S9 on Edge at 1366×768 @edge", async ({ browser }) => {
     await fan.getByTestId("profile-start").click();
     await fan.getByTestId("voice-toggle").click();
     await expect(fan.getByTestId("voice-toggle")).toHaveAttribute("aria-pressed", "true");
-    await expect(fan.getByTestId("voice-status")).toContainText(/trình duyệt/);
+    // the browser's own voice, or says plainly this browser has no Vietnamese voice (a
+    // headless Edge has none; the person checks by ear on a real phone and browser)
+    await expect(fan.getByTestId("voice-status")).toContainText(/trình duyệt/i);
     await expect(fan.getByTestId("rule-explanation").first()).toBeVisible();
     await fan.getByTestId("tab-recap").click();
     await expect(fan.getByTestId("recap-panel")).not.toBeEmpty();
