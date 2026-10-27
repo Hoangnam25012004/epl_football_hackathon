@@ -843,6 +843,7 @@ Docker Desktop trên máy này chỉ có 8 GB RAM nên không chạy được `-
 - **Phạm lỗi:** câu chỉ nhắc đội phạm lỗi cạnh con số; bản đầu nhắc cả hai đội ("đá phạt cho {opp} … ({team}: N lần phạm lỗi)") và test đột biến cho thấy nếu tráo tên hai đội thì Guardrail không bắt được.
 - **Nhịp giọng:** preset mới, rate / pitch / volume (%): `calm` +8 / +2 / −5, `lively` +14 / +6 / −3, `excited` +20 / +10 / 0, `peak` +25 / +14 / 0, `burst` +30 / +20 / 0, `tension` −2 / −3 / 0, `recap` +4 / 0 / −8, `greeting` +4 / +2 / −8 (`explainer` giữ chậm hơn). Nghỉ giữa các khoảnh khắc trong recap 400 → 250 ms. Cú sút bị cứu thua / dội cột đọc `lively` (excitement 1); `box_entry` cũng `lively`.
 - **Nam / nữ:** Fan chỉ hiện nút chọn khi hai giọng thực sự khác nhau: giọng của server (Azure / mock), hoặc trình duyệt có cả hai giọng (`hasBothGenders`; Edge desktop có). iPhone: ẩn nút, không còn lựa chọn giả.
+- **Tên giọng của Edge (sửa lúc chuẩn bị quay video, 28/10):** Edge 156 đặt tên "Microsoft Hoài My Online (Natural)" / "Microsoft Nam Minh Online (Natural)", có dấu và dấu cách, nên `pickVoice` (tìm `HoaiMy` / `NamMinh`) chưa bao giờ chọn được giọng nam trên Edge, và bản C14 đầu ẩn nút nam / nữ trên chính Edge. Nay so tên sau khi bỏ dấu và dấu cách; test dùng đúng tên thật của Edge.
 - **Video demo:** quay trang Fan bằng **Edge desktop** (giọng `Microsoft HoaiMy / NamMinh Online (Natural)` qua đúng Web Speech API), không cần đổi code.
 
 Giá trị mới thay cho các con số tương ứng ở day3-design §4 (mốc 15', khoảng lặng ≤ 5') và bảng preset ở day5-design §6.

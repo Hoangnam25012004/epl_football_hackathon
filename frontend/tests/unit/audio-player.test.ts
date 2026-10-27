@@ -264,8 +264,22 @@ describe("BrowserVoice", () => {
     expect(pickVoice([EN], "vi-VN", "female")).toBeNull();
   });
 
+  it("finds Edge's voices, spelled with accents and spaces", () => {
+    const hoaiMy = {
+      name: "Microsoft Hoài My Online (Natural) - Vietnamese (Vietnam)",
+      lang: "vi-VN",
+    };
+    const namMinh = {
+      name: "Microsoft Nam Minh Online (Natural) - Vietnamese (Vietnam)",
+      lang: "vi-VN",
+    };
+    expect(pickVoice([EN, hoaiMy, namMinh], "vi-VN", "male")).toBe(namMinh);
+    expect(pickVoice([EN, namMinh, hoaiMy], "vi-VN", "female")).toBe(hoaiMy);
+    expect(hasBothGenders([EN, hoaiMy, namMinh], "vi")).toBe(true);
+  });
+
   it("offers female / male only when the two voices differ", () => {
-    expect(hasBothGenders([EN, VI_FEMALE, VI_MALE], "vi")).toBe(true); // Edge
+    expect(hasBothGenders([EN, VI_FEMALE, VI_MALE], "vi")).toBe(true);
     const linh = { name: "Linh", lang: "vi-VN" }; // an iPhone: one system voice
     expect(hasBothGenders([EN, linh], "vi")).toBe(false);
     expect(hasBothGenders([EN, VI_FEMALE], "vi")).toBe(false);

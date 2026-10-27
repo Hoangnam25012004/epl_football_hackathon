@@ -119,8 +119,9 @@ describe("VoiceControl", () => {
 
   it("keeps female / male when the browser has both (Edge)", () => {
     const voices = [
-      { name: "Microsoft HoaiMy Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
-      { name: "Microsoft NamMinh Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
+      // Edge 156 spells them with accents and spaces
+      { name: "Microsoft Hoài My Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
+      { name: "Microsoft Nam Minh Online (Natural) - Vietnamese (Vietnam)", lang: "vi-VN" },
     ];
     vi.stubGlobal("speechSynthesis", {
       getVoices: () => voices,

@@ -46,6 +46,11 @@ export function splitForSpeech(text: string, max = MAX_CHUNK): string[] {
   return chunks;
 }
 
+/** "Microsoft Hoài My Online (Natural)" → "MicrosoftHoaiMyOnline(Natural)": Edge spells the
+ * voices with accents and spaces, the Azure names have neither. */
+const plainName = (name: string): string =>
+  name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "");
+
 /** The voice to use: the Azure one by name (Edge has them online), else any voice of the
  * language, else none. */
 export function pickVoice(
@@ -55,7 +60,11 @@ export function pickVoice(
 ): VoiceLike | null {
   const prefix = lang.slice(0, 2).toLowerCase();
   const ofLanguage = voices.filter((voice) => voice.lang.toLowerCase().startsWith(prefix));
-  return ofLanguage.find((voice) => voice.name.includes(NAMES[gender])) ?? ofLanguage[0] ?? null;
+  return (
+    ofLanguage.find((voice) => plainName(voice.name).includes(NAMES[gender])) ??
+    ofLanguage[0] ??
+    null
+  );
 }
 
 /** A female and a male voice that differ (Edge: HoaiMy and NamMinh); one system voice (an
