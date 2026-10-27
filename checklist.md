@@ -74,7 +74,7 @@
 
 - [x] **A (mock, bắt buộc):** claim *"Đội nhà áp đảo hiệp 2"* trên `dominant_loser-42` trả về TRUE, kèm số liệu (61% kiểm soát bóng, sút 15–1, xG 2.24–0.24) và event ID; mọi test xanh mà không cần mạng.
 - [x] **B1 (LLM thật, local):** Ollama `qwen2.5:3b` (21/10): bộ eval 20 claim đúng 20/20, 0 verdict sai, held-out 10/10, không câu sai nào lọt Guardrail.
-- [ ] **B2 (Foundry):** ~~`pundit eval --provider foundry` trên Azure~~ không có Azure; thay bằng eval với **Foundry Local** (`phi-4-mini`, cùng client OpenAI-compatible) ở Ngày 7 (C10, cần M3).
+- [x] **B2 (Foundry):** ~~`pundit eval --provider foundry` trên Azure~~ không có Azure; thay bằng eval với **Foundry Local** (`phi-4-mini`, cùng client OpenAI-compatible) ở Ngày 7 (C10, cần M3). Xong 27/10: Foundry Local 20 claim 100 %, 0 số bịa.
 
 **Kết quả (20/10):** 1210 test xanh (không cần mạng), coverage 94,9%; eval mock: 20/20 đúng, 0 verdict sai trên cả 2 bộ, held-out 9/10 có verdict (claim còn lại được từ chối an toàn), p95 36 ms. Chi tiết: day2-design §19.
 
@@ -197,11 +197,11 @@
 - [x] **P0** Mở rộng bộ eval lên 50–100 claim (cả 2–3 kịch bản) (100 claim / 3 trận: 72 có nhãn, 28 held-out đóng băng trước khi sửa parser; nhãn dựa trên số đếm độc lập; **bảng nhãn chờ bạn duyệt** (M4))
 - [x] **P0** Đo: tỷ lệ verdict đúng, tỷ lệ số liệu bịa (mục tiêu **0%**) (mock: 96 % bộ có nhãn, 0 verdict sai, 0/274 số không nguồn, gate trong CI; Ollama `qwen2.5:3b`: 97 % bộ có nhãn, 0 verdict sai, held-out 75 %, 0/188 số không nguồn, sau bản sửa "cách đọc 'áp đảo' chỉ LLM đưa ra phải có từ áp đảo trong câu"; kiểm toán số độc lập với Guardrail)
 - [x] **P1** Eval chế độ "Người mới xem": giải thích đúng luật, kích hoạt đúng tình huống (4 trận trong CI, 4 × 3 ở `-m slow`; giải thích ngay ở dòng đầu cần luật 17/18, trường hợp còn lại đến ở dòng kế tiếp cùng phút)
-- [ ] **P0** Ghi kết quả eval vào README (bảng số liệu) (`docs/eval.md` tiếng Anh đã sẵn; chép vào README ở Ngày 7)
+- [x] **P0** Ghi kết quả eval vào README (bảng số liệu) (`docs/eval.md` tiếng Anh đã sẵn; README mục Results, 28/10)
 
 **Độ trễ**
 - [x] **P0** Đo trên bản deploy (Space, 27/10, C10): event → talking point p95 55–62 ms ở 20x; event → audio: giọng trình duyệt đọc ngay trên máy người xem, server không tổng hợp clip (không có Azure / Piper)
-- [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS (chưa cần: số đo local đạt; song song agent đã có từ Ngày 3)
+- [x] ~~**P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS~~ không cần (số đo local và trên Space đạt; song song agent đã có từ Ngày 3)
 
 **Ổn định & UI**
 - [x] **P0** Thử tắt Foundry → fallback hoạt động, UI không crash (proxy bơm lỗi trước Ollama, cùng client với Foundry: C1–C13 13/13, 3 lượt liên tiếp; E2E `chaos` CH1–CH3; M6 tắt / bật Ollama thật giữa trận: fallback + chip + UI chạy tiếp; lần thử đầu sau khi bật lại hết giờ ở mặc định 90 s, phục hồi ngay khi `LLM_TIMEOUT_S=180` cho CPU này; Foundry thật ở tầng B)
@@ -230,12 +230,12 @@
 - [x] **P0** C4: claim progressive (26/10): rev.1 theo luật ngay, rev.2 = workflow một lượt trên một worker; bất biến kiểm trên 100 claim eval; bật trên Space (`CLAIM_PROGRESSIVE=true`)
 - [x] **P0** C5: luồng `agent_event` (WebSocket riêng `/ws/agents/{id}`) + trang `/agents` (26/10)
 - [x] **P1** C6: Chaos theo phiên riêng (26/10): 6 lỗi, service + breaker riêng; "model nói dối": hơn 100 câu sai, 0 câu lên màn hình
-- [ ] **P1** C7: ghi / phát lại phiên model bằng **Foundry Local** (`phi-4-mini`), nhãn "recorded" (cần M3)
+- [ ] **P1** C7: ghi / phát lại phiên model bằng **Foundry Local** (`phi-4-mini`), nhãn "recorded" (cần M3). **Không làm:** Windows chặn python.exe trên máy dev từ 28/10, Studio trên Space dùng template (README ghi đúng)
 - [x] **P0** M3 (27/10): Foundry Local 0.12.1 + `Phi-4-mini-instruct-generic-cpu:5` (bản GPU nạp lỗi trên máy này), gọi qua provider `openai`
 - [x] ~~**P0** C8: Piper TTS provider~~ không làm: S2 không đạt gate tốc độ; giữ giọng trình duyệt (26/10)
 - [x] **P0** C9: không còn chữ "mock" trên UI, nguồn câu chữ bằng lời, Agent Ops / Chaos trong "Thử gì", HelpDrawer (26/10). Demo-run S1–S9 trên Space tự động qua (Edge, 27/10). Còn: bộ ảnh `shots`
 - [x] **P0** C10 (27/10): eval 100 claim trên Space (96 %, 0 verdict sai, 1 số bịa "2-0" → luật `WRONG_OUTCOME`) và 20 claim với Foundry Local (100 %, 0 số bịa); rev.1 p95 0,3 s (1 người xem) / 1,16 s (3 người xem); **gate S1 trên Space không đạt** (p95 54,8 s), giữ model vì claim là progressive. Lộ thêm 2 lỗi: janitor dọn phiên chung đang được dùng qua API; lượt model bị Guardrail chặn bị báo "không kịp trả lời" (nay `rejected`). Chi tiết: [docs/eval.md](docs/eval.md), day7-design §7.4
-- [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review
+- [x] **P0** C12 (28/10): watchdog (lớp 2) `tools/ops/watchdog.py` + `.github/workflows/watchdog.yml` + 17 test, **Claude viết** vì M4 (Copilot) quá hạn (đúng quy tắc §2.12); `docs/copilot.md` không ghi phần này cho Copilot. Còn bạn: Actions → watchdog → Run workflow một lần
 - [x] **P0** M5 (27/10): UptimeRobot (lớp 3), monitor Keyword `/healthz`, đã thử báo động Down / Up thật qua email (day7-design §7.5)
 - [ ] **P0** M10: bug bash trên Space. Phần tự động xong 27/10 (`frontend/playwright.space.config.ts`: Edge S1–S9, Chrome S1 / S2 / S5, điện thoại giả lập; lộ 1 lỗi axe, đã sửa). iPhone thật (Wi-Fi) 28/10: giọng Việt đọc đúng, lộ 4 nhận xét về giọng → C14. Còn bạn: điện thoại qua 4G, hai trình duyệt / hai phiên riêng với Chaos
 - [x] **P0** C14 (28/10): giọng bình luận dày và nhanh hơn: đọc mọi câu, cue nhỏ `tackle` / `foul` / `box_entry`, mốc thống kê 5', khoảng lặng thường ≤ 2' (trần 3'), 110–154 câu / trận, preset nhanh hơn, ẩn nút nam / nữ khi chỉ có một giọng (day7-design §7.6)
@@ -248,14 +248,14 @@
 
 > Nháp ngày 24/10: `README.md` (tiếng Anh, cột trạng thái chỉ ghi việc đã chạy thật), `docs/pitch.md`, `docs/video/script.md` (1:55), `docs/video/subtitles.srt`. Viết lại 26/10 theo hướng không có Azure (C11): pitch, kịch bản (progressive, Agent Ops, Chaos), `docs/video/voiceover.txt`, phụ đề, README. Còn: link demo / video, số đo trên Space, `docs/submission.md`.
 
-- [ ] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft nào, giải quyết vấn đề gì
-- [ ] **P0** Vấn đề → giải pháp → người dùng (studio + fan toàn cầu, ví dụ fan Việt)
-- [ ] **P0** Sơ đồ kiến trúc + bảng agent
-- [ ] **P0** Công nghệ Microsoft đã dùng, ghi đúng sự thật: Agent Framework, Foundry Local, GitHub Actions / GHCR, Copilot Agent Mode, MCP; Foundry cloud, Azure AI Speech, Bicep / `azd`: "Azure-ready, not deployed"
-- [ ] **P0** Bảng mapping **5 tiêu chí chấm**: tính năng nào đáp ứng tiêu chí nào
-- [ ] **P0** Hướng dẫn chạy local + image Space (Docker)
-- [ ] **P0** Kết quả eval + số đo độ trễ (trên Space)
-- [ ] **P0** Ghi rõ: chỉ dùng dữ liệu tổng hợp, không liên kết với Premier League / CLB nào
+- [x] **P0** Project pitch ngắn: làm gì, dùng công nghệ Microsoft nào, giải quyết vấn đề gì
+- [x] **P0** Vấn đề → giải pháp → người dùng (studio + fan toàn cầu, ví dụ fan Việt)
+- [x] **P0** Sơ đồ kiến trúc + bảng agent
+- [x] **P0** Công nghệ Microsoft đã dùng, ghi đúng sự thật: Agent Framework, Foundry Local, GitHub Actions / GHCR, Copilot Agent Mode, MCP; Foundry cloud, Azure AI Speech, Bicep / `azd`: "Azure-ready, not deployed"
+- [x] **P0** Bảng mapping **5 tiêu chí chấm**: tính năng nào đáp ứng tiêu chí nào
+- [x] **P0** Hướng dẫn chạy local + image Space (Docker)
+- [x] **P0** Kết quả eval + số đo độ trễ (trên Space)
+- [x] **P0** Ghi rõ: chỉ dùng dữ liệu tổng hợp, không liên kết với Premier League / CLB nào
 - [ ] **P1** Ảnh chụp màn hình / GIF
 
 **Video demo (bắt buộc DƯỚI 2 phút)**
@@ -267,16 +267,16 @@
 
 **Nộp bài**
 - [ ] **P0** Repo public, link demo hoạt động, link video hoạt động (build UI với `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` để trang đầu có link thay cho "sắp có"; job CI `security` + gate eval xanh trước khi push public)
-- [ ] **P0** Link demo không cần đăng nhập (hoặc ghi tài khoản test trong testing instructions)
-- [ ] **P0** Chọn hạng mục: Grand Prize + **Best Multi-Agent System** (mỗi bài thắng tối đa 1 Grand + 1 Category)
-- [ ] **P0** Điền form nộp bài trên Innovation Studio, **nộp trước 22:00 giờ VN 27/10** (dư thời gian xử lý sự cố)
+- [x] **P0** Link demo không cần đăng nhập (hoặc ghi tài khoản test trong testing instructions)
+- [x] **P0** Chọn hạng mục: Grand Prize + **Best Multi-Agent System** (mỗi bài thắng tối đa 1 Grand + 1 Category)
+- [ ] **P0** Điền form nộp bài trên Innovation Studio từ `docs/submission.md` (28/10, có sẵn mọi ô + testing instructions; chỉ thiếu link video), **hạn 13:59 giờ VN 28/10**
 - [ ] **P0** Chụp màn hình xác nhận đã nộp
 
 ---
 
 ## Sau khi nộp (27/10 → 10/11)
 
-- [ ] Giữ URL demo chạy miễn phí, không giới hạn tới hết **10/11** (Rules mục 4.8): Space + 3 lớp keepalive; xem issue do watchdog mở
+- [ ] (đang chạy) Giữ URL demo chạy miễn phí, không giới hạn tới hết **10/11** (Rules mục 4.8): Space + 3 lớp keepalive; xem issue do watchdog mở
 - [ ] Sau 10/11: pause Space, tắt workflow watchdog, xoá token `github-actions-pundit`, pause UptimeRobot (day7-design §3)
 - [ ] Người thắng được công bố chậm nhất 20/11. Nếu thắng, phải nộp giấy tờ xác minh trong 10 ngày làm việc
 

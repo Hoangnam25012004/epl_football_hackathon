@@ -1,11 +1,3 @@
-<!--
-Draft of 26/10/2026 (no Azure: the public demo is a Hugging Face Space). To finish on Day 7:
-- the live demo and video links (top), and NEXT_PUBLIC_REPO_URL / NEXT_PUBLIC_VIDEO_URL at build;
-- "Microsoft technologies": Copilot Agent Mode once docs/copilot.md has its runs;
-- the model and latency measured on the Space (claim, event -> talking point, event -> audio);
-- screenshots.
--->
-
 # Pundit Copilot
 
 > **Synthetic data only.** Every team, player, referee and match is generated. Not affiliated
@@ -23,6 +15,25 @@ Prize, Best Multi-Agent System).
 | Live demo | <https://hnam2501-pundit-copilot.hf.space> (one container on a Hugging Face Space, no login) |
 | Demo video (< 2 min) | _added at submission_ |
 | Results | [docs/eval.md](docs/eval.md) |
+
+## Try it in three steps (no login)
+
+1. Open the [live demo](https://hnam2501-pundit-copilot.hf.space) and press **Start my demo
+   match**: you get a private match of your own, replayed at 20x.
+2. In the studio, type the claim **"Đội nhà áp đảo hiệp 2"** ("the home side dominated the
+   second half"): the verdict and its numbers arrive in under a second, the model's explanation
+   follows.
+   Open **Why · Evidence · Agent Trace**, then **Agent Ops** to watch the agents, and **Chaos**
+   to break the model ("the model lies") and see the guardrail block it.
+3. Open **Fan**, choose Vietnamese, beginner mode and **Turn the voice on**: the commentary is
+   read aloud as the match goes. The voice is the browser's: Edge on a desktop has natural
+   Vietnamese voices (female and male); an iPhone has one system voice.
+
+AI assistants can query the same statistics over MCP at
+`https://hnam2501-pundit-copilot.hf.space/mcp` (Streamable HTTP, read-only, [docs/mcp.md](docs/mcp.md)).
+The Space is kept awake by three independent layers (the app pings itself, a GitHub Actions
+watchdog restarts it, an outside uptime monitor alerts); if it was restarted, press **Start my
+demo match** again.
 
 ## The problem
 
@@ -52,8 +63,10 @@ around the world follow a match in a language that is not English, often new to 
 **For fans**:
 
 - **Live commentary in Vietnamese or English**, read aloud from a spoken script the server
-  checks (numbers written as words), faster and higher on a goal. In the public demo the
-  browser's Vietnamese voice reads it.
+  checks (numbers written as words): goals, chances, saves, corners, offsides, VAR, cards, but
+  also tackles, fouls and passes into the box, and a statistics update every five minutes,
+  110–154 verified lines a match; faster and higher on a goal. In the public demo the browser's
+  Vietnamese voice reads it.
 - **Beginner mode** explains offside, VAR, penalties… the first time they happen.
 - **Personalised**: analyst (dense numbers) or casual (plain words), a favourite club, one player
   followed all match, one metric only. The same moment, written two ways: see the compare page.
@@ -158,9 +171,21 @@ data". The notes of docs/eval.md keep the first measurements and every fix a wro
 full match and its claims gave over 100 wrong texts: the guardrail rejected every one, and none
 was published (backend/tests/api/test_chaos.py).
 
-Quality gates: 2,600+ backend tests (95 % coverage), 178 frontend unit and component tests, 42
-end-to-end tests, the judge's demo path run three times in a row, accessibility (axe) on every
-page in both themes and languages, secret and Official Rules scans on the whole git history.
+Quality gates: 2,700+ backend tests (95 % coverage), 200+ frontend unit and component tests, 46
+end-to-end tests, the judge's demo path run on the public Space (Edge, Chrome, an emulated
+phone) and heard on a real iPhone, accessibility (axe) on every page in both themes and
+languages, secret and Official Rules scans on the whole git history. Every commentary phrasing
+is checked by the guardrail as if a model had written it, on twelve generated matches.
+
+## How it meets the judging criteria
+
+| Criterion | Where to look |
+|---|---|
+| **Technological implementation** | A seeded synthetic match engine (realistic event streams, three story scenarios); 33 deterministic metrics with evidence event IDs; 2,700+ tests; CI → GHCR → Space deploy by image digest; a self-healing watchdog |
+| **Agentic design & innovation** | Microsoft Agent Framework workflows (sequential claim pipeline, fan-out / fan-in studio), typed handoffs over one shared match state, a guardrail agent that can veto any sentence, progressive answers (rules first, model second), circuit breakers and fault injection, the live Agent Ops view, a read-only MCP server |
+| **Real-world impact** | Broadcasters never air an unchecked number; editors get verified talking points and on-air graphics; fans get live commentary in their own language, explained for beginners; runs in one CPU container, on premises, without a cloud account |
+| **User experience & presentation** | One-click private demo, studio / overlay / fan / compare pages in Vietnamese and English, beginner mode, voice, light and dark themes, accessibility checked; a demo video under two minutes |
+| **Category: Best Multi-Agent System** | Distinct roles (table above), shared state pinned at an event, typed messages, recovery on failure (13 failure modes, Chaos per match), the full trace in the UI, and a result no single agent gives: a model that is allowed to write but never to invent a number |
 
 ## Microsoft technologies
 
@@ -182,7 +207,10 @@ The public demo is **one container on a free Hugging Face Space** (2 vCPU, no GP
 this repository by GitHub Actions ([.github/workflows/space.yml](.github/workflows/space.yml)):
 the API, the static UI, `/mcp` and an open model on the CPU (Ollama, `qwen2.5:1.5b`, Apache-2.0)
 for the claim checker only. The studio writes from its templates there: a CPU model cannot meet
-its 2.5–3 s budgets. The app pings its own public URL so the Space does not sleep. A broadcaster
+its 2.5–3 s budgets. Three layers keep it awake: the app pings its own public URL, a GitHub
+Actions watchdog ([.github/workflows/watchdog.yml](.github/workflows/watchdog.yml)) restarts the
+Space when it sleeps or fails and opens an issue, and an outside uptime monitor checks
+`/healthz` every five minutes. A broadcaster
 could run the same image on premises or in an outside-broadcast truck: the data never leaves the
 machine and nothing needs a cloud account. Design and measurements:
 [docs/day7-design.md](docs/day7-design.md).
