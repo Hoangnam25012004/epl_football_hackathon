@@ -40,6 +40,17 @@ def skipped(rev1: ClaimResult, reason: SkipReason) -> ClaimResult:
     return rev1.model_copy(update={"model_pass": "skipped", "skip_reason": reason})
 
 
+def skip_reason(passed: ClaimResult) -> SkipReason:
+    """Why a model pass added nothing, in the words a viewer reads (never "too slow" for a
+    model whose texts the guardrail refused)."""
+    if "circuit_open" in passed.degraded:
+        return "circuit_open"
+    spans = passed.trace or ()
+    if any(s.kind == "guardrail" and s.status == "rejected" for s in spans):
+        return "rejected"
+    return "no_answer"
+
+
 def second_revision(rev1: ClaimResult, passed: ClaimResult | None, pass_ms: float) -> ClaimResult:
     """rev.2 from the one-pass result of the model pass (None: the pass itself failed)."""
     base: dict[str, Any] = {"revision": 2, "rev1_verdict": rev1.verdict}
@@ -59,9 +70,14 @@ def second_revision(rev1: ClaimResult, passed: ClaimResult | None, pass_ms: floa
         or "analyst_disagreement" in passed.degraded
     )
     if not model_added:  # the model failed, was too slow or was rejected: rev.1 stands
-        reason: SkipReason = "circuit_open" if "circuit_open" in passed.degraded else "no_answer"
         return rev1.model_copy(
-            update={**base, "model_pass": "skipped", "skip_reason": reason, "timings_ms": timings}
+            update={
+                **base,
+                "model_pass": "skipped",
+                "skip_reason": skip_reason(passed),
+                "timings_ms": timings,
+                "trace": passed.trace,  # the drawer shows what the model pass did
+            }
         )
     return passed.model_copy(
         update={**base, "model_pass": "done", "skip_reason": None, "timings_ms": timings}
@@ -118,9 +134,11 @@ class ModelPassQueue:
         if self._busy and len(self._waiting) >= self.max_waiting:
             self.counts["busy"] += 1
             return skipped(rev1, "busy")
-        # the model reads the same shared state as the rules: pinned at rev.1's event
-        pinned = request if request.as_of_seq is not None else (
-            request.model_copy(update={"as_of_seq": rev1.as_of_seq})
+        # the model reads the same shared state as the rules (pinned at rev.1's event), and its
+        # trace is kept: rev.2 shows what the pass did, even when it adds nothing
+        pinned = request.model_copy(
+            update={"as_of_seq": rev1.as_of_seq if request.as_of_seq is None else request.as_of_seq,
+                    "include_trace": True}
         )  # fmt: skip
         first = rev1.model_copy(update={"model_pass": "queued"})
         self._waiting.append(_Job(pinned, source, first, publish, listen, service))

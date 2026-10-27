@@ -200,7 +200,7 @@
 - [ ] **P0** Ghi kết quả eval vào README (bảng số liệu) (`docs/eval.md` tiếng Anh đã sẵn; chép vào README ở Ngày 7)
 
 **Độ trễ**
-- [ ] **P0** Đo trên bản deploy: event → talking point (< 3s), event → audio (< 5s) (đo trên Hugging Face Space ở Ngày 7, C10)
+- [x] **P0** Đo trên bản deploy (Space, 27/10, C10): event → talking point p95 55–62 ms ở 20x; event → audio: giọng trình duyệt đọc ngay trên máy người xem, server không tổng hợp clip (không có Azure / Piper)
 - [ ] **P1** Tối ưu: chạy song song agent, cache kết quả Stats Tools, rút gọn prompt, streaming TTS (chưa cần: số đo local đạt; song song agent đã có từ Ngày 3)
 
 **Ổn định & UI**
@@ -226,15 +226,15 @@
 - [x] **P0** C1 / S2: Piper (26/10). License: engine MIT (+ espeak-ng GPL, chạy process riêng), giọng `vais1000` CC BY 4.0 đạt, hai giọng còn lại bị loại. **RTF 1 CPU 0,77 > 0,5: gate không đạt ở máy dev** → C8 không làm, giữ giọng trình duyệt. S1 với `qwen2.5:0.5b`: p95 58 s, cũng không đạt → giữ 1.5b
 - [x] **P0** C2: image Space (Ollama v0.40.2 CPU + model, uid 1000, `start.sh`, keepalive lớp 1 trong app; 2,58 GB, `/healthz` sau 26 s)
 - [x] **P0** C3: `space.yml` (sau `ci` xanh: build → GHCR → Space theo digest → smoke). Lần chạy đầu: build + push xong, **Space PAUSED vì tài khoản Hugging Face mới có hạn mức cpu-basic = 0** → chờ M2b
-- [ ] **P0** M2b: nâng Hugging Face PRO (hoặc tài khoản cũ hơn), đặt 2 package GHCR public, chạy lại `space` (`force`)
+- [x] **P0** M2b (27/10): Hugging Face PRO, 2 package GHCR public, Space RUNNING; `space.yml` tự deploy build `3a15622` sau `ci` xanh
 - [x] **P0** C4: claim progressive (26/10): rev.1 theo luật ngay, rev.2 = workflow một lượt trên một worker; bất biến kiểm trên 100 claim eval; bật trên Space (`CLAIM_PROGRESSIVE=true`)
 - [x] **P0** C5: luồng `agent_event` (WebSocket riêng `/ws/agents/{id}`) + trang `/agents` (26/10)
 - [x] **P1** C6: Chaos theo phiên riêng (26/10): 6 lỗi, service + breaker riêng; "model nói dối": hơn 100 câu sai, 0 câu lên màn hình
 - [ ] **P1** C7: ghi / phát lại phiên model bằng **Foundry Local** (`phi-4-mini`), nhãn "recorded" (cần M3)
-- [ ] **P0** M3: cài Foundry Local + model
+- [x] **P0** M3 (27/10): Foundry Local 0.12.1 + `Phi-4-mini-instruct-generic-cpu:5` (bản GPU nạp lỗi trên máy này), gọi qua provider `openai`
 - [x] ~~**P0** C8: Piper TTS provider~~ không làm: S2 không đạt gate tốc độ; giữ giọng trình duyệt (26/10)
 - [x] **P0** C9: không còn chữ "mock" trên UI, nguồn câu chữ bằng lời, Agent Ops / Chaos trong "Thử gì", HelpDrawer (26/10). Còn: bộ ảnh `shots`, demo-run S1–S9 trên Space
-- [ ] **P0** C10: eval với model của Space và Foundry Local + đo độ trễ trên Space
+- [x] **P0** C10 (27/10): eval 100 claim trên Space (96 %, 0 verdict sai, 1 số bịa "2-0" → luật `WRONG_OUTCOME`) và 20 claim với Foundry Local (100 %, 0 số bịa); rev.1 p95 0,3 s (1 người xem) / 1,16 s (3 người xem); **gate S1 trên Space không đạt** (p95 54,8 s), giữ model vì claim là progressive. Lộ thêm 2 lỗi: janitor dọn phiên chung đang được dùng qua API; lượt model bị Guardrail chặn bị báo "không kịp trả lời" (nay `rejected`). Chi tiết: [docs/eval.md](docs/eval.md), day7-design §7.4
 - [ ] **P0** M4 + C12: watchdog (lớp 2) bằng Copilot Agent Mode, Claude review · M5: UptimeRobot (lớp 3)
 - [ ] **P0** M6 + C13: duyệt bảng nhãn eval, chạy gate
 - [x] **P1** Thêm file `LICENSE` (MIT, Dang Hoang Nam, 26/10)

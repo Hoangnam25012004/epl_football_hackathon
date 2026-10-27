@@ -2,6 +2,7 @@
 session never stopped, the cap (503), new private sessions per address (429), the janitor, the
 API, the WebSocket, claims and MCP on a session id, and a state machine of random lives."""
 
+import itertools
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -357,6 +358,10 @@ class Lives(RuleBasedStateMachine):
         self.now = Now()
         self.sessions = manager(self.now, max_sessions=4, private_per_ip=50)
         self.viewers: dict[str, list[Any]] = {}
+        # tokens in order, not random: the sorted ids `come` draws from must be the same each
+        # time Hypothesis replays an example (else FlakyStrategyDefinition, now and then)
+        tokens = (f"t{n:07d}" for n in itertools.count())
+        self.sessions._fresh_token = lambda match_id: next(tokens)  # type: ignore[method-assign]
 
     def _watched(self) -> set[str]:
         return {key for key, clients in self.viewers.items() if clients}

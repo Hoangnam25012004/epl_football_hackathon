@@ -99,7 +99,7 @@ export interface ClaimResult {
     | "as_of_out_of_range";
   rev1_verdict?: ("TRUE" | "PARTLY_TRUE" | "FALSE" | "INSUFFICIENT_DATA") | null;
   revision?: number;
-  skip_reason?: ("busy" | "circuit_open" | "no_answer") | null;
+  skip_reason?: ("busy" | "circuit_open" | "no_answer" | "rejected") | null;
   text: string;
   timings_ms: {
     [k: string]: number;

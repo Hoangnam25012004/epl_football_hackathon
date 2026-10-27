@@ -394,6 +394,7 @@ export const en = {
   "claim.skip.busy": "Model busy: the rules' answer stands",
   "claim.skip.circuit_open": "Model paused after errors: the rules' answer stands",
   "claim.skip.no_answer": "The model did not answer in time: the rules' answer stands",
+  "claim.skip.rejected": "The guardrail refused the model's text: the rules' answer stands",
   "claim.agree": "The model read it as the rules did",
   "claim.disagree": "The model read it differently; the rules stand",
   "claim.updated": "Updated after the model's reading: {from} → {to}",

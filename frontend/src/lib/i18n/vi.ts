@@ -389,6 +389,7 @@ export const vi: Record<Key, string> = {
   "claim.skip.busy": "Model bận, câu trả lời theo luật giữ nguyên",
   "claim.skip.circuit_open": "Model tạm ngưng sau nhiều lỗi, câu trả lời theo luật giữ nguyên",
   "claim.skip.no_answer": "Model không kịp trả lời, câu trả lời theo luật giữ nguyên",
+  "claim.skip.rejected": "Guardrail chặn câu của model, câu trả lời theo luật giữ nguyên",
   "claim.agree": "Model đọc giống luật",
   "claim.disagree": "Model đọc khác, giữ kết quả của luật",
   "claim.updated": "Cập nhật sau khi model phân tích: {from} → {to}",

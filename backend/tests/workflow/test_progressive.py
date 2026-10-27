@@ -221,3 +221,19 @@ def test_every_eval_claim_rev2_matches_one_pass_and_the_verdict_rule(path: Path)
                 assert rules_could_not_read(rev1), case.id
 
     run(scenario())
+
+
+def test_a_model_whose_texts_the_guardrail_refused_is_not_called_slow() -> None:
+    """Day 7 (C10, on the Space): rev.2 said "the model did not answer in time" when the model
+    had answered and the guardrail had refused its text. The reason now says so, and rev.2
+    keeps the trace of the model pass for the drawer."""
+    from pundit.api.chaos import SessionChaos
+
+    chaos = SessionChaos(mock_service(mock_llm_faults="analyst:timeout:9", llm_timeout_s=0.5), None)
+    chaos.switch("model_lies", 60, now=0.0)  # every explanation gets one wrong number
+    _, published, _ = run(progressive(chaos.claims, request()))
+    rev2 = published[-1]
+    assert (rev2.model_pass, rev2.skip_reason, rev2.verdict) == ("skipped", "rejected", "TRUE")
+    assert rev2.explanation_source == "template" and chaos.state.lies
+    agents = {span.agent for span in rev2.trace or ()}
+    assert {"Explainer", "Guardrail"} <= agents  # what the model pass did

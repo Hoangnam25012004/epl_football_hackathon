@@ -183,6 +183,49 @@ Refused (INSUFFICIENT_DATA where the label has a verdict)
 
 <!-- Notes written by hand: pundit eval --markdown keeps them. -->
 
+## Day 7: on the public Space, and with Microsoft Foundry Local
+
+The same claims, answered by the deployed app (2026-10-27, build `1187a03`): one container on a
+Hugging Face Space, 2 vCPUs, `qwen2.5:1.5b` on Ollama for claims only, progressive claims (the
+rules answer at once, the model pass follows). Sent over the internet by
+`tools/ops/measure_space.py` and scored by `pundit eval --from`, on the final answer (rev.2).
+
+- **Space, one claim after another**: what a burst of claims sees. After a few model timeouts
+  the claim breaker opens and the rules answer the rest (97 of 100 model passes skipped).
+- **Space, model waited for** (`--wait-model`): each claim waits for the breaker to close, so the
+  model gets a pass on every one; this is the column that measures the model.
+- **Foundry Local** (`Phi-4-mini-instruct-generic-cpu:5`, the developer's laptop CPU, through the
+  same OpenAI-compatible client): the first 20 labelled claims, one pass each, no breaker.
+
+| Measure | Target | Space, burst | Space, model waited for | Foundry Local (20 claims) |
+|---|---|---|---|---|
+| Accuracy, labelled set | ≥ 85% | 96% of 72 | 96% of 72 | 100% of 20 |
+| Wrong verdicts, all sets | 0 | 0 | 0 | 0 |
+| Held-out coverage (not refused) | ≥ 70% | 64% of 28 | 68% of 28 | - |
+| Invented numbers in published text | 0 | 0 of 270 | **1 of 239** (fixed, below) | 0 of 54 |
+| Model explanations published | - | 2 | 34 | 14 |
+| Model passes done / skipped | - | 3 / 97 | 51 / 49 | - |
+| rev.1 (rules) round trip, p50 / p95 | < 1 s | 281 / 297 ms | 281 / 323 ms | - |
+| Model pass p50 / p95 | ≤ 45 s (gate S1) | - | 39.4 / 54.8 s | 330 / 348 s per claim |
+
+**The invented number.** For e01 ("Đội nhà áp đảo hiệp 2", TRUE: Harbor dominated the second
+half and lost 1-2) the Space's model wrote "…tạo điều kiện cho họ giành chiến thắng 2-0". The
+guardrail let "2-0" through as two sides of a stat of the facts. Fixed with a general rule
+(`WRONG_OUTCOME`): after a word of the result (thắng, thua, hòa, tỷ số, won, beat, lost, draw,
+score…), a pair is a scoreline and must be the score of the match or the goals of a window the
+facts give (`backend/tests/agents/test_guardrail_day7.py`). The mock eval and every template are
+unchanged by the rule. The Space run is kept as measured.
+
+**Gate S1 on the Space** (docs/day7-design.md section 2.1): the model pass p95 is 54.8 s, above
+45 s, so the gate is not met. The model is kept on the Space because claims are progressive: the
+rules' answer comes in 0.3 s and the model only refines it later; its verdicts were never wrong.
+
+**A wrong reason on screen.** Many skipped passes on the Space took about 39 s, inside the 60 s
+budget: the model had answered, and the guardrail had refused what it wrote. rev.2 still said
+"the model did not answer in time". It now says "the guardrail refused the model's text"
+(`skip_reason: rejected`), and rev.2 keeps the trace of the model pass so the drawer shows the
+refused draft (`backend/tests/workflow/test_progressive.py`).
+
 ## Notes
 
 ### The eval set

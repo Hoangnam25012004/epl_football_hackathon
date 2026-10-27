@@ -78,7 +78,7 @@ describe("claimView", () => {
   });
 
   it("a skipped model pass keeps rev.1 and says why", () => {
-    for (const reason of ["busy", "circuit_open", "no_answer"] as const) {
+    for (const reason of ["busy", "circuit_open", "no_answer", "rejected"] as const) {
       const view = claimView(claim({ revision: 1, model_pass: "skipped", skip_reason: reason }));
       expect(view.chips.map((c) => c.key)).toContain(`claim.skip.${reason}`);
       expect(view.progress).toBeNull();

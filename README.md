@@ -1,8 +1,7 @@
 <!--
 Draft of 26/10/2026 (no Azure: the public demo is a Hugging Face Space). To finish on Day 7:
 - the live demo and video links (top), and NEXT_PUBLIC_REPO_URL / NEXT_PUBLIC_VIDEO_URL at build;
-- "Microsoft technologies": Foundry Local once sessions are recorded and evaluated with it,
-  Copilot Agent Mode once docs/copilot.md has its runs;
+- "Microsoft technologies": Copilot Agent Mode once docs/copilot.md has its runs;
 - the model and latency measured on the Space (claim, event -> talking point, event -> audio);
 - screenshots.
 -->
@@ -21,7 +20,7 @@ Prize, Best Multi-Agent System).
 
 | | |
 |---|---|
-| Live demo | _added at submission_ (one container on a free Hugging Face Space, no login) |
+| Live demo | <https://hnam2501-pundit-copilot.hf.space> (one container on a Hugging Face Space, no login) |
 | Demo video (< 2 min) | _added at submission_ |
 | Results | [docs/eval.md](docs/eval.md) |
 
@@ -144,6 +143,14 @@ apart and frozen before any parser change).
 | Numbers with no source in published text | 0 | 0 of 274 | 0 of 188 |
 | Prompt injections judged true | 0 | 0 | 0 |
 
+**On the public Space** (2 vCPUs, `qwen2.5:1.5b`, the same 100 claims sent over the internet):
+96 % accuracy on the labelled set, 0 wrong verdicts; the rules answer in 281 ms (p50, round
+trip); the model pass, waited for, takes 39 s at p50 and 55 s at p95 and refines 51 of 100
+claims. It also wrote one invented scoreline ("won 2-0" for a team that lost), which the
+audit caught and a new guardrail rule now blocks. **With Microsoft Foundry Local**
+(`phi-4-mini` on a laptop CPU, 20 claims): 100 % accuracy, 0 wrong verdicts, 0 invented
+numbers, about 5.5 minutes a claim. Details: [docs/eval.md](docs/eval.md).
+
 Refusing is allowed, misleading is not: a claim the system cannot read is answered "not enough
 data". The notes of docs/eval.md keep the first measurements and every fix a wrong verdict led to.
 
@@ -163,7 +170,7 @@ nothing below runs on Azure. The table says what runs and where.
 | Technology | How it is used | Status |
 |---|---|---|
 | **Microsoft Agent Framework** | The claim and studio workflows (executors, typed messages, fan-out / fan-in) | In use, in the public demo |
-| **Microsoft Foundry Local** | Runs a model on the developer's machine through the same OpenAI-compatible client as Foundry: records model sessions that the demo replays through the full pipeline and guardrail, and evaluates the claim checker | Planned for Day 7 |
+| **Microsoft Foundry Local** | Runs `phi-4-mini` on the developer's machine through the same OpenAI-compatible client as Foundry; used to evaluate the claim checker | In use for evaluation (20 claims, [docs/eval.md](docs/eval.md)) |
 | **MCP** | The read-only statistics server (stdio and `/mcp`, 9 tools) | In use, in the public demo |
 | **GitHub Actions + GHCR** | Tests, the evaluation gate, secret and compliance scans; builds the images, pushes them to GHCR and deploys the Space by image digest, then smoke-tests it | In use |
 | **GitHub Copilot Agent Mode** | A client of the MCP server, and the author of the keepalive watchdog ([docs/copilot.md](docs/copilot.md)) | Setup ready; runs pending |

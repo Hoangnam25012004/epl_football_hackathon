@@ -50,6 +50,7 @@ SkipReason = Literal[
     "busy",  # the queue of model passes was full
     "circuit_open",  # the model failed too often lately: no call
     "no_answer",  # the model was too slow or gave nothing usable; the rules' answer stands
+    "rejected",  # the model answered, and the guardrail refused every text it wrote
 ]
 Op = Literal[">", ">=", "<", "<=", "==", "~"]
 AssertionKind = Literal["dominance", "compare", "value"]

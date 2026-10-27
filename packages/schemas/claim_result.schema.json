@@ -749,7 +749,8 @@
           "enum": [
             "busy",
             "circuit_open",
-            "no_answer"
+            "no_answer",
+            "rejected"
           ],
           "type": "string"
         },
