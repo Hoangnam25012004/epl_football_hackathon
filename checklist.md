@@ -269,7 +269,7 @@
 - [ ] **P0** Repo public, link demo hoạt động, link video hoạt động (build UI với `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` để trang đầu có link thay cho "sắp có"; job CI `security` + gate eval xanh trước khi push public)
 - [x] **P0** Link demo không cần đăng nhập (hoặc ghi tài khoản test trong testing instructions)
 - [x] **P0** Chọn hạng mục: Grand Prize + **Best Multi-Agent System** (mỗi bài thắng tối đa 1 Grand + 1 Category)
-- [ ] **P0** Điền form nộp bài trên Innovation Studio từ `docs/submission.md` (28/10, có sẵn mọi ô + testing instructions + link video), **hạn 13:59 giờ VN 28/10**
+- [x] **P0** Nộp bài (28/10): không truy cập được Innovation Studio nên nộp **qua email thủ công** theo hướng dẫn của cuộc thi, nội dung từ `docs/submission.md` (mô tả, link demo, repo, video, hạng mục, testing instructions); hạn 13:59 giờ VN 28/10. Còn bạn: giữ email đã gửi (có dấu thời gian) và nếu ban tổ chức xác nhận thì ghi lại
 - [ ] **P0** Chụp màn hình xác nhận đã nộp
 
 ---
