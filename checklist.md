@@ -208,8 +208,8 @@
 - [x] **P0** Sửa toàn bộ lỗi chặn demo (bug bash: 0 blocker / major còn mở; demo-run S1–S7 3/3 liên tiếp trên bản build production)
 - [x] **P1** Đánh bóng UI: màu, font, responsive, trạng thái loading / lỗi (hướng dẫn 3 bước, HelpDrawer, title, trạng thái panel, bố cục < 1280 px; 60 ảnh × axe)
 - [x] **P0** Kiểm tra bảo mật: không có secret trong repo / lịch sử git (scanner của mình trên lịch sử + working tree + build + `.env`, tuân thủ tên thật, gitleaks, job CI `security`)
-- [ ] **P1** Đóng gói Stats Tools thành **MCP server** read-only, demo gọi thử từ GitHub Copilot (điểm cộng cho tiêu chí Agentic) (MCP xong: stdio + `/mcp`, 9 tool; demo Copilot chờ M1)
-- [ ] **P1** Ghi lại cách đã dùng GitHub Copilot Agent Mode trong quá trình phát triển (hero technology) (`docs/copilot.md` có cấu hình và 6 câu; chỉ ghi việc đã làm thật, hiện chưa có)
+- [x] **P1** Đóng gói Stats Tools thành **MCP server** read-only, demo gọi thử từ GitHub Copilot (điểm cộng cho tiêu chí Agentic) (MCP xong: stdio + `/mcp`, 9 tool; 28/10: Copilot Agent Mode trong VS Code 1.143.1 gọi `/mcp` của Space, 6 câu đều trả lời từ tool, số khớp; câu 6 sai hai lần đầu vì chỉ gọi `list_matches`, đã ghi)
+- [x] **P1** Ghi lại cách đã dùng GitHub Copilot Agent Mode trong quá trình phát triển (hero technology) (`docs/copilot.md`: 6 câu MCP + một việc phát triển thật, audit tuân thủ dữ liệu tổng hợp; watchdog do Claude viết, không ghi cho Copilot)
 
 **Hoàn thành khi:** demo chạy trơn 3 lần liên tiếp trên URL public, không lỗi. (Bản local: 3/3 trên bản build production; URL public: Hugging Face Space, Ngày 7.)
 
@@ -263,13 +263,13 @@
 - [x] **P0** Quay cảnh sản phẩm chạy thật trên bản deploy (28/10, Claude quay bằng `tools/video`: Edge + OBS + ffmpeg trên Space thật, 1:46,6 → `C:/pundit-video/pundit-copilot-demo.mp4`; khác kịch bản: `docs/video/script.md` mục "As recorded")
 - [x] **P0** Phụ đề tiếng Anh cho mọi đoạn tiếng Việt (burn sẵn trong video; `docs/video/subtitles.srt` có cả voice-over để tải lên YouTube)
 - [x] **P0** Không dùng nhạc có bản quyền hay logo / thương hiệu bên thứ ba (không nhạc; toàn màn hình, không thanh trình duyệt)
-- [ ] **P0** Upload **public** lên YouTube hoặc Vimeo (bạn làm; file `C:/pundit-video/pundit-copilot-demo.mp4` + `docs/video/subtitles.srt`)
+- [x] **P0** Upload **public** lên YouTube hoặc Vimeo (28/10: https://youtu.be/bYzH88GSvcg, public, 1:47, kiểm tra công khai bằng oEmbed; phụ đề `.srt` chưa tải lên, YouTube chỉ có bản tự sinh, không bắt buộc vì chữ phụ đã burn sẵn)
 
 **Nộp bài**
 - [ ] **P0** Repo public, link demo hoạt động, link video hoạt động (build UI với `NEXT_PUBLIC_REPO_URL` và `NEXT_PUBLIC_VIDEO_URL` để trang đầu có link thay cho "sắp có"; job CI `security` + gate eval xanh trước khi push public)
 - [x] **P0** Link demo không cần đăng nhập (hoặc ghi tài khoản test trong testing instructions)
 - [x] **P0** Chọn hạng mục: Grand Prize + **Best Multi-Agent System** (mỗi bài thắng tối đa 1 Grand + 1 Category)
-- [ ] **P0** Điền form nộp bài trên Innovation Studio từ `docs/submission.md` (28/10, có sẵn mọi ô + testing instructions; chỉ thiếu link video), **hạn 13:59 giờ VN 28/10**
+- [ ] **P0** Điền form nộp bài trên Innovation Studio từ `docs/submission.md` (28/10, có sẵn mọi ô + testing instructions + link video), **hạn 13:59 giờ VN 28/10**
 - [ ] **P0** Chụp màn hình xác nhận đã nộp
 
 ---

@@ -861,3 +861,11 @@ Giá trị mới thay cho các con số tương ứng ở day3-design §4 (mốc
 - **README:** bỏ ghi chú nháp; thêm "Try it in three steps", bảng 5 tiêu chí chấm, giọng đọc dày hơn (C14), ba lớp keepalive; số test cập nhật. Link video điền khi có.
 - **`docs/submission.md`:** mọi ô của form (tên, tagline, mô tả 60 từ, pitch, link, hạng mục, testing instructions 5 bước, ghi chú cho giám khảo); chỉ thiếu link video.
 - **Không làm:** C7 (ghi phiên Foundry Local cho Studio): máy dev chặn `python.exe`, Studio trên Space dùng template và README nói đúng như vậy.
+
+### 7.8. M8 / M1: Copilot Agent Mode với `/mcp` của Space (28/10)
+
+- **Cấu hình:** VS Code 1.143.1, Copilot Chat Agent, model "Auto"; `.vscode/mcp.json` thêm `pundit-space` (HTTPS) cạnh `pundit-live`. Máy dev chặn `python.exe` nên không chạy được app local, dùng Space. Cản trở trên đường: thư mục ở Restricted Mode (không có nút Start), trạng thái "Error" cũ của file cấu hình cho tới khi mở lại VS Code; sau đó "Running · 9 tools · 2 prompts".
+- **Kết quả:** 6 câu đều được trả lời từ lời gọi tool, mọi con số khớp với số tôi đọc độc lập từ `/mcp` trước khi chạy (câu 2: 61 % / 39 %; câu 3: TRUE, sút 15–1, xG 2.24–0.24, momentum ±0.91; câu 4: FALSE, 7 so với 21; câu 5: bàn 35' bị VAR huỷ ở 36', Ironvale thắng 3–2). Không có số bịa.
+- **Lỗi của Copilot (ghi nguyên văn trong `docs/copilot.md`):** câu 6 hai lần đầu chỉ gọi `list_matches`, thấy `live: []` và kết luận không có phiên. `list_matches` chỉ liệt kê phiên công khai; phiên riêng chỉ truy cập bằng mã. Lần ba nêu tên tool + mã thì đúng. Không đổi mô tả tool: sửa code lúc này buộc build lại và deploy Space sát hạn, trong khi lỗi đã ghi trung thực. Có thể làm sau hạn: ghi trong mô tả `list_matches` rằng phiên riêng không nằm trong danh sách.
+- **Phần phát triển (§9):** một việc thật: audit tuân thủ dữ liệu tổng hợp bằng Copilot (không đổi file nào, 0 vi phạm, 1 cảnh báo họ trùng "Shaw" đã xem xét). Watchdog vẫn do Claude viết.
+- **Không có:** ảnh chụp khối tool (chỉ có chữ của các lượt chạy, gồm các dòng "Completed with input").

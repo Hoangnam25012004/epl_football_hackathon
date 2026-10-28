@@ -1,8 +1,8 @@
 # Submission form: Pundit Copilot
 
 > Text to copy into the Innovation Studio form. Synthetic data only: fictional teams, players and
-> matches; not affiliated with the Premier League or any club. Fields marked **(fill in)** need
-> a link that exists only once the video is uploaded.
+> matches; not affiliated with the Premier League or any club. The demo video is public on
+> YouTube (1:47, English subtitles burned in for the Vietnamese parts).
 
 ## Project name
 
@@ -52,7 +52,7 @@ number blocked before publication.
 |---|---|
 | Live demo (no login) | https://hnam2501-pundit-copilot.hf.space |
 | Source code | https://github.com/Hoangnam25012004/epl_football_hackathon |
-| Demo video (< 2 min, public) | **(fill in: the YouTube link)** |
+| Demo video (< 2 min, public) | https://youtu.be/bYzH88GSvcg |
 
 ## Categories
 

@@ -13,7 +13,7 @@ Prize, Best Multi-Agent System).
 | | |
 |---|---|
 | Live demo | <https://hnam2501-pundit-copilot.hf.space> (one container on a Hugging Face Space, no login) |
-| Demo video (< 2 min) | _added at submission_ |
+| Demo video (< 2 min) | https://youtu.be/bYzH88GSvcg |
 | Results | [docs/eval.md](docs/eval.md) |
 
 ## Try it in three steps (no login)
@@ -198,7 +198,7 @@ nothing below runs on Azure. The table says what runs and where.
 | **Microsoft Foundry Local** | Runs `phi-4-mini` on the developer's machine through the same OpenAI-compatible client as Foundry; used to evaluate the claim checker | In use for evaluation (20 claims, [docs/eval.md](docs/eval.md)) |
 | **MCP** | The read-only statistics server (stdio and `/mcp`, 9 tools) | In use, in the public demo |
 | **GitHub Actions + GHCR** | Tests, the evaluation gate, secret and compliance scans; builds the images, pushes them to GHCR and deploys the Space by image digest, then smoke-tests it | In use |
-| **GitHub Copilot Agent Mode** | A client of the MCP server, and the author of the keepalive watchdog ([docs/copilot.md](docs/copilot.md)) | Setup ready; runs pending |
+| **GitHub Copilot Agent Mode** | A client of the MCP server, and the second pair of eyes on the synthetic-data rule ([docs/copilot.md](docs/copilot.md)) | Six questions answered from the tools, plus one repository audit; recorded in full, including where it went wrong |
 | Microsoft Foundry (cloud), Azure AI Speech, Azure Container Apps, Application Insights | Foundry client with Entra ID, Vietnamese neural voices by REST with SSML, Bicep / `azd` infrastructure (`infra/`, `azure.yaml`) | **Azure-ready, not deployed**: built and tested against deterministic mocks only |
 
 ## Deployment
